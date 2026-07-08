@@ -17,7 +17,7 @@
   --card-d: min(88vw, 40vh, 340px);
 }
 
-@media (min-width: 760px) {
+@media (min-width: 760px), (orientation: landscape) {
   :root {
     --card-d: min(38vw, 56vh, 340px);
   }
@@ -63,6 +63,33 @@ body {
 
 .mute-btn:active {
   transform: scale(0.92);
+}
+
+/*
+ * Durante la partida el juego es UNA sola pantalla: altura fija al viewport
+ * dinámico (100dvh sigue a las barras de Safari), sin scroll, encabezado
+ * compacto, y el diámetro de carta se calcula restando el espacio del HUD
+ * para que la base y tu carta siempre se vean completas.
+ */
+.shell.playing {
+  height: 100dvh;
+  overflow: hidden;
+  /* alto disponible ≈ 100dvh − (padding 32 + título 30 + HUD 56 + progreso 10
+     + márgenes 16 + separación entre cartas 18) → mitad para cada carta */
+  --card-d: min(88vw, calc(50dvh - 88px), 340px);
+}
+
+.shell.playing .title {
+  font-size: 1.2rem;
+  margin-top: 0;
+}
+
+.shell.playing .hud {
+  padding: 6px 4px;
+}
+
+.shell.playing .chain-area {
+  margin: 8px 0;
 }
 
 .title {
@@ -403,7 +430,13 @@ body {
   }
 }
 
-@media (min-width: 760px) {
+/* Pantallas anchas o celular horizontal: las cartas van lado a lado. */
+@media (min-width: 760px), (orientation: landscape) {
+  .shell.playing {
+    /* una sola fila de cartas: solo se resta el chrome vertical una vez */
+    --card-d: min(38vw, calc(100dvh - 178px), 340px);
+  }
+
   .chain-area {
     --card-gap: 32px;
     width: calc(var(--card-d) * 2 + var(--card-gap));

@@ -258,7 +258,7 @@ export default function GameShell() {
   }
 
   return (
-    <main className="shell">
+    <main className={`shell${phase === "playing" ? " playing" : ""}`}>
       <button
         type="button"
         className="mute-btn"
