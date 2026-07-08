@@ -262,7 +262,9 @@ export default function GameShell() {
       <header className="topbar">
         <span className="topbar-side" aria-hidden="true" />
         <h1 className="title">
-          Avíspate <span>Visual</span> ⚡
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-avispate.png" alt="" className="brand-icon" />
+          Avíspate <span>Visual</span>
         </h1>
         <button
           type="button"
@@ -276,10 +278,26 @@ export default function GameShell() {
 
       {phase === "setup" && (
         <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-avispate.png" alt="Avíspate" className="hero-icon" />
           <p className="subtitle">
-            Gasta tu mazo en el menor tiempo posible: encuentra en tu carta el
-            símbolo que comparte con la base y tócalo.
+            ¡Despierta esos ojos! Gasta tu mazo de cartas en el menor tiempo
+            posible.
           </p>
+          <div className="steps">
+            <div className="step">
+              <span className="step-emoji">👀</span>
+              Encuentra el símbolo común
+            </div>
+            <div className="step">
+              <span className="step-emoji">👆</span>
+              Tócalo en tu carta
+            </div>
+            <div className="step">
+              <span className="step-emoji">⚡</span>
+              ¡Avíspate y repite!
+            </div>
+          </div>
           <PlayerForm initialName={playerName} onStart={startGame} />
           <div style={{ width: "100%", maxWidth: 420 }}>
             <LocalLeaderboard entries={leaderboard} />
@@ -288,8 +306,10 @@ export default function GameShell() {
       )}
 
       {phase === "countdown" && (
-        <div className="countdown" key={countdown}>
-          {countdown}
+        <div className="countdown">
+          <div className="countdown-badge" key={countdown}>
+            {countdown}
+          </div>
         </div>
       )}
 

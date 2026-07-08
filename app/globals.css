@@ -4,16 +4,23 @@
   padding: 0;
 }
 
+/* Identidad Avíspate: amarillo feliz, negro tinta, cyan de acento. */
 :root {
-  --bg: #fdf6ec;
-  --bg-accent: #ffe8d6;
-  --ink: #3a2e39;
-  --ink-soft: #7a6c78;
-  --primary: #ff6b35;
-  --primary-dark: #e5541f;
+  --yellow: #ffc20e;
+  --yellow-deep: #fbbd02;
+  --yellow-press: #d9a300; /* base de la sombra dura de los botones */
+  --yellow-soft: #fff3cd;
+  --ink: #0d0d0f;
+  --white: #ffffff;
+  --cyan: #00c7d6;
+  --cyan-soft: #d9f6f9;
+  --gray: #a6adb4;
+  --gray-soft: #eef0f2;
+  --bg: #fffdf6;
   --good: #2fbf71;
   --bad: #ef476f;
-  --card-bg: #ffffff;
+  --font-title: var(--font-fredoka), "Comic Sans MS", system-ui, sans-serif;
+  --font-body: var(--font-nunito), system-ui, sans-serif;
   --card-d: min(88vw, 40vh, 340px);
 }
 
@@ -29,8 +36,11 @@ body {
 }
 
 body {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  background: linear-gradient(160deg, var(--bg) 0%, var(--bg-accent) 100%);
+  font-family: var(--font-body);
+  background:
+    radial-gradient(560px 380px at 92% -6%, rgba(255, 194, 14, 0.22), transparent 65%),
+    radial-gradient(480px 340px at -8% 108%, rgba(0, 199, 214, 0.14), transparent 65%),
+    var(--bg);
   color: var(--ink);
   -webkit-tap-highlight-color: transparent;
 }
@@ -46,61 +56,8 @@ body {
   align-items: center;
 }
 
-.mute-btn {
-  justify-self: end;
-  width: 44px;
-  height: 44px;
-  border: none;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 2px 10px rgba(58, 46, 57, 0.12);
-  font-size: 1.2rem;
-  cursor: pointer;
-}
+/* ---------- Barra superior ---------- */
 
-.mute-btn:active {
-  transform: scale(0.92);
-}
-
-/*
- * Durante la partida el juego es UNA sola pantalla: altura fija al viewport
- * dinámico (100dvh sigue a las barras de Safari), sin scroll, encabezado
- * compacto, y el diámetro de carta se calcula restando el espacio del HUD
- * para que la base y tu carta siempre se vean completas.
- */
-.shell.playing {
-  height: 100dvh;
-  overflow: hidden;
-  /* alto disponible ≈ 100dvh − (padding 32 + topbar 36 + HUD 56 + progreso 10
-     + márgenes 16 + separación entre cartas 18) → mitad para cada carta */
-  --card-d: min(88vw, calc(50dvh - 92px), 340px);
-}
-
-.shell.playing .topbar {
-  margin-top: 0;
-  grid-template-columns: 36px 1fr 36px;
-}
-
-.shell.playing .title {
-  font-size: 1.2rem;
-}
-
-.shell.playing .mute-btn {
-  width: 36px;
-  height: 36px;
-  font-size: 1rem;
-}
-
-.shell.playing .hud {
-  padding: 6px 4px;
-}
-
-.shell.playing .chain-area {
-  margin: 8px 0;
-}
-
-/* Barra superior: título centrado y control de sonido anclado a la esquina,
-   en flujo del layout para que nunca se superponga con el HUD. */
 .topbar {
   width: 100%;
   display: grid;
@@ -115,34 +72,114 @@ body {
 }
 
 .title {
-  font-size: 2rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
+  font-family: var(--font-title);
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
 }
 
 .title span {
-  color: var(--primary);
+  color: var(--cyan);
+}
+
+.brand-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+
+.mute-btn {
+  justify-self: end;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 3px 0 var(--gray-soft);
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.mute-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--gray-soft);
+}
+
+/* ---------- Inicio ---------- */
+
+.hero-icon {
+  width: 92px;
+  height: 92px;
+  border-radius: 22px;
+  margin-top: 18px;
+  box-shadow: 0 10px 26px rgba(255, 194, 14, 0.45);
+  animation: hero-float 3s ease-in-out infinite;
+}
+
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-8px) rotate(2deg);
+  }
 }
 
 .subtitle {
-  color: var(--ink-soft);
+  color: var(--ink);
+  opacity: 0.75;
   text-align: center;
-  margin-top: 6px;
-  max-width: 30rem;
-  line-height: 1.4;
+  margin-top: 12px;
+  max-width: 26rem;
+  line-height: 1.45;
+  font-weight: 600;
 }
 
-/* ---------- Formulario de inicio ---------- */
-
-.panel {
-  background: var(--card-bg);
-  border-radius: 20px;
-  box-shadow: 0 6px 24px rgba(58, 46, 57, 0.1);
-  padding: 24px;
+.steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
   width: 100%;
   max-width: 420px;
-  margin-top: 20px;
+  margin-top: 16px;
+}
+
+.step {
+  background: var(--white);
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  padding: 10px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.step-emoji {
+  font-size: 1.5rem;
+}
+
+/* ---------- Paneles y formulario ---------- */
+
+.panel {
+  background: var(--white);
+  border: 2px solid var(--gray-soft);
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(13, 13, 15, 0.07);
+  padding: 22px;
+  width: 100%;
+  max-width: 420px;
+  margin-top: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -150,24 +187,28 @@ body {
 
 .field label {
   display: block;
-  font-weight: 600;
-  margin-bottom: 6px;
-  font-size: 0.95rem;
+  font-family: var(--font-title);
+  font-weight: 500;
+  margin-bottom: 8px;
+  font-size: 1rem;
 }
 
 .field input {
   width: 100%;
-  padding: 12px 14px;
+  padding: 13px 16px;
   font-size: 1rem;
-  border: 2px solid #e8ddd4;
-  border-radius: 12px;
-  background: #fffdfa;
+  font-family: var(--font-body);
+  font-weight: 700;
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  background: var(--bg);
   color: var(--ink);
   outline: none;
+  transition: border-color 0.15s ease;
 }
 
 .field input:focus {
-  border-color: var(--primary);
+  border-color: var(--cyan);
 }
 
 .rounds-options {
@@ -177,57 +218,75 @@ body {
 
 .rounds-options button {
   flex: 1;
-  padding: 10px 0;
-  border-radius: 12px;
-  border: 2px solid #e8ddd4;
-  background: #fffdfa;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--ink-soft);
+  padding: 11px 0;
+  border-radius: 999px;
+  border: 2px solid var(--gray-soft);
+  background: var(--white);
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--gray);
   cursor: pointer;
+  transition: all 0.12s ease;
 }
 
 .rounds-options button.selected {
-  border-color: var(--primary);
-  background: #fff0e8;
-  color: var(--primary-dark);
+  border-color: var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--yellow-press);
 }
 
 .btn-primary {
-  padding: 14px;
-  border: none;
-  border-radius: 14px;
-  background: var(--primary);
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  padding: 16px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 1.2rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: transform 0.08s ease, background 0.15s ease;
+  box-shadow: 0 5px 0 var(--yellow-press);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
 }
 
 .btn-primary:active {
-  transform: scale(0.97);
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 var(--yellow-press);
 }
 
-.btn-primary:hover {
-  background: var(--primary-dark);
+.btn-primary:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 .btn-secondary {
-  padding: 12px;
-  border: 2px solid #e8ddd4;
-  border-radius: 14px;
-  background: transparent;
+  font-family: var(--font-title);
+  padding: 13px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 999px;
+  background: var(--white);
   color: var(--ink);
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 500;
   cursor: pointer;
+  box-shadow: 0 3px 0 var(--gray-soft);
+}
+
+.btn-secondary:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--gray-soft);
 }
 
 .hint {
   font-size: 0.85rem;
-  color: var(--ink-soft);
-  line-height: 1.45;
+  color: var(--ink);
+  opacity: 0.65;
+  line-height: 1.5;
+  text-align: center;
 }
 
 /* ---------- Cuenta regresiva ---------- */
@@ -237,9 +296,22 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 6rem;
-  font-weight: 800;
-  color: var(--primary);
+}
+
+.countdown-badge {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--yellow);
+  border: 4px solid var(--ink);
+  box-shadow: 0 8px 0 var(--yellow-press);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-title);
+  font-size: 5rem;
+  font-weight: 600;
+  color: var(--ink);
   animation: pop 0.7s ease infinite;
 }
 
@@ -249,7 +321,7 @@ body {
     opacity: 0.4;
   }
   40% {
-    transform: scale(1.1);
+    transform: scale(1.08);
     opacity: 1;
   }
   100% {
@@ -271,27 +343,48 @@ body {
 }
 
 .hud-item {
-  background: rgba(255, 255, 255, 0.75);
-  border-radius: 12px;
-  padding: 6px 12px;
+  background: var(--white);
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  padding: 6px 14px;
   text-align: center;
-  min-width: 72px;
+  min-width: 84px;
 }
 
 .hud-item .hud-label {
   display: block;
-  font-size: 0.7rem;
+  font-size: 0.66rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-soft);
+  letter-spacing: 0.07em;
+  font-weight: 800;
+  color: var(--gray);
 }
 
 .hud-item .hud-value {
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
+/* Progreso del mazo */
+.progress {
+  width: 100%;
+  max-width: 720px;
+  height: 8px;
+  background: var(--white);
+  border: 1px solid var(--gray-soft);
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--cyan);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
 
 /* ---------- Cadena de cartas ---------- */
 
@@ -332,7 +425,7 @@ body {
 }
 
 .chain-card.slot-incoming .card-circle {
-  border-color: #ffd9bd;
+  border-color: var(--cyan);
 }
 
 /* La carta base es de referencia: sus símbolos no responden al toque. */
@@ -348,28 +441,39 @@ body {
 .slot-tag {
   position: absolute;
   z-index: 4;
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-family: var(--font-title);
+  font-size: 0.72rem;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.85);
-  padding: 2px 10px;
+  color: var(--ink);
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  padding: 2px 12px;
   border-radius: 999px;
   pointer-events: none;
 }
 
 .slot-tag-base {
-  top: -9px;
+  top: -10px;
   left: 50%;
   transform: translateX(-50%);
 }
 
 .slot-tag-mine {
-  top: calc(var(--card-d) + var(--card-gap) - 9px);
+  top: calc(var(--card-d) + var(--card-gap) - 10px);
   left: 50%;
   transform: translateX(-50%);
-  color: var(--primary-dark);
+  background: var(--cyan);
+  color: var(--white);
+}
+
+.chain-card.slot-exiting {
+  transform: translate(calc(var(--card-d) * -0.55), calc(var(--card-d) * -0.35))
+    rotate(-14deg) scale(0.72);
+  opacity: 0;
+  z-index: 1;
+  pointer-events: none;
 }
 
 /* Penalización por error: un +1s rojo que flota hacia arriba y se esfuma. */
@@ -378,8 +482,9 @@ body {
   top: 46%;
   left: 50%;
   z-index: 5;
+  font-family: var(--font-title);
   font-size: 1.5rem;
-  font-weight: 800;
+  font-weight: 600;
   color: var(--bad);
   pointer-events: none;
   animation: float-up 0.9s ease forwards;
@@ -396,43 +501,17 @@ body {
   }
 }
 
-/* Progreso del mazo */
-.progress {
-  width: 100%;
-  max-width: 720px;
-  height: 6px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
-  overflow: hidden;
-  margin-bottom: 4px;
-}
-
-.progress-fill {
-  height: 100%;
-  background: var(--primary);
-  border-radius: 999px;
-  transition: width 0.3s ease;
-}
-
 /* Mazo: una carta fantasma asomada detrás de tu carta mientras queden más. */
 .deck-stack {
   position: absolute;
   width: var(--card-d);
   height: var(--card-d);
   border-radius: 50%;
-  background: #fff3e6;
-  border: 4px solid #f3e3d3;
+  background: var(--yellow-soft);
+  border: 3px solid var(--yellow-deep);
   transform: translate(8px, calc(var(--card-d) + var(--card-gap) + 10px))
     rotate(4deg);
   z-index: 0;
-}
-
-.chain-card.slot-exiting {
-  transform: translate(calc(var(--card-d) * -0.55), calc(var(--card-d) * -0.35))
-    rotate(-14deg) scale(0.72);
-  opacity: 0;
-  z-index: 1;
-  pointer-events: none;
 }
 
 /*
@@ -480,12 +559,12 @@ body {
 
   .slot-tag-base {
     left: calc(var(--card-d) / 2);
-    top: -11px;
+    top: -12px;
   }
 
   .slot-tag-mine {
     left: calc(var(--card-d) * 1.5 + var(--card-gap));
-    top: -11px;
+    top: -12px;
   }
 
   .deck-stack {
@@ -513,21 +592,58 @@ body {
   }
 
   .card-circle.shake,
-  .countdown,
-  .hud-value,
+  .countdown-badge,
+  .hero-icon,
   .penalty-float {
     animation-duration: 0.01s;
   }
 }
+
+/*
+ * Durante la partida el juego es UNA sola pantalla: altura fija al viewport
+ * dinámico (100dvh sigue a las barras de Safari), sin scroll, encabezado
+ * compacto, y el diámetro de carta se calcula restando el espacio del HUD
+ * para que la base y tu carta siempre se vean completas.
+ */
+.shell.playing {
+  height: 100dvh;
+  overflow: hidden;
+  /* alto disponible ≈ 100dvh − (padding 32 + topbar 36 + HUD 56 + progreso 10
+     + márgenes 16 + separación entre cartas 18) → mitad para cada carta */
+  --card-d: min(88vw, calc(50dvh - 92px), 340px);
+}
+
+.shell.playing .topbar {
+  margin-top: 0;
+  grid-template-columns: 36px 1fr 36px;
+}
+
+.shell.playing .title {
+  font-size: 1.2rem;
+}
+
+.shell.playing .brand-icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+}
+
+.shell.playing .mute-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
+}
+
+/* ---------- Cartas circulares ---------- */
 
 .card-circle {
   position: relative;
   width: var(--card-d);
   height: var(--card-d);
   border-radius: 50%;
-  background: var(--card-bg);
-  border: 4px solid #f3e3d3;
-  box-shadow: 0 8px 24px rgba(58, 46, 57, 0.12);
+  background: var(--white);
+  border: 4px solid var(--yellow);
+  box-shadow: 0 10px 24px rgba(13, 13, 15, 0.1);
   flex-shrink: 0;
 }
 
@@ -536,10 +652,19 @@ body {
 }
 
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-7px); }
-  50% { transform: translateX(7px); }
-  75% { transform: translateX(-4px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-7px);
+  }
+  50% {
+    transform: translateX(7px);
+  }
+  75% {
+    transform: translateX(-4px);
+  }
 }
 
 .symbol-btn {
@@ -561,7 +686,7 @@ body {
 }
 
 .symbol-btn:active {
-  background: rgba(255, 107, 53, 0.12);
+  background: rgba(0, 199, 214, 0.15);
 }
 
 .symbol-btn.flash-good {
@@ -574,9 +699,15 @@ body {
 }
 
 @keyframes pulse-good {
-  0% { transform: translate(-50%, -50%) scale(1); }
-  50% { transform: translate(-50%, -50%) scale(1.3); }
-  100% { transform: translate(-50%, -50%) scale(1); }
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.3);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
 }
 
 .symbol-emoji {
@@ -593,72 +724,138 @@ body {
 }
 
 .stat {
-  background: #fff8f2;
-  border-radius: 14px;
+  background: var(--bg);
+  border: 2px solid var(--gray-soft);
+  border-radius: 18px;
   padding: 12px;
   text-align: center;
 }
 
 .stat .stat-label {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-soft);
+  letter-spacing: 0.06em;
+  font-weight: 800;
+  color: var(--gray);
 }
 
 .stat .stat-value {
-  font-size: 1.3rem;
-  font-weight: 800;
+  font-family: var(--font-title);
+  font-size: 1.35rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
 .stat.highlight {
-  background: #fff0e8;
+  background: var(--yellow);
+  border-color: var(--ink);
 }
 
-.stat.highlight .stat-value {
-  color: var(--primary-dark);
+.stat.highlight .stat-label {
+  color: rgba(13, 13, 15, 0.6);
 }
 
 .rank-note {
+  font-family: var(--font-title);
   text-align: center;
-  font-weight: 700;
-  color: var(--good);
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--cyan);
 }
 
 /* ---------- Ranking ---------- */
 
-.leaderboard-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
+.lb-title {
+  font-family: var(--font-title);
+  font-size: 1.2rem;
+  font-weight: 600;
 }
 
-.leaderboard-table th,
-.leaderboard-table td {
-  padding: 8px 6px;
-  text-align: left;
-  border-bottom: 1px solid #f0e6dc;
+.lb-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
-.leaderboard-table th {
+.lb-row {
+  display: grid;
+  grid-template-columns: 40px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg);
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  padding: 8px 12px;
+}
+
+.lb-row.top-1 {
+  background: var(--yellow-soft);
+  border-color: var(--yellow);
+}
+
+.lb-row.top-2 {
+  background: #f7f8f9;
+  border-color: var(--gray);
+}
+
+.lb-row.top-3 {
+  background: #fdf1e7;
+  border-color: #e8a87c;
+}
+
+.lb-row.me {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
+}
+
+.lb-rank {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.lb-name {
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+  min-width: 0;
+}
+
+.lb-name > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-name small {
   font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--ink-soft);
+  font-weight: 700;
+  color: var(--gray);
 }
 
-.leaderboard-table td.num {
+.lb-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-.leaderboard-table tr.me {
-  background: #fff0e8;
+.lb-time small {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gray);
 }
 
 .empty-note {
-  color: var(--ink-soft);
+  color: var(--gray);
+  font-weight: 700;
   text-align: center;
   padding: 12px 0;
 }

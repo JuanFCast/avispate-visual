@@ -8,6 +8,8 @@ interface Props {
   highlightPosition?: number;
 }
 
+const MEDALS = ["🥇", "🥈", "🥉"];
+
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString("es", {
@@ -25,41 +27,35 @@ export default function LocalLeaderboard({
 }: Props) {
   return (
     <div className="panel">
-      <h2 style={{ fontSize: "1.1rem" }}>🏅 Ranking local</h2>
+      <h2 className="lb-title">🏆 Ranking</h2>
       {entries.length === 0 ? (
         <p className="empty-note">
-          Aún no hay partidas. ¡Sé la primera persona en el ranking!
+          Aún no hay partidas. ¡Sé quien estrene el ranking!
         </p>
       ) : (
-        <div style={{ overflowX: "auto" }}>
-          <table className="leaderboard-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Nombre</th>
-                <th>Prom.</th>
-                <th>Tiempo</th>
-                <th>Cartas</th>
-                <th>Fecha</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.map((entry, i) => (
-                <tr
-                  key={`${entry.createdAt}-${i}`}
-                  className={i + 1 === highlightPosition ? "me" : ""}
-                >
-                  <td className="num">{i + 1}</td>
-                  <td>{entry.playerName}</td>
-                  <td className="num">{formatMs(entry.averageMs)}</td>
-                  <td className="num">{formatMs(entry.totalMs)}</td>
-                  <td className="num">{entry.cards}</td>
-                  <td>{formatDate(entry.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ol className="lb-list">
+          {entries.map((entry, i) => {
+            const classes = ["lb-row"];
+            if (i < 3) classes.push(`top-${i + 1}`);
+            if (i + 1 === highlightPosition) classes.push("me");
+            return (
+              <li key={`${entry.createdAt}-${i}`} className={classes.join(" ")}>
+                <span className="lb-rank">{MEDALS[i] ?? i + 1}</span>
+                <span className="lb-name">
+                  <span>{entry.playerName}</span>
+                  <small>
+                    {entry.cards} cartas · {entry.errors} err ·{" "}
+                    {formatDate(entry.createdAt)}
+                  </small>
+                </span>
+                <span className="lb-time">
+                  {formatMs(entry.averageMs)}
+                  <small>{formatMs(entry.totalMs)} total</small>
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       )}
     </div>
   );

@@ -55,10 +55,8 @@ export default function PlayerForm({ initialName, onStart }: Props) {
       </button>
 
       <p className="hint">
-        Tienes un mazo de cartas y una carta base que no se toca. Encuentra en{" "}
-        <strong>tu carta</strong> el símbolo que comparte con la base y tócalo:
-        tu carta pasa a ser la nueva base y sale la siguiente del mazo. Cada
-        error suma 1 segundo. ¡Gasta todo el mazo en el menor tiempo posible!
+        Tu carta y la base siempre comparten <strong>un símbolo</strong>. Cada
+        error suma 1 segundo, ¡así que ojo avispa! 🐝
       </p>
     </form>
   );
