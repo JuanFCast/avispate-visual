@@ -363,16 +363,34 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* Progreso del mazo */
-.progress {
+/* Progreso del mazo: rotulado y con aire antes del tablero. */
+.progress-wrap {
   width: 100%;
   max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  margin-bottom: clamp(24px, 3vh, 40px);
+}
+
+.progress-label {
+  font-family: var(--font-title);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--gray);
+}
+
+.progress {
+  width: 100%;
   height: 8px;
   background: var(--white);
   border: 1px solid var(--gray-soft);
   border-radius: 999px;
   overflow: hidden;
-  margin-bottom: 4px;
 }
 
 .progress-fill {
@@ -391,11 +409,11 @@ body {
  * base, la base vieja sale volando y la carta nueva entra como desde un mazo.
  */
 .chain-area {
-  --card-gap: 18px;
+  --card-gap: 24px;
   position: relative;
   width: var(--card-d);
   height: calc(var(--card-d) * 2 + var(--card-gap));
-  margin: 8px 0 24px;
+  margin: 0 0 16px;
 }
 
 .chain-card {
@@ -531,11 +549,12 @@ body {
 @media (min-width: 760px), (orientation: landscape) {
   .shell.playing {
     /* una sola fila de cartas: solo se resta el chrome vertical una vez */
-    --card-d: min(38vw, calc(100dvh - 184px), 340px);
+    --card-d: min(38vw, calc(100dvh - 214px), 340px);
   }
 
   .chain-area {
-    --card-gap: 32px;
+    /* gap horizontal generoso para que las cartas no parezcan solaparse */
+    --card-gap: clamp(32px, 6vw, 72px);
     width: calc(var(--card-d) * 2 + var(--card-gap));
     height: var(--card-d);
   }
@@ -604,14 +623,19 @@ body {
 .shell.playing {
   height: 100dvh;
   overflow: hidden;
-  /* alto disponible ≈ 100dvh − (padding 32 + topbar 36 + HUD 56 + progreso 10
-     + márgenes 16 + separación entre cartas 18) → mitad para cada carta */
-  --card-d: min(88vw, calc(50dvh - 92px), 340px);
+  /* alto disponible ≈ 100dvh − (padding 32 + topbar 36 + HUD 66 + progreso
+     rotulado con su aire 62 + margen del tablero 16 + gap entre cartas 24)
+     → mitad para cada carta */
+  --card-d: min(88vw, calc(50dvh - 120px), 340px);
 }
 
 .shell.playing .topbar {
   margin-top: 0;
   grid-template-columns: 36px 1fr 36px;
+}
+
+.shell.playing .chain-area {
+  margin-bottom: 8px;
 }
 
 .shell.playing .title {

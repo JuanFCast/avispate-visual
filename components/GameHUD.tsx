@@ -33,17 +33,22 @@ export default function GameHUD({
           <span className="hud-value">{errors}</span>
         </div>
       </div>
-      <div
-        className="progress"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={deckSize}
-        aria-valuenow={spent}
-      >
+      <div className="progress-wrap">
+        <span className="progress-label">
+          Ronda {Math.min(spent + 1, deckSize)} de {deckSize}
+        </span>
         <div
-          className="progress-fill"
-          style={{ width: `${(spent / deckSize) * 100}%` }}
-        />
+          className="progress"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={deckSize}
+          aria-valuenow={spent}
+        >
+          <div
+            className="progress-fill"
+            style={{ width: `${(spent / deckSize) * 100}%` }}
+          />
+        </div>
       </div>
     </>
   );
