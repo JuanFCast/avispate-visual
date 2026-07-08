@@ -262,9 +262,12 @@ export default function GameShell() {
       <header className="topbar">
         <span className="topbar-side" aria-hidden="true" />
         <h1 className="title">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-avispate.png" alt="" className="brand-icon" />
-          Avíspate <span>Visual</span>
+          {/* En el inicio la avispa ya protagoniza como héroe: no se repite. */}
+          {phase !== "setup" && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/logo-avispate.png" alt="" className="brand-icon" />
+          )}
+          Avíspate
         </h1>
         <button
           type="button"

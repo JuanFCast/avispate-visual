@@ -1,4 +1,4 @@
-# Avíspate Visual ⚡
+# Avíspate 🐝⚡
 
 Juego de agilidad visual inspirado en cartas circulares con símbolos comunes.
 Tienes un mazo de cartas y una carta base de referencia (que no se toca). Tu
