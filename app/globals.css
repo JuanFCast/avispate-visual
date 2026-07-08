@@ -47,10 +47,7 @@ body {
 }
 
 .mute-btn {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 10;
+  justify-self: end;
   width: 44px;
   height: 44px;
   border: none;
@@ -74,14 +71,24 @@ body {
 .shell.playing {
   height: 100dvh;
   overflow: hidden;
-  /* alto disponible ≈ 100dvh − (padding 32 + título 30 + HUD 56 + progreso 10
+  /* alto disponible ≈ 100dvh − (padding 32 + topbar 36 + HUD 56 + progreso 10
      + márgenes 16 + separación entre cartas 18) → mitad para cada carta */
-  --card-d: min(88vw, calc(50dvh - 88px), 340px);
+  --card-d: min(88vw, calc(50dvh - 92px), 340px);
+}
+
+.shell.playing .topbar {
+  margin-top: 0;
+  grid-template-columns: 36px 1fr 36px;
 }
 
 .shell.playing .title {
   font-size: 1.2rem;
-  margin-top: 0;
+}
+
+.shell.playing .mute-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 1rem;
 }
 
 .shell.playing .hud {
@@ -92,11 +99,26 @@ body {
   margin: 8px 0;
 }
 
+/* Barra superior: título centrado y control de sonido anclado a la esquina,
+   en flujo del layout para que nunca se superponga con el HUD. */
+.topbar {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.topbar-side {
+  width: 44px;
+}
+
 .title {
   font-size: 2rem;
   font-weight: 800;
   letter-spacing: -0.02em;
-  margin-top: 12px;
+  text-align: center;
 }
 
 .title span {
@@ -434,7 +456,7 @@ body {
 @media (min-width: 760px), (orientation: landscape) {
   .shell.playing {
     /* una sola fila de cartas: solo se resta el chrome vertical una vez */
-    --card-d: min(38vw, calc(100dvh - 178px), 340px);
+    --card-d: min(38vw, calc(100dvh - 184px), 340px);
   }
 
   .chain-area {

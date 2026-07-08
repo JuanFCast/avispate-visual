@@ -259,17 +259,20 @@ export default function GameShell() {
 
   return (
     <main className={`shell${phase === "playing" ? " playing" : ""}`}>
-      <button
-        type="button"
-        className="mute-btn"
-        onClick={toggleMuted}
-        aria-label={muted ? "Activar sonido" : "Silenciar"}
-      >
-        {muted ? "🔇" : "🔊"}
-      </button>
-      <h1 className="title">
-        Avíspate <span>Visual</span> ⚡
-      </h1>
+      <header className="topbar">
+        <span className="topbar-side" aria-hidden="true" />
+        <h1 className="title">
+          Avíspate <span>Visual</span> ⚡
+        </h1>
+        <button
+          type="button"
+          className="mute-btn"
+          onClick={toggleMuted}
+          aria-label={muted ? "Activar sonido" : "Silenciar"}
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
+      </header>
 
       {phase === "setup" && (
         <>
