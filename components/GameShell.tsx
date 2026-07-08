@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  computeScore,
-  generateRounds,
-  ERROR_PENALTY_MS,
+  computeAccuracy,
+  generateFirstCard,
+  generateNextCard,
+  COMBO_BONUS,
+  ERROR_POINTS,
   POINTS_CORRECT,
-  POINTS_ERROR,
+  type ChainCard,
   type GameResult,
-  type Round,
 } from "@/lib/game";
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import PlayerForm from "./PlayerForm";
@@ -18,14 +19,22 @@ import ResultsPanel from "./ResultsPanel";
 import LocalLeaderboard from "./LocalLeaderboard";
 
 type Phase = "setup" | "countdown" | "playing" | "results";
+type Role = "base" | "incoming" | "exiting";
+
+interface VisualCard {
+  card: ChainCard;
+  role: Role;
+  /** Recién repartida: entra con animación de mazo. */
+  fresh: boolean;
+}
 
 interface Feedback {
-  card: "A" | "B";
+  cardId: number;
   symbolId: string;
   type: "good" | "bad";
 }
 
-const ADVANCE_DELAY_MS = 280;
+const EXIT_ANIMATION_MS = 450;
 
 function vibrate(pattern: number | number[]) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -36,26 +45,34 @@ function vibrate(pattern: number | number[]) {
 export default function GameShell() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [playerName, setPlayerName] = useState("");
-  const [totalRounds, setTotalRounds] = useState(10);
-  const [rounds, setRounds] = useState<Round[]>([]);
-  const [roundIndex, setRoundIndex] = useState(0);
+  const [durationS, setDurationS] = useState(60);
+  const [cards, setCards] = useState<VisualCard[]>([]);
   const [countdown, setCountdown] = useState(3);
+  const [timeLeftMs, setTimeLeftMs] = useState(0);
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
   const [errors, setErrors] = useState(0);
-  const [points, setPoints] = useState(0);
-  const [elapsedMs, setElapsedMs] = useState(0);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
-  const [shakeCard, setShakeCard] = useState<"A" | "B" | null>(null);
-  const [answered, setAnswered] = useState(false);
+  const [shakeCardId, setShakeCardId] = useState<number | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
   const [position, setPosition] = useState(-1);
+  const [isNewRecord, setIsNewRecord] = useState(false);
+  const [bestScore, setBestScore] = useState(0);
   const [leaderboard, setLeaderboard] = useState<GameResult[]>([]);
 
-  // Acumuladores de la partida en curso (no necesitan re-render por sí mismos).
-  const roundStartRef = useRef(0);
-  const accumulatedMsRef = useRef(0);
+  // Estado vivo de la partida: se lee dentro de timeouts/intervalos sin
+  // preocuparse por closures viejos.
+  const baseRef = useRef<ChainCard | null>(null);
+  const incomingRef = useRef<ChainCard | null>(null);
+  const targetRef = useRef("");
+  const nextIdRef = useRef(3);
+  const scoreRef = useRef(0);
+  const correctRef = useRef(0);
   const errorsRef = useRef(0);
-  const streakRef = useRef(0);
-  const maxStreakRef = useRef(0);
+  const comboRef = useRef(0);
+  const maxComboRef = useRef(0);
+  const endAtRef = useRef(0);
+  const finishedRef = useRef(false);
 
   useEffect(() => {
     setLeaderboard(loadLeaderboard());
@@ -65,113 +82,150 @@ export default function GameShell() {
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdown === 0) {
-      roundStartRef.current = performance.now();
+      endAtRef.current = performance.now() + durationS * 1000;
+      setTimeLeftMs(durationS * 1000);
       setPhase("playing");
       return;
     }
     const t = setTimeout(() => setCountdown((c) => c - 1), 700);
     return () => clearTimeout(t);
-  }, [phase, countdown]);
+  }, [phase, countdown, durationS]);
 
-  // Cronómetro visible (tiempo real acumulado + ronda actual + penalizaciones).
+  // Reloj de la partida: al llegar a cero se termina el juego.
   useEffect(() => {
     if (phase !== "playing") return;
     const interval = setInterval(() => {
-      const current = answered ? 0 : performance.now() - roundStartRef.current;
-      setElapsedMs(
-        accumulatedMsRef.current +
-          current +
-          errorsRef.current * ERROR_PENALTY_MS
-      );
+      const left = endAtRef.current - performance.now();
+      if (left <= 0) {
+        setTimeLeftMs(0);
+        finishGame();
+      } else {
+        setTimeLeftMs(left);
+      }
     }, 100);
     return () => clearInterval(interval);
-  }, [phase, answered]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
-  function startGame(name: string, roundsCount: number) {
+  function startGame(name: string, duration: number) {
+    const base = generateFirstCard();
+    const gen = generateNextCard(base, 2);
+    baseRef.current = base;
+    incomingRef.current = gen.card;
+    targetRef.current = gen.targetSymbolId;
+    nextIdRef.current = 3;
+    scoreRef.current = 0;
+    correctRef.current = 0;
+    errorsRef.current = 0;
+    comboRef.current = 0;
+    maxComboRef.current = 0;
+    finishedRef.current = false;
+
     setPlayerName(name);
-    setTotalRounds(roundsCount);
-    setRounds(generateRounds(roundsCount));
-    setRoundIndex(0);
+    setDurationS(duration);
+    setCards([
+      { card: base, role: "base", fresh: true },
+      { card: gen.card, role: "incoming", fresh: true },
+    ]);
+    setScore(0);
+    setCombo(0);
     setErrors(0);
-    setPoints(0);
-    setElapsedMs(0);
     setFeedback(null);
-    setShakeCard(null);
-    setAnswered(false);
+    setShakeCardId(null);
     setResult(null);
     setPosition(-1);
-    accumulatedMsRef.current = 0;
-    errorsRef.current = 0;
-    streakRef.current = 0;
-    maxStreakRef.current = 0;
+    setIsNewRecord(false);
     setCountdown(3);
     setPhase("countdown");
   }
 
   function finishGame() {
-    const totalMs =
-      accumulatedMsRef.current + errorsRef.current * ERROR_PENALTY_MS;
+    if (finishedRef.current) return;
+    finishedRef.current = true;
+
+    const previousBest = loadLeaderboard()[0]?.score ?? 0;
     const gameResult: GameResult = {
       playerName,
-      score: computeScore(
-        totalMs,
-        totalRounds,
-        errorsRef.current,
-        maxStreakRef.current
-      ),
-      totalMs: Math.round(totalMs),
-      averageMs: Math.round(totalMs / totalRounds),
-      correct: totalRounds,
+      score: scoreRef.current,
+      correct: correctRef.current,
       errors: errorsRef.current,
-      maxStreak: maxStreakRef.current,
+      accuracy: computeAccuracy(correctRef.current, errorsRef.current),
+      maxCombo: maxComboRef.current,
+      durationS,
       createdAt: new Date().toISOString(),
     };
     const saved = saveResult(gameResult);
     setResult(gameResult);
     setPosition(saved.position);
     setLeaderboard(saved.leaderboard);
+    setBestScore(Math.max(previousBest, gameResult.score));
+    setIsNewRecord(gameResult.score > previousBest && gameResult.score > 0);
     setPhase("results");
   }
 
-  function handleTap(card: "A" | "B", symbolId: string) {
-    if (answered || phase !== "playing") return;
-    const round = rounds[roundIndex];
+  /**
+   * Avanza la cadena: la carta base sale, la entrante pasa a ser la nueva base
+   * y se reparte una carta nueva. Los cambios de rol animan por CSS.
+   */
+  function advanceChain() {
+    const exiting = baseRef.current!;
+    const newBase = incomingRef.current!;
+    const gen = generateNextCard(newBase, nextIdRef.current++);
+    baseRef.current = newBase;
+    incomingRef.current = gen.card;
+    targetRef.current = gen.targetSymbolId;
 
-    if (symbolId === round.targetSymbolId) {
-      accumulatedMsRef.current += performance.now() - roundStartRef.current;
-      streakRef.current += 1;
-      maxStreakRef.current = Math.max(maxStreakRef.current, streakRef.current);
-      setAnswered(true);
-      setPoints((p) => p + POINTS_CORRECT);
-      setFeedback({ card, symbolId, type: "good" });
-      vibrate(30);
+    setCards((prev) =>
+      prev
+        .map((c) =>
+          c.card.id === exiting.id
+            ? { ...c, role: "exiting" as Role }
+            : c.card.id === newBase.id
+              ? { ...c, role: "base" as Role }
+              : c
+        )
+        .concat({ card: gen.card, role: "incoming", fresh: true })
+    );
+    setTimeout(() => {
+      setCards((prev) => prev.filter((c) => c.card.id !== exiting.id));
+    }, EXIT_ANIMATION_MS);
+  }
 
+  function handleTap(cardId: number, symbolId: string) {
+    if (phase !== "playing" || finishedRef.current) return;
+
+    if (symbolId === targetRef.current) {
+      comboRef.current += 1;
+      maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
+      correctRef.current += 1;
+      scoreRef.current +=
+        POINTS_CORRECT + (comboRef.current - 1) * COMBO_BONUS;
+      setScore(scoreRef.current);
+      setCombo(comboRef.current);
+      setFeedback({ cardId, symbolId, type: "good" });
+      vibrate(25);
+      advanceChain();
       setTimeout(() => {
-        setFeedback(null);
-        if (roundIndex + 1 >= totalRounds) {
-          finishGame();
-        } else {
-          setRoundIndex((i) => i + 1);
-          setAnswered(false);
-          roundStartRef.current = performance.now();
-        }
-      }, ADVANCE_DELAY_MS);
+        setFeedback((f) =>
+          f && f.cardId === cardId && f.type === "good" ? null : f
+        );
+      }, 250);
     } else {
       errorsRef.current += 1;
-      streakRef.current = 0;
+      comboRef.current = 0;
+      scoreRef.current = Math.max(0, scoreRef.current - ERROR_POINTS);
       setErrors(errorsRef.current);
-      setPoints((p) => p + POINTS_ERROR);
-      setFeedback({ card, symbolId, type: "bad" });
-      setShakeCard(card);
+      setCombo(0);
+      setScore(scoreRef.current);
+      setFeedback({ cardId, symbolId, type: "bad" });
+      setShakeCardId(cardId);
       vibrate([60, 40, 60]);
       setTimeout(() => {
         setFeedback(null);
-        setShakeCard(null);
-      }, 350);
+        setShakeCardId(null);
+      }, 300);
     }
   }
-
-  const round = rounds[roundIndex];
 
   return (
     <main className="shell">
@@ -182,7 +236,8 @@ export default function GameShell() {
       {phase === "setup" && (
         <>
           <p className="subtitle">
-            Encuentra el símbolo común entre las dos cartas antes que nadie.
+            Las cartas fluyen una tras otra: encuentra el símbolo común, tócalo
+            y sigue avanzando antes de que se acabe el tiempo.
           </p>
           <PlayerForm initialName={playerName} onStart={startGame} />
           <div style={{ width: "100%", maxWidth: 420 }}>
@@ -197,32 +252,34 @@ export default function GameShell() {
         </div>
       )}
 
-      {phase === "playing" && round && (
+      {phase === "playing" && (
         <>
           <GameHUD
-            round={roundIndex + 1}
-            totalRounds={totalRounds}
-            elapsedMs={elapsedMs}
+            timeLeftMs={timeLeftMs}
+            score={score}
+            combo={combo}
             errors={errors}
-            points={points}
           />
-          <div className="cards-area">
-            <CardView
-              symbols={round.cardA}
-              flashSymbolId={feedback?.card === "A" ? feedback.symbolId : null}
-              flashType={feedback?.card === "A" ? feedback.type : null}
-              shake={shakeCard === "A"}
-              disabled={answered}
-              onTap={(id) => handleTap("A", id)}
-            />
-            <CardView
-              symbols={round.cardB}
-              flashSymbolId={feedback?.card === "B" ? feedback.symbolId : null}
-              flashType={feedback?.card === "B" ? feedback.type : null}
-              shake={shakeCard === "B"}
-              disabled={answered}
-              onTap={(id) => handleTap("B", id)}
-            />
+          <div className="chain-area">
+            {cards.map((vc) => (
+              <div
+                key={vc.card.id}
+                className={`chain-card slot-${vc.role}${vc.fresh ? " fresh" : ""}`}
+              >
+                <CardView
+                  symbols={vc.card.symbols}
+                  flashSymbolId={
+                    feedback?.cardId === vc.card.id ? feedback.symbolId : null
+                  }
+                  flashType={
+                    feedback?.cardId === vc.card.id ? feedback.type : null
+                  }
+                  shake={shakeCardId === vc.card.id}
+                  disabled={vc.role === "exiting"}
+                  onTap={(symbolId) => handleTap(vc.card.id, symbolId)}
+                />
+              </div>
+            ))}
           </div>
         </>
       )}
@@ -232,7 +289,9 @@ export default function GameShell() {
           <ResultsPanel
             result={result}
             position={position}
-            onPlayAgain={() => startGame(playerName, totalRounds)}
+            bestScore={bestScore}
+            isNewRecord={isNewRecord}
+            onPlayAgain={() => startGame(playerName, durationS)}
             onChangePlayer={() => setPhase("setup")}
           />
           <div style={{ width: "100%", maxWidth: 420 }}>

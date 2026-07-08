@@ -1,8 +1,10 @@
 # Avíspate Visual ⚡
 
 Juego de agilidad visual inspirado en cartas circulares con símbolos comunes.
-En cada ronda aparecen dos cartas con 8 símbolos cada una; entre ambas hay
-**exactamente un símbolo en común** y hay que tocarlo lo más rápido posible.
+Las cartas fluyen en cadena continua: una carta base y una carta nueva, con
+**exactamente un símbolo en común** entre ambas. Al tocarlo, la carta nueva
+pasa a ser la base (con animación), la vieja sale de pantalla y entra otra del
+mazo. Así hasta que se acaba el tiempo.
 
 MVP individual: sin login, sin backend, sin pagos. El ranking se guarda en
 `localStorage` del navegador (`visualRushLeaderboard_v1`, top 20).
@@ -18,11 +20,15 @@ Abrir <http://localhost:3000/visual-rush> (la raíz `/` redirige ahí).
 
 ## Reglas
 
-- 10 rondas por defecto (selector de 10 / 15 / 20 en la pantalla de inicio).
-- Acierto: +100 puntos y avanza de ronda.
-- Error: −20 puntos, +1 segundo de penalización, y puede seguir intentando.
-- Puntaje final: `max(0, 1000 − promedioMs/10 − errores×50 + rachaMax×25)`.
-- Ranking ordenado por puntos; en empate gana el menor tiempo promedio.
+- Partida contrarreloj: 60s por defecto (selector de 30 / 60 / 90 al inicio).
+- Acierto: +100 puntos + bono de combo (+10 por cada acierto seguido extra),
+  y la cadena avanza a la siguiente carta.
+- Error: −20 puntos, se pierde el combo y la carta tiembla; se puede seguir
+  intentando.
+- Al final: puntaje, cartas acertadas, errores, precisión, mejor combo y
+  mejor marca personal.
+- Ranking ordenado por puntos; en empate gana mayor precisión y luego más
+  cartas acertadas.
 
 ## Estructura
 
@@ -30,7 +36,7 @@ Abrir <http://localhost:3000/visual-rush> (la raíz `/` redirige ahí).
 - `components/` — `GameShell` (orquestador), `PlayerForm`, `CardView`,
   `SymbolButton`, `GameHUD`, `ResultsPanel`, `LocalLeaderboard`.
 - `lib/symbols.ts` — banco de 48 símbolos (emojis propios).
-- `lib/game.ts` — generación de rondas, reglas y puntaje.
+- `lib/game.ts` — generación de la cadena de cartas, reglas y puntaje.
 - `lib/leaderboard.ts` — persistencia del ranking en localStorage.
 
 ## Siguiente fase (según el brief)

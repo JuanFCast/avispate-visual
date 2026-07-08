@@ -223,20 +223,112 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ---------- Cartas ---------- */
+.hud-value.warn {
+  color: var(--bad);
+  animation: blink 0.5s ease infinite alternate;
+}
 
-.cards-area {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  padding: 8px 0 24px;
+@keyframes blink {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.45;
+  }
+}
+
+.hud-value.hot {
+  color: var(--primary-dark);
+}
+
+/* ---------- Cadena de cartas ---------- */
+
+/*
+ * Las dos cartas viven en slots fijos (base y entrante) dentro de un lienzo
+ * posicionado. Cambiar el rol de una carta cambia su clase de slot y la
+ * transición de transform la mueve sola: la entrante viaja al puesto de la
+ * base, la base vieja sale volando y la carta nueva entra como desde un mazo.
+ */
+.chain-area {
+  --card-gap: 18px;
+  position: relative;
+  width: var(--card-d);
+  height: calc(var(--card-d) * 2 + var(--card-gap));
+  margin: 8px 0 24px;
+}
+
+.chain-card {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--card-d);
+  height: var(--card-d);
+  transition:
+    transform 0.35s cubic-bezier(0.25, 0.9, 0.35, 1.12),
+    opacity 0.3s ease;
+  will-change: transform;
+}
+
+.chain-card.slot-base {
+  transform: translate(0, 0);
+  z-index: 2;
+}
+
+.chain-card.slot-incoming {
+  transform: translate(0, calc(var(--card-d) + var(--card-gap)));
+  z-index: 3;
+}
+
+.chain-card.slot-incoming .card-circle {
+  border-color: #ffd9bd;
+}
+
+.chain-card.slot-exiting {
+  transform: translate(calc(var(--card-d) * -0.55), calc(var(--card-d) * -0.35))
+    rotate(-14deg) scale(0.72);
+  opacity: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.chain-card.fresh {
+  animation: deal-in-v 0.4s cubic-bezier(0.25, 0.9, 0.35, 1.08);
+}
+
+@keyframes deal-in-v {
+  from {
+    transform: translate(calc(var(--card-d) * 0.3), calc(var(--card-d) * 2.6))
+      rotate(10deg) scale(0.85);
+    opacity: 0;
+  }
 }
 
 @media (min-width: 760px) {
-  .cards-area {
-    flex-direction: row;
-    gap: 32px;
+  .chain-area {
+    --card-gap: 32px;
+    width: calc(var(--card-d) * 2 + var(--card-gap));
+    height: var(--card-d);
+  }
+
+  .chain-card.slot-incoming {
+    transform: translate(calc(var(--card-d) + var(--card-gap)), 0);
+  }
+
+  .chain-card.slot-exiting {
+    transform: translate(calc(var(--card-d) * -0.65), calc(var(--card-d) * -0.2))
+      rotate(-14deg) scale(0.72);
+  }
+
+  .chain-card.fresh {
+    animation-name: deal-in-h;
+  }
+}
+
+@keyframes deal-in-h {
+  from {
+    transform: translate(calc(var(--card-d) * 2.8), calc(var(--card-d) * 0.2))
+      rotate(10deg) scale(0.85);
+    opacity: 0;
   }
 }
 

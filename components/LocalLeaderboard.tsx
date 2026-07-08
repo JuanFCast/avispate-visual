@@ -1,6 +1,6 @@
 "use client";
 
-import { formatMs, type GameResult } from "@/lib/game";
+import type { GameResult } from "@/lib/game";
 
 interface Props {
   entries: GameResult[];
@@ -38,8 +38,8 @@ export default function LocalLeaderboard({
                 <th>#</th>
                 <th>Nombre</th>
                 <th>Puntos</th>
-                <th>Prom.</th>
-                <th>Err.</th>
+                <th>Cartas</th>
+                <th>Prec.</th>
                 <th>Fecha</th>
               </tr>
             </thead>
@@ -52,8 +52,8 @@ export default function LocalLeaderboard({
                   <td className="num">{i + 1}</td>
                   <td>{entry.playerName}</td>
                   <td className="num">{entry.score}</td>
-                  <td className="num">{formatMs(entry.averageMs)}</td>
-                  <td className="num">{entry.errors}</td>
+                  <td className="num">{entry.correct}</td>
+                  <td className="num">{entry.accuracy}%</td>
                   <td>{formatDate(entry.createdAt)}</td>
                 </tr>
               ))}

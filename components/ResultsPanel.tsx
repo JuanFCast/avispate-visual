@@ -1,10 +1,12 @@
 "use client";
 
-import { formatMs, type GameResult } from "@/lib/game";
+import type { GameResult } from "@/lib/game";
 
 interface Props {
   result: GameResult;
   position: number;
+  bestScore: number;
+  isNewRecord: boolean;
   onPlayAgain: () => void;
   onChangePlayer: () => void;
 }
@@ -12,12 +14,17 @@ interface Props {
 export default function ResultsPanel({
   result,
   position,
+  bestScore,
+  isNewRecord,
   onPlayAgain,
   onChangePlayer,
 }: Props) {
   return (
     <div className="panel">
-      {position > 0 && (
+      {isNewRecord && (
+        <p className="rank-note">🔥 ¡Nuevo récord personal, {result.playerName}!</p>
+      )}
+      {!isNewRecord && position > 0 && (
         <p className="rank-note">
           🏆 {result.playerName}, quedaste en el puesto #{position} del ranking
         </p>
@@ -29,24 +36,24 @@ export default function ResultsPanel({
           <span className="stat-value">{result.score}</span>
         </div>
         <div className="stat highlight">
-          <span className="stat-label">Tiempo total</span>
-          <span className="stat-value">{formatMs(result.totalMs)}</span>
+          <span className="stat-label">Precisión</span>
+          <span className="stat-value">{result.accuracy}%</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Promedio / ronda</span>
-          <span className="stat-value">{formatMs(result.averageMs)}</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">Mejor racha</span>
-          <span className="stat-value">{result.maxStreak}</span>
-        </div>
-        <div className="stat">
-          <span className="stat-label">Aciertos</span>
+          <span className="stat-label">Cartas acertadas</span>
           <span className="stat-value">{result.correct}</span>
         </div>
         <div className="stat">
           <span className="stat-label">Errores</span>
           <span className="stat-value">{result.errors}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Mejor combo</span>
+          <span className="stat-value">x{result.maxCombo}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-label">Mejor marca</span>
+          <span className="stat-value">{bestScore}</span>
         </div>
       </div>
 

@@ -1,12 +1,14 @@
 import type { GameResult } from "./game";
 
-const STORAGE_KEY = "visualRushLeaderboard_v1";
+// v2: el modo individual pasó de rondas fijas a cadena continua contrarreloj.
+const STORAGE_KEY = "visualRushLeaderboard_v2";
 const MAX_ENTRIES = 20;
 
-/** Más puntos primero; si empatan, gana el menor tiempo promedio. */
+/** Más puntos primero; si empatan, mayor precisión y luego más aciertos. */
 export function sortResults(results: GameResult[]): GameResult[] {
   return [...results].sort(
-    (a, b) => b.score - a.score || a.averageMs - b.averageMs
+    (a, b) =>
+      b.score - a.score || b.accuracy - a.accuracy || b.correct - a.correct
   );
 }
 

@@ -1,11 +1,11 @@
 import { SYMBOLS } from "./symbols";
 
-export const DEFAULT_ROUNDS = 10;
-export const ROUND_OPTIONS = [10, 15, 20];
+export const DEFAULT_DURATION_S = 60;
+export const DURATION_OPTIONS = [30, 60, 90];
 export const SYMBOLS_PER_CARD = 8;
-export const ERROR_PENALTY_MS = 1000;
 export const POINTS_CORRECT = 100;
-export const POINTS_ERROR = -20;
+export const COMBO_BONUS = 10;
+export const ERROR_POINTS = 20;
 
 export interface PlacedSymbol {
   symbolId: string;
@@ -18,21 +18,21 @@ export interface PlacedSymbol {
   scale: number;
 }
 
-export interface Round {
+/** Una carta de la cadena: la partida es un flujo continuo de cartas encadenadas. */
+export interface ChainCard {
   id: number;
-  cardA: PlacedSymbol[];
-  cardB: PlacedSymbol[];
-  targetSymbolId: string;
+  symbols: PlacedSymbol[];
 }
 
 export interface GameResult {
   playerName: string;
   score: number;
-  totalMs: number;
-  averageMs: number;
   correct: number;
   errors: number;
-  maxStreak: number;
+  /** Porcentaje de aciertos 0-100. */
+  accuracy: number;
+  maxCombo: number;
+  durationS: number;
   createdAt: string;
 }
 
@@ -79,44 +79,32 @@ function placeSymbols(symbolIds: string[]): PlacedSymbol[] {
   return placed;
 }
 
-/**
- * Genera las rondas de una partida. Regla simple y confiable: 1 símbolo común
- * al azar + 7 distractores únicos por carta, sin repetir distractores entre
- * las dos cartas.
- */
-export function generateRounds(count: number): Round[] {
-  const rounds: Round[] = [];
-  for (let r = 0; r < count; r++) {
-    const pool = shuffle(SYMBOLS.map((s) => s.id));
-    const target = pool[0];
-    const distractorsA = pool.slice(1, SYMBOLS_PER_CARD);
-    const distractorsB = pool.slice(SYMBOLS_PER_CARD, SYMBOLS_PER_CARD * 2 - 1);
-    rounds.push({
-      id: r + 1,
-      cardA: placeSymbols([target, ...distractorsA]),
-      cardB: placeSymbols([target, ...distractorsB]),
-      targetSymbolId: target,
-    });
-  }
-  return rounds;
+/** Primera carta base de la cadena: 8 símbolos únicos al azar. */
+export function generateFirstCard(): ChainCard {
+  const pool = shuffle(SYMBOLS.map((s) => s.id)).slice(0, SYMBOLS_PER_CARD);
+  return { id: 1, symbols: placeSymbols(pool) };
 }
 
 /**
- * Puntaje final: 1000 - promedioMs/10 - errores*50 + rachaMax*25 (nunca negativo).
+ * Genera la siguiente carta de la cadena: comparte exactamente 1 símbolo con
+ * la carta base y los otros 7 no aparecen en ella.
  */
-export function computeScore(
-  totalMs: number,
-  rounds: number,
-  errors: number,
-  maxStreak: number
-): number {
-  const averageMs = totalMs / Math.max(1, rounds);
-  return Math.max(
-    0,
-    Math.round(1000 - averageMs / 10 - errors * 50 + maxStreak * 25)
-  );
+export function generateNextCard(
+  base: ChainCard,
+  id: number
+): { card: ChainCard; targetSymbolId: string } {
+  const baseIds = base.symbols.map((p) => p.symbolId);
+  const target = baseIds[Math.floor(Math.random() * baseIds.length)];
+  const others = shuffle(
+    SYMBOLS.map((s) => s.id).filter((sid) => !baseIds.includes(sid))
+  ).slice(0, SYMBOLS_PER_CARD - 1);
+  return {
+    card: { id, symbols: placeSymbols([target, ...others]) },
+    targetSymbolId: target,
+  };
 }
 
-export function formatMs(ms: number): string {
-  return `${(ms / 1000).toFixed(2)}s`;
+export function computeAccuracy(correct: number, errors: number): number {
+  const total = correct + errors;
+  return total === 0 ? 100 : Math.round((correct / total) * 100);
 }

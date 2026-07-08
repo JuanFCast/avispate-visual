@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { DEFAULT_ROUNDS, ROUND_OPTIONS } from "@/lib/game";
+import { DEFAULT_DURATION_S, DURATION_OPTIONS } from "@/lib/game";
 
 interface Props {
   initialName: string;
-  onStart: (name: string, rounds: number) => void;
+  onStart: (name: string, durationS: number) => void;
 }
 
 export default function PlayerForm({ initialName, onStart }: Props) {
   const [name, setName] = useState(initialName);
-  const [rounds, setRounds] = useState(DEFAULT_ROUNDS);
+  const [duration, setDuration] = useState(DEFAULT_DURATION_S);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    onStart(trimmed, rounds);
+    onStart(trimmed, duration);
   }
 
   return (
@@ -35,16 +35,16 @@ export default function PlayerForm({ initialName, onStart }: Props) {
       </div>
 
       <div className="field">
-        <label>Rondas</label>
+        <label>Duración de la partida</label>
         <div className="rounds-options">
-          {ROUND_OPTIONS.map((option) => (
+          {DURATION_OPTIONS.map((option) => (
             <button
               key={option}
               type="button"
-              className={option === rounds ? "selected" : ""}
-              onClick={() => setRounds(option)}
+              className={option === duration ? "selected" : ""}
+              onClick={() => setDuration(option)}
             >
-              {option}
+              {option}s
             </button>
           ))}
         </div>
@@ -55,9 +55,10 @@ export default function PlayerForm({ initialName, onStart }: Props) {
       </button>
 
       <p className="hint">
-        En cada ronda verás dos cartas circulares. Entre ambas hay exactamente{" "}
-        <strong>un símbolo en común</strong>: tócalo lo más rápido posible. Cada
-        error suma 1 segundo de penalización.
+        Las cartas fluyen en cadena: entre la carta base y la nueva siempre hay{" "}
+        <strong>un símbolo en común</strong>. Tócalo y la carta avanza. Cada
+        acierto seguido sube tu combo; si fallas, pierdes el combo y unos
+        puntos. ¡Pasa todas las cartas que puedas antes de que acabe el tiempo!
       </p>
     </form>
   );
