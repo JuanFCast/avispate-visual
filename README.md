@@ -29,6 +29,11 @@ Abrir <http://localhost:3000/visual-rush> (la raíz `/` redirige ahí).
   intentando.
 - Al final: tiempo total, promedio por carta, errores, precisión y mejor
   marca personal.
+- Distractores con trampa: la carta nueva se llena de símbolos del mismo
+  color y categoría que el objetivo (si el común es la manzana, aparecen
+  cosas rojas y comidas).
+- Sonido generado con WebAudio (sin archivos): acierto, error, reparto,
+  cuenta regresiva y fanfarria final. Botón 🔊/🔇 con preferencia guardada.
 - Ranking ordenado por menor tiempo promedio por carta (comparable entre
   mazos de distinto tamaño); en empate, menos errores.
 
@@ -37,8 +42,11 @@ Abrir <http://localhost:3000/visual-rush> (la raíz `/` redirige ahí).
 - `app/visual-rush/page.tsx` — ruta del juego.
 - `components/` — `GameShell` (orquestador), `PlayerForm`, `CardView`,
   `SymbolButton`, `GameHUD`, `ResultsPanel`, `LocalLeaderboard`.
-- `lib/symbols.ts` — banco de 48 símbolos (emojis propios).
-- `lib/game.ts` — generación de la cadena de cartas, reglas y puntaje.
+- `lib/symbols.ts` — banco de 59 símbolos (emojis propios) con color y
+  categoría.
+- `lib/game.ts` — generación de la cadena con distractores parecidos al
+  objetivo, reglas y puntaje.
+- `lib/sound.ts` — efectos de sonido WebAudio y toggle de silencio.
 - `lib/leaderboard.ts` — persistencia del ranking en localStorage.
 
 ## Siguiente fase (según el brief)

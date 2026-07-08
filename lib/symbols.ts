@@ -1,59 +1,107 @@
+export type SymbolColor =
+  | "rojo"
+  | "naranja"
+  | "amarillo"
+  | "verde"
+  | "azul"
+  | "morado"
+  | "rosado"
+  | "cafe"
+  | "blanco"
+  | "negro"
+  | "multi";
+
+export type SymbolCategory =
+  | "animal"
+  | "comida"
+  | "naturaleza"
+  | "objeto"
+  | "transporte"
+  | "deporte";
+
 export interface Symbol {
   id: string;
   label: string;
   emoji: string;
+  /** Color dominante: se usa para elegir distractores parecidos al objetivo. */
+  color: SymbolColor;
+  category: SymbolCategory;
 }
 
-// Banco de símbolos propios (emojis): 48 opciones bien diferenciables entre sí.
+// Banco de símbolos propios (emojis), con color y categoría para poder rodear
+// al símbolo común de distractores parecidos (si el común es la manzana, la
+// carta se llena de cosas rojas y de comidas).
 export const SYMBOLS: Symbol[] = [
-  { id: "sun", label: "Sol", emoji: "☀️" },
-  { id: "moon", label: "Luna", emoji: "🌙" },
-  { id: "star", label: "Estrella", emoji: "⭐" },
-  { id: "bolt", label: "Rayo", emoji: "⚡" },
-  { id: "fire", label: "Fuego", emoji: "🔥" },
-  { id: "drop", label: "Gota", emoji: "💧" },
-  { id: "snow", label: "Copo", emoji: "❄️" },
-  { id: "rainbow", label: "Arcoíris", emoji: "🌈" },
-  { id: "apple", label: "Manzana", emoji: "🍎" },
-  { id: "banana", label: "Banano", emoji: "🍌" },
-  { id: "grapes", label: "Uvas", emoji: "🍇" },
-  { id: "watermelon", label: "Sandía", emoji: "🍉" },
-  { id: "pineapple", label: "Piña", emoji: "🍍" },
-  { id: "avocado", label: "Aguacate", emoji: "🥑" },
-  { id: "pizza", label: "Pizza", emoji: "🍕" },
-  { id: "icecream", label: "Helado", emoji: "🍦" },
-  { id: "cat", label: "Gato", emoji: "🐱" },
-  { id: "dog", label: "Perro", emoji: "🐶" },
-  { id: "frog", label: "Rana", emoji: "🐸" },
-  { id: "butterfly", label: "Mariposa", emoji: "🦋" },
-  { id: "bee", label: "Abeja", emoji: "🐝" },
-  { id: "octopus", label: "Pulpo", emoji: "🐙" },
-  { id: "turtle", label: "Tortuga", emoji: "🐢" },
-  { id: "penguin", label: "Pingüino", emoji: "🐧" },
-  { id: "whale", label: "Ballena", emoji: "🐳" },
-  { id: "unicorn", label: "Unicornio", emoji: "🦄" },
-  { id: "crab", label: "Cangrejo", emoji: "🦀" },
-  { id: "ladybug", label: "Mariquita", emoji: "🐞" },
-  { id: "rocket", label: "Cohete", emoji: "🚀" },
-  { id: "car", label: "Carro", emoji: "🚗" },
-  { id: "bike", label: "Bicicleta", emoji: "🚲" },
-  { id: "anchor", label: "Ancla", emoji: "⚓" },
-  { id: "balloon", label: "Globo", emoji: "🎈" },
-  { id: "gift", label: "Regalo", emoji: "🎁" },
-  { id: "soccer", label: "Balón", emoji: "⚽" },
-  { id: "basketball", label: "Baloncesto", emoji: "🏀" },
-  { id: "dice", label: "Dado", emoji: "🎲" },
-  { id: "guitar", label: "Guitarra", emoji: "🎸" },
-  { id: "trumpet", label: "Trompeta", emoji: "🎺" },
-  { id: "palette", label: "Paleta", emoji: "🎨" },
-  { id: "key", label: "Llave", emoji: "🔑" },
-  { id: "lock", label: "Candado", emoji: "🔒" },
-  { id: "bell", label: "Campana", emoji: "🔔" },
-  { id: "magnet", label: "Imán", emoji: "🧲" },
-  { id: "bulb", label: "Bombillo", emoji: "💡" },
-  { id: "clover", label: "Trébol", emoji: "🍀" },
-  { id: "cactus", label: "Cactus", emoji: "🌵" },
-  { id: "mushroom", label: "Hongo", emoji: "🍄" },
+  // Naturaleza
+  { id: "sun", label: "Sol", emoji: "☀️", color: "amarillo", category: "naturaleza" },
+  { id: "moon", label: "Luna", emoji: "🌙", color: "amarillo", category: "naturaleza" },
+  { id: "star", label: "Estrella", emoji: "⭐", color: "amarillo", category: "naturaleza" },
+  { id: "bolt", label: "Rayo", emoji: "⚡", color: "amarillo", category: "naturaleza" },
+  { id: "sunflower", label: "Girasol", emoji: "🌻", color: "amarillo", category: "naturaleza" },
+  { id: "fire", label: "Fuego", emoji: "🔥", color: "naranja", category: "naturaleza" },
+  { id: "drop", label: "Gota", emoji: "💧", color: "azul", category: "naturaleza" },
+  { id: "snow", label: "Copo", emoji: "❄️", color: "azul", category: "naturaleza" },
+  { id: "rainbow", label: "Arcoíris", emoji: "🌈", color: "multi", category: "naturaleza" },
+  { id: "clover", label: "Trébol", emoji: "🍀", color: "verde", category: "naturaleza" },
+  { id: "cactus", label: "Cactus", emoji: "🌵", color: "verde", category: "naturaleza" },
+  { id: "blossom", label: "Flor", emoji: "🌸", color: "rosado", category: "naturaleza" },
+
+  // Comida
+  { id: "apple", label: "Manzana", emoji: "🍎", color: "rojo", category: "comida" },
+  { id: "strawberry", label: "Fresa", emoji: "🍓", color: "rojo", category: "comida" },
+  { id: "watermelon", label: "Sandía", emoji: "🍉", color: "rojo", category: "comida" },
+  { id: "mushroom", label: "Hongo", emoji: "🍄", color: "rojo", category: "comida" },
+  { id: "carrot", label: "Zanahoria", emoji: "🥕", color: "naranja", category: "comida" },
+  { id: "orange", label: "Naranja", emoji: "🍊", color: "naranja", category: "comida" },
+  { id: "pizza", label: "Pizza", emoji: "🍕", color: "naranja", category: "comida" },
+  { id: "banana", label: "Banano", emoji: "🍌", color: "amarillo", category: "comida" },
+  { id: "pineapple", label: "Piña", emoji: "🍍", color: "amarillo", category: "comida" },
+  { id: "avocado", label: "Aguacate", emoji: "🥑", color: "verde", category: "comida" },
+  { id: "broccoli", label: "Brócoli", emoji: "🥦", color: "verde", category: "comida" },
+  { id: "grapes", label: "Uvas", emoji: "🍇", color: "morado", category: "comida" },
+  { id: "blueberries", label: "Arándanos", emoji: "🫐", color: "morado", category: "comida" },
+  { id: "icecream", label: "Helado", emoji: "🍦", color: "blanco", category: "comida" },
+
+  // Animales
+  { id: "crab", label: "Cangrejo", emoji: "🦀", color: "rojo", category: "animal" },
+  { id: "ladybug", label: "Mariquita", emoji: "🐞", color: "rojo", category: "animal" },
+  { id: "octopus", label: "Pulpo", emoji: "🐙", color: "rojo", category: "animal" },
+  { id: "cat", label: "Gato", emoji: "🐱", color: "naranja", category: "animal" },
+  { id: "bee", label: "Abeja", emoji: "🐝", color: "amarillo", category: "animal" },
+  { id: "frog", label: "Rana", emoji: "🐸", color: "verde", category: "animal" },
+  { id: "turtle", label: "Tortuga", emoji: "🐢", color: "verde", category: "animal" },
+  { id: "crocodile", label: "Caimán", emoji: "🐊", color: "verde", category: "animal" },
+  { id: "butterfly", label: "Mariposa", emoji: "🦋", color: "azul", category: "animal" },
+  { id: "whale", label: "Ballena", emoji: "🐳", color: "azul", category: "animal" },
+  { id: "dolphin", label: "Delfín", emoji: "🐬", color: "azul", category: "animal" },
+  { id: "unicorn", label: "Unicornio", emoji: "🦄", color: "rosado", category: "animal" },
+  { id: "flamingo", label: "Flamenco", emoji: "🦩", color: "rosado", category: "animal" },
+  { id: "dog", label: "Perro", emoji: "🐶", color: "cafe", category: "animal" },
+  { id: "penguin", label: "Pingüino", emoji: "🐧", color: "negro", category: "animal" },
+
+  // Transporte
+  { id: "car", label: "Carro", emoji: "🚗", color: "rojo", category: "transporte" },
+  { id: "bike", label: "Bicicleta", emoji: "🚲", color: "rojo", category: "transporte" },
+  { id: "rocket", label: "Cohete", emoji: "🚀", color: "blanco", category: "transporte" },
+
+  // Deporte
+  { id: "basketball", label: "Baloncesto", emoji: "🏀", color: "naranja", category: "deporte" },
+  { id: "soccer", label: "Balón", emoji: "⚽", color: "negro", category: "deporte" },
+
+  // Objetos
+  { id: "balloon", label: "Globo", emoji: "🎈", color: "rojo", category: "objeto" },
+  { id: "gift", label: "Regalo", emoji: "🎁", color: "rojo", category: "objeto" },
+  { id: "magnet", label: "Imán", emoji: "🧲", color: "rojo", category: "objeto" },
+  { id: "key", label: "Llave", emoji: "🔑", color: "amarillo", category: "objeto" },
+  { id: "lock", label: "Candado", emoji: "🔒", color: "amarillo", category: "objeto" },
+  { id: "bell", label: "Campana", emoji: "🔔", color: "amarillo", category: "objeto" },
+  { id: "bulb", label: "Bombillo", emoji: "💡", color: "amarillo", category: "objeto" },
+  { id: "trumpet", label: "Trompeta", emoji: "🎺", color: "amarillo", category: "objeto" },
+  { id: "anchor", label: "Ancla", emoji: "⚓", color: "azul", category: "objeto" },
+  { id: "crystal", label: "Bola de cristal", emoji: "🔮", color: "morado", category: "objeto" },
+  { id: "guitar", label: "Guitarra", emoji: "🎸", color: "cafe", category: "objeto" },
+  { id: "dice", label: "Dado", emoji: "🎲", color: "blanco", category: "objeto" },
+  { id: "palette", label: "Paleta", emoji: "🎨", color: "multi", category: "objeto" },
 ];
 
 export const SYMBOL_BY_ID: Record<string, Symbol> = Object.fromEntries(

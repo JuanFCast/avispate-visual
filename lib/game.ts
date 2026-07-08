@@ -1,4 +1,4 @@
-import { SYMBOLS } from "./symbols";
+import { SYMBOLS, SYMBOL_BY_ID, type Symbol } from "./symbols";
 
 export const DEFAULT_DECK_SIZE = 10;
 export const DECK_OPTIONS = [10, 15, 20];
@@ -85,22 +85,72 @@ export function generateFirstCard(): ChainCard {
   return { id: 1, symbols: placeSymbols(pool) };
 }
 
+/** Cuántos distractores buscan parecerse al objetivo. */
+const MAX_SAME_COLOR = 4;
+const MAX_SIMILAR = 6; // mismo color + misma categoría, combinados
+
 /**
  * Genera la siguiente carta de la cadena: comparte exactamente 1 símbolo con
  * la carta base y los otros 7 no aparecen en ella.
+ *
+ * Los distractores se eligen para confundir: primero símbolos del mismo color
+ * que el objetivo (si el común es la manzana, aparecen cosas rojas), luego de
+ * la misma categoría, y el resto al azar.
  */
 export function generateNextCard(
   base: ChainCard,
   id: number
 ): { card: ChainCard; targetSymbolId: string } {
-  const baseIds = base.symbols.map((p) => p.symbolId);
-  const target = baseIds[Math.floor(Math.random() * baseIds.length)];
-  const others = shuffle(
-    SYMBOLS.map((s) => s.id).filter((sid) => !baseIds.includes(sid))
-  ).slice(0, SYMBOLS_PER_CARD - 1);
+  const baseIds = new Set(base.symbols.map((p) => p.symbolId));
+  const targetId =
+    base.symbols[Math.floor(Math.random() * base.symbols.length)].symbolId;
+  const target = SYMBOL_BY_ID[targetId];
+
+  const available = SYMBOLS.filter(
+    (s) => !baseIds.has(s.id) && s.id !== targetId
+  );
+  const sameColor = shuffle(
+    available.filter((s) => s.color === target.color)
+  );
+  const sameCategory = shuffle(
+    available.filter(
+      (s) => s.color !== target.color && s.category === target.category
+    )
+  );
+  const rest = shuffle(
+    available.filter(
+      (s) => s.color !== target.color && s.category !== target.category
+    )
+  );
+
+  const distractors: Symbol[] = [];
+  for (const s of sameColor) {
+    if (distractors.length >= MAX_SAME_COLOR) break;
+    distractors.push(s);
+  }
+  for (const s of sameCategory) {
+    if (distractors.length >= MAX_SIMILAR) break;
+    distractors.push(s);
+  }
+  for (const s of rest) {
+    if (distractors.length >= SYMBOLS_PER_CARD - 1) break;
+    distractors.push(s);
+  }
+  // Si los grupos parecidos eran pequeños, completa con lo que quede.
+  if (distractors.length < SYMBOLS_PER_CARD - 1) {
+    const chosen = new Set(distractors.map((s) => s.id));
+    for (const s of shuffle(available)) {
+      if (distractors.length >= SYMBOLS_PER_CARD - 1) break;
+      if (!chosen.has(s.id)) distractors.push(s);
+    }
+  }
+
   return {
-    card: { id, symbols: placeSymbols([target, ...others]) },
-    targetSymbolId: target,
+    card: {
+      id,
+      symbols: placeSymbols([targetId, ...distractors.map((s) => s.id)]),
+    },
+    targetSymbolId: targetId,
   };
 }
 

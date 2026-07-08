@@ -10,6 +10,7 @@ import {
   type GameResult,
 } from "@/lib/game";
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
+import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import PlayerForm from "./PlayerForm";
 import CardView from "./CardView";
 import GameHUD from "./GameHUD";
@@ -32,8 +33,8 @@ interface Feedback {
   type: "good" | "bad";
 }
 
-const EXIT_ANIMATION_MS = 450;
-const FINAL_CARD_DELAY_MS = 500;
+const EXIT_ANIMATION_MS = 600;
+const FINAL_CARD_DELAY_MS = 650;
 
 function vibrate(pattern: number | number[]) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -57,6 +58,7 @@ export default function GameShell() {
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [bestAverageMs, setBestAverageMs] = useState(0);
   const [leaderboard, setLeaderboard] = useState<GameResult[]>([]);
+  const [muted, setMutedState] = useState(false);
 
   // Estado vivo de la partida: se lee dentro de timeouts/intervalos sin
   // preocuparse por closures viejos.
@@ -71,17 +73,27 @@ export default function GameShell() {
 
   useEffect(() => {
     setLeaderboard(loadLeaderboard());
+    setMutedState(isMuted());
   }, []);
+
+  function toggleMuted() {
+    const next = !muted;
+    setMuted(next);
+    setMutedState(next);
+    if (!next) unlockAudio();
+  }
 
   // Cuenta regresiva 3, 2, 1 → jugar.
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdown === 0) {
+      sound.go();
       startAtRef.current = performance.now();
       setElapsedMs(0);
       setPhase("playing");
       return;
     }
+    sound.tick();
     const t = setTimeout(() => setCountdown((c) => c - 1), 700);
     return () => clearTimeout(t);
   }, [phase, countdown]);
@@ -101,6 +113,7 @@ export default function GameShell() {
   }, [phase]);
 
   function startGame(name: string, deck: number) {
+    unlockAudio();
     const base = generateFirstCard();
     const gen = generateNextCard(base, 2);
     baseRef.current = base;
@@ -150,6 +163,11 @@ export default function GameShell() {
     setLeaderboard(saved.leaderboard);
     setBestAverageMs(Math.min(previousBest, averageMs));
     setIsNewRecord(averageMs < previousBest);
+    if (averageMs < previousBest) {
+      sound.record();
+    } else {
+      sound.finish();
+    }
     setPhase("results");
   }
 
@@ -188,6 +206,8 @@ export default function GameShell() {
       setCardsLeft(remaining);
       setFeedback({ cardId, symbolId, type: "good" });
       vibrate(25);
+      sound.correct();
+      if (remaining > 0) sound.deal(0.2);
 
       if (remaining === 0) {
         // Última carta gastada: el reloj se detiene aquí, la animación cierra.
@@ -214,6 +234,7 @@ export default function GameShell() {
       setFeedback({ cardId, symbolId, type: "bad" });
       setShakeCardId(cardId);
       vibrate([60, 40, 60]);
+      sound.error();
       setTimeout(() => {
         setFeedback(null);
         setShakeCardId(null);
@@ -221,8 +242,31 @@ export default function GameShell() {
     }
   }
 
+  /**
+   * Qué símbolo destella en cada carta: al acertar, el símbolo común brilla
+   * tanto en tu carta como en la base para confirmar el match; al fallar,
+   * solo el símbolo tocado.
+   */
+  function flashSymbolFor(vc: VisualCard): string | null {
+    if (!feedback) return null;
+    if (feedback.type === "bad") {
+      return feedback.cardId === vc.card.id ? feedback.symbolId : null;
+    }
+    return vc.role !== "incoming" || feedback.cardId === vc.card.id
+      ? feedback.symbolId
+      : null;
+  }
+
   return (
     <main className="shell">
+      <button
+        type="button"
+        className="mute-btn"
+        onClick={toggleMuted}
+        aria-label={muted ? "Activar sonido" : "Silenciar"}
+      >
+        {muted ? "🔇" : "🔊"}
+      </button>
       <h1 className="title">
         Avíspate <span>Visual</span> ⚡
       </h1>
@@ -251,12 +295,18 @@ export default function GameShell() {
           <GameHUD
             elapsedMs={elapsedMs}
             cardsLeft={cardsLeft}
+            deckSize={deckSize}
             errors={errors}
           />
           <div className="chain-area">
             <span className="slot-tag slot-tag-base">Base</span>
             <span className="slot-tag slot-tag-mine">Tu carta</span>
             {cardsLeft > 1 && <div className="deck-stack" />}
+            {errors > 0 && (
+              <span key={errors} className="penalty-float">
+                +1s
+              </span>
+            )}
             {cards.map((vc) => (
               <div
                 key={vc.card.id}
@@ -264,12 +314,8 @@ export default function GameShell() {
               >
                 <CardView
                   symbols={vc.card.symbols}
-                  flashSymbolId={
-                    feedback?.cardId === vc.card.id ? feedback.symbolId : null
-                  }
-                  flashType={
-                    feedback?.cardId === vc.card.id ? feedback.type : null
-                  }
+                  flashSymbolId={flashSymbolFor(vc)}
+                  flashType={feedback?.type ?? null}
                   shake={shakeCardId === vc.card.id}
                   disabled={vc.role !== "incoming"}
                   onTap={(symbolId) => handleTap(vc.card.id, symbolId)}
