@@ -1,22 +1,22 @@
 "use client";
 
 import { useState } from "react";
-import { DEFAULT_DURATION_S, DURATION_OPTIONS } from "@/lib/game";
+import { DEFAULT_DECK_SIZE, DECK_OPTIONS } from "@/lib/game";
 
 interface Props {
   initialName: string;
-  onStart: (name: string, durationS: number) => void;
+  onStart: (name: string, deckSize: number) => void;
 }
 
 export default function PlayerForm({ initialName, onStart }: Props) {
   const [name, setName] = useState(initialName);
-  const [duration, setDuration] = useState(DEFAULT_DURATION_S);
+  const [deckSize, setDeckSize] = useState(DEFAULT_DECK_SIZE);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = name.trim();
     if (!trimmed) return;
-    onStart(trimmed, duration);
+    onStart(trimmed, deckSize);
   }
 
   return (
@@ -35,16 +35,16 @@ export default function PlayerForm({ initialName, onStart }: Props) {
       </div>
 
       <div className="field">
-        <label>Duración de la partida</label>
+        <label>Cartas del mazo</label>
         <div className="rounds-options">
-          {DURATION_OPTIONS.map((option) => (
+          {DECK_OPTIONS.map((option) => (
             <button
               key={option}
               type="button"
-              className={option === duration ? "selected" : ""}
-              onClick={() => setDuration(option)}
+              className={option === deckSize ? "selected" : ""}
+              onClick={() => setDeckSize(option)}
             >
-              {option}s
+              {option}
             </button>
           ))}
         </div>
@@ -55,10 +55,10 @@ export default function PlayerForm({ initialName, onStart }: Props) {
       </button>
 
       <p className="hint">
-        Las cartas fluyen en cadena: entre la carta base y la nueva siempre hay{" "}
-        <strong>un símbolo en común</strong>. Tócalo y la carta avanza. Cada
-        acierto seguido sube tu combo; si fallas, pierdes el combo y unos
-        puntos. ¡Pasa todas las cartas que puedas antes de que acabe el tiempo!
+        Tienes un mazo de cartas y una carta base que no se toca. Encuentra en{" "}
+        <strong>tu carta</strong> el símbolo que comparte con la base y tócalo:
+        tu carta pasa a ser la nueva base y sale la siguiente del mazo. Cada
+        error suma 1 segundo. ¡Gasta todo el mazo en el menor tiempo posible!
       </p>
     </form>
   );

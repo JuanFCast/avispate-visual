@@ -1,11 +1,9 @@
 import { SYMBOLS } from "./symbols";
 
-export const DEFAULT_DURATION_S = 60;
-export const DURATION_OPTIONS = [30, 60, 90];
+export const DEFAULT_DECK_SIZE = 10;
+export const DECK_OPTIONS = [10, 15, 20];
 export const SYMBOLS_PER_CARD = 8;
-export const POINTS_CORRECT = 100;
-export const COMBO_BONUS = 10;
-export const ERROR_POINTS = 20;
+export const ERROR_PENALTY_MS = 1000;
 
 export interface PlacedSymbol {
   symbolId: string;
@@ -26,13 +24,15 @@ export interface ChainCard {
 
 export interface GameResult {
   playerName: string;
-  score: number;
-  correct: number;
+  /** Tiempo total en gastar el mazo, penalizaciones incluidas. */
+  totalMs: number;
+  /** Tiempo promedio por carta: la métrica del ranking. */
+  averageMs: number;
+  /** Tamaño del mazo gastado. */
+  cards: number;
   errors: number;
   /** Porcentaje de aciertos 0-100. */
   accuracy: number;
-  maxCombo: number;
-  durationS: number;
   createdAt: string;
 }
 
@@ -107,4 +107,8 @@ export function generateNextCard(
 export function computeAccuracy(correct: number, errors: number): number {
   const total = correct + errors;
   return total === 0 ? 100 : Math.round((correct / total) * 100);
+}
+
+export function formatMs(ms: number): string {
+  return `${(ms / 1000).toFixed(2)}s`;
 }

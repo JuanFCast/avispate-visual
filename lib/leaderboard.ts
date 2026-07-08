@@ -1,14 +1,17 @@
 import type { GameResult } from "./game";
 
-// v2: el modo individual pasó de rondas fijas a cadena continua contrarreloj.
-const STORAGE_KEY = "visualRushLeaderboard_v2";
+// v3: el modo individual es gastar el mazo en el menor tiempo posible.
+const STORAGE_KEY = "visualRushLeaderboard_v3";
 const MAX_ENTRIES = 20;
 
-/** Más puntos primero; si empatan, mayor precisión y luego más aciertos. */
+/**
+ * Menor tiempo promedio por carta primero (comparable entre mazos de distinto
+ * tamaño); si empatan, menos errores y luego menor tiempo total.
+ */
 export function sortResults(results: GameResult[]): GameResult[] {
   return [...results].sort(
     (a, b) =>
-      b.score - a.score || b.accuracy - a.accuracy || b.correct - a.correct
+      a.averageMs - b.averageMs || a.errors - b.errors || a.totalMs - b.totalMs
   );
 }
 

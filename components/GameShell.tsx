@@ -5,9 +5,7 @@ import {
   computeAccuracy,
   generateFirstCard,
   generateNextCard,
-  COMBO_BONUS,
-  ERROR_POINTS,
-  POINTS_CORRECT,
+  ERROR_PENALTY_MS,
   type ChainCard,
   type GameResult,
 } from "@/lib/game";
@@ -35,6 +33,7 @@ interface Feedback {
 }
 
 const EXIT_ANIMATION_MS = 450;
+const FINAL_CARD_DELAY_MS = 500;
 
 function vibrate(pattern: number | number[]) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -45,19 +44,18 @@ function vibrate(pattern: number | number[]) {
 export default function GameShell() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [playerName, setPlayerName] = useState("");
-  const [durationS, setDurationS] = useState(60);
+  const [deckSize, setDeckSize] = useState(10);
   const [cards, setCards] = useState<VisualCard[]>([]);
   const [countdown, setCountdown] = useState(3);
-  const [timeLeftMs, setTimeLeftMs] = useState(0);
-  const [score, setScore] = useState(0);
-  const [combo, setCombo] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [cardsLeft, setCardsLeft] = useState(0);
   const [errors, setErrors] = useState(0);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [shakeCardId, setShakeCardId] = useState<number | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
   const [position, setPosition] = useState(-1);
   const [isNewRecord, setIsNewRecord] = useState(false);
-  const [bestScore, setBestScore] = useState(0);
+  const [bestAverageMs, setBestAverageMs] = useState(0);
   const [leaderboard, setLeaderboard] = useState<GameResult[]>([]);
 
   // Estado vivo de la partida: se lee dentro de timeouts/intervalos sin
@@ -66,12 +64,9 @@ export default function GameShell() {
   const incomingRef = useRef<ChainCard | null>(null);
   const targetRef = useRef("");
   const nextIdRef = useRef(3);
-  const scoreRef = useRef(0);
-  const correctRef = useRef(0);
+  const spentRef = useRef(0);
   const errorsRef = useRef(0);
-  const comboRef = useRef(0);
-  const maxComboRef = useRef(0);
-  const endAtRef = useRef(0);
+  const startAtRef = useRef(0);
   const finishedRef = useRef(false);
 
   useEffect(() => {
@@ -82,53 +77,48 @@ export default function GameShell() {
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdown === 0) {
-      endAtRef.current = performance.now() + durationS * 1000;
-      setTimeLeftMs(durationS * 1000);
+      startAtRef.current = performance.now();
+      setElapsedMs(0);
       setPhase("playing");
       return;
     }
     const t = setTimeout(() => setCountdown((c) => c - 1), 700);
     return () => clearTimeout(t);
-  }, [phase, countdown, durationS]);
+  }, [phase, countdown]);
 
-  // Reloj de la partida: al llegar a cero se termina el juego.
+  // Cronómetro hacia arriba: tiempo real + 1s de penalización por error.
   useEffect(() => {
     if (phase !== "playing") return;
     const interval = setInterval(() => {
-      const left = endAtRef.current - performance.now();
-      if (left <= 0) {
-        setTimeLeftMs(0);
-        finishGame();
-      } else {
-        setTimeLeftMs(left);
-      }
+      if (finishedRef.current) return;
+      setElapsedMs(
+        performance.now() -
+          startAtRef.current +
+          errorsRef.current * ERROR_PENALTY_MS
+      );
     }, 100);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
-  function startGame(name: string, duration: number) {
+  function startGame(name: string, deck: number) {
     const base = generateFirstCard();
     const gen = generateNextCard(base, 2);
     baseRef.current = base;
     incomingRef.current = gen.card;
     targetRef.current = gen.targetSymbolId;
     nextIdRef.current = 3;
-    scoreRef.current = 0;
-    correctRef.current = 0;
+    spentRef.current = 0;
     errorsRef.current = 0;
-    comboRef.current = 0;
-    maxComboRef.current = 0;
     finishedRef.current = false;
 
     setPlayerName(name);
-    setDurationS(duration);
+    setDeckSize(deck);
+    setCardsLeft(deck);
     setCards([
       { card: base, role: "base", fresh: true },
       { card: gen.card, role: "incoming", fresh: true },
     ]);
-    setScore(0);
-    setCombo(0);
+    setElapsedMs(0);
     setErrors(0);
     setFeedback(null);
     setShakeCardId(null);
@@ -139,53 +129,49 @@ export default function GameShell() {
     setPhase("countdown");
   }
 
-  function finishGame() {
+  function finishGame(totalMs: number) {
     if (finishedRef.current) return;
     finishedRef.current = true;
 
-    const previousBest = loadLeaderboard()[0]?.score ?? 0;
+    const previousBest = loadLeaderboard()[0]?.averageMs ?? Infinity;
+    const averageMs = Math.round(totalMs / deckSize);
     const gameResult: GameResult = {
       playerName,
-      score: scoreRef.current,
-      correct: correctRef.current,
+      totalMs: Math.round(totalMs),
+      averageMs,
+      cards: deckSize,
       errors: errorsRef.current,
-      accuracy: computeAccuracy(correctRef.current, errorsRef.current),
-      maxCombo: maxComboRef.current,
-      durationS,
+      accuracy: computeAccuracy(deckSize, errorsRef.current),
       createdAt: new Date().toISOString(),
     };
     const saved = saveResult(gameResult);
     setResult(gameResult);
     setPosition(saved.position);
     setLeaderboard(saved.leaderboard);
-    setBestScore(Math.max(previousBest, gameResult.score));
-    setIsNewRecord(gameResult.score > previousBest && gameResult.score > 0);
+    setBestAverageMs(Math.min(previousBest, averageMs));
+    setIsNewRecord(averageMs < previousBest);
     setPhase("results");
   }
 
-  /**
-   * Avanza la cadena: la carta base sale, la entrante pasa a ser la nueva base
-   * y se reparte una carta nueva. Los cambios de rol animan por CSS.
-   */
-  function advanceChain() {
+  /** Rota roles: la base vieja sale y tu carta pasa a ser la nueva base. */
+  function promoteCards(newIncoming: ChainCard | null) {
     const exiting = baseRef.current!;
     const newBase = incomingRef.current!;
-    const gen = generateNextCard(newBase, nextIdRef.current++);
     baseRef.current = newBase;
-    incomingRef.current = gen.card;
-    targetRef.current = gen.targetSymbolId;
+    incomingRef.current = newIncoming;
 
-    setCards((prev) =>
-      prev
-        .map((c) =>
-          c.card.id === exiting.id
-            ? { ...c, role: "exiting" as Role }
-            : c.card.id === newBase.id
-              ? { ...c, role: "base" as Role }
-              : c
-        )
-        .concat({ card: gen.card, role: "incoming", fresh: true })
-    );
+    setCards((prev) => {
+      const rotated = prev.map((c) =>
+        c.card.id === exiting.id
+          ? { ...c, role: "exiting" as Role }
+          : c.card.id === newBase.id
+            ? { ...c, role: "base" as Role }
+            : c
+      );
+      return newIncoming
+        ? rotated.concat({ card: newIncoming, role: "incoming", fresh: true })
+        : rotated;
+    });
     setTimeout(() => {
       setCards((prev) => prev.filter((c) => c.card.id !== exiting.id));
     }, EXIT_ANIMATION_MS);
@@ -193,18 +179,30 @@ export default function GameShell() {
 
   function handleTap(cardId: number, symbolId: string) {
     if (phase !== "playing" || finishedRef.current) return;
+    // Solo se juega con tu carta: la base es de referencia y no responde.
+    if (cardId !== incomingRef.current?.id) return;
 
     if (symbolId === targetRef.current) {
-      comboRef.current += 1;
-      maxComboRef.current = Math.max(maxComboRef.current, comboRef.current);
-      correctRef.current += 1;
-      scoreRef.current +=
-        POINTS_CORRECT + (comboRef.current - 1) * COMBO_BONUS;
-      setScore(scoreRef.current);
-      setCombo(comboRef.current);
+      spentRef.current += 1;
+      const remaining = deckSize - spentRef.current;
+      setCardsLeft(remaining);
       setFeedback({ cardId, symbolId, type: "good" });
       vibrate(25);
-      advanceChain();
+
+      if (remaining === 0) {
+        // Última carta gastada: el reloj se detiene aquí, la animación cierra.
+        const totalMs =
+          performance.now() -
+          startAtRef.current +
+          errorsRef.current * ERROR_PENALTY_MS;
+        setElapsedMs(totalMs);
+        promoteCards(null);
+        setTimeout(() => finishGame(totalMs), FINAL_CARD_DELAY_MS);
+      } else {
+        const gen = generateNextCard(incomingRef.current, nextIdRef.current++);
+        targetRef.current = gen.targetSymbolId;
+        promoteCards(gen.card);
+      }
       setTimeout(() => {
         setFeedback((f) =>
           f && f.cardId === cardId && f.type === "good" ? null : f
@@ -212,11 +210,7 @@ export default function GameShell() {
       }, 250);
     } else {
       errorsRef.current += 1;
-      comboRef.current = 0;
-      scoreRef.current = Math.max(0, scoreRef.current - ERROR_POINTS);
       setErrors(errorsRef.current);
-      setCombo(0);
-      setScore(scoreRef.current);
       setFeedback({ cardId, symbolId, type: "bad" });
       setShakeCardId(cardId);
       vibrate([60, 40, 60]);
@@ -236,8 +230,8 @@ export default function GameShell() {
       {phase === "setup" && (
         <>
           <p className="subtitle">
-            Las cartas fluyen una tras otra: encuentra el símbolo común, tócalo
-            y sigue avanzando antes de que se acabe el tiempo.
+            Gasta tu mazo en el menor tiempo posible: encuentra en tu carta el
+            símbolo que comparte con la base y tócalo.
           </p>
           <PlayerForm initialName={playerName} onStart={startGame} />
           <div style={{ width: "100%", maxWidth: 420 }}>
@@ -255,12 +249,14 @@ export default function GameShell() {
       {phase === "playing" && (
         <>
           <GameHUD
-            timeLeftMs={timeLeftMs}
-            score={score}
-            combo={combo}
+            elapsedMs={elapsedMs}
+            cardsLeft={cardsLeft}
             errors={errors}
           />
           <div className="chain-area">
+            <span className="slot-tag slot-tag-base">Base</span>
+            <span className="slot-tag slot-tag-mine">Tu carta</span>
+            {cardsLeft > 1 && <div className="deck-stack" />}
             {cards.map((vc) => (
               <div
                 key={vc.card.id}
@@ -275,7 +271,7 @@ export default function GameShell() {
                     feedback?.cardId === vc.card.id ? feedback.type : null
                   }
                   shake={shakeCardId === vc.card.id}
-                  disabled={vc.role === "exiting"}
+                  disabled={vc.role !== "incoming"}
                   onTap={(symbolId) => handleTap(vc.card.id, symbolId)}
                 />
               </div>
@@ -289,9 +285,9 @@ export default function GameShell() {
           <ResultsPanel
             result={result}
             position={position}
-            bestScore={bestScore}
+            bestAverageMs={bestAverageMs}
             isNewRecord={isNewRecord}
-            onPlayAgain={() => startGame(playerName, durationS)}
+            onPlayAgain={() => startGame(playerName, deckSize)}
             onChangePlayer={() => setPhase("setup")}
           />
           <div style={{ width: "100%", maxWidth: 420 }}>

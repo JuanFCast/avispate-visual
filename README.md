@@ -1,10 +1,11 @@
 # Avíspate Visual ⚡
 
 Juego de agilidad visual inspirado en cartas circulares con símbolos comunes.
-Las cartas fluyen en cadena continua: una carta base y una carta nueva, con
-**exactamente un símbolo en común** entre ambas. Al tocarlo, la carta nueva
-pasa a ser la base (con animación), la vieja sale de pantalla y entra otra del
-mazo. Así hasta que se acaba el tiempo.
+Tienes un mazo de cartas y una carta base de referencia (que no se toca). Tu
+carta y la base comparten **exactamente un símbolo**: encuéntralo en tu carta
+y tócalo. Tu carta pasa a ser la nueva base (con animación), la vieja sale de
+pantalla y entra la siguiente del mazo. Gana quien gaste todo el mazo en el
+menor tiempo.
 
 MVP individual: sin login, sin backend, sin pagos. El ranking se guarda en
 `localStorage` del navegador (`visualRushLeaderboard_v1`, top 20).
@@ -20,15 +21,16 @@ Abrir <http://localhost:3000/visual-rush> (la raíz `/` redirige ahí).
 
 ## Reglas
 
-- Partida contrarreloj: 60s por defecto (selector de 30 / 60 / 90 al inicio).
-- Acierto: +100 puntos + bono de combo (+10 por cada acierto seguido extra),
-  y la cadena avanza a la siguiente carta.
-- Error: −20 puntos, se pierde el combo y la carta tiembla; se puede seguir
+- Mazo de 10 cartas por defecto (selector de 10 / 15 / 20 al inicio).
+- El cronómetro corre hacia arriba desde la primera carta.
+- Solo se toca **tu carta** (la de abajo/derecha); la base es de referencia.
+- Acierto: tu carta se convierte en la base y sale la siguiente del mazo.
+- Error: +1 segundo de penalización y la carta tiembla; puedes seguir
   intentando.
-- Al final: puntaje, cartas acertadas, errores, precisión, mejor combo y
-  mejor marca personal.
-- Ranking ordenado por puntos; en empate gana mayor precisión y luego más
-  cartas acertadas.
+- Al final: tiempo total, promedio por carta, errores, precisión y mejor
+  marca personal.
+- Ranking ordenado por menor tiempo promedio por carta (comparable entre
+  mazos de distinto tamaño); en empate, menos errores.
 
 ## Estructura
 
