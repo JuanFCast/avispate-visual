@@ -326,44 +326,79 @@ body {
   }
 }
 
-/* ---------- HUD ---------- */
+/* ---------- HUD de partida ---------- */
 
-.hud {
+/* Franja superior: progreso rotulado + sonido, con aire antes del tablero. */
+.play-top {
   width: 100%;
   max-width: 720px;
   display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding: 10px 4px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  margin-bottom: clamp(20px, 3vh, 36px);
 }
 
-.hud-item {
+.play-top .progress-wrap {
+  margin: 0;
+  flex: 1;
+}
+
+.play-top .mute-btn {
+  width: 36px;
+  height: 36px;
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+
+/* Estadísticas a los lados del tablero: las cartas son las protagonistas. */
+.play-board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.side-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stat-pill {
+  width: 52px;
   background: var(--white);
   border: 2px solid var(--gray-soft);
-  border-radius: 16px;
-  padding: 6px 14px;
-  text-align: center;
-  min-width: 84px;
+  border-radius: 14px;
+  padding: 7px 2px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
 }
 
-.hud-item .hud-label {
-  display: block;
-  font-size: 0.66rem;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-weight: 800;
-  color: var(--gray);
+.stat-pill .sp-emoji {
+  font-size: 0.95rem;
 }
 
-.hud-item .hud-value {
+.stat-pill .sp-value {
   font-family: var(--font-title);
-  font-size: 1.1rem;
+  font-size: 0.78rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
-/* Progreso del mazo: rotulado y con aire antes del tablero. */
+.stat-pill .sp-label {
+  font-size: 0.5rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray);
+}
+
+/* Progreso del mazo rotulado. */
 .progress-wrap {
   width: 100%;
   max-width: 720px;
@@ -371,8 +406,6 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 6px;
-  margin-top: 4px;
-  margin-bottom: clamp(24px, 3vh, 40px);
 }
 
 .progress-label {
@@ -548,8 +581,31 @@ body {
 /* Pantallas anchas o celular horizontal: las cartas van lado a lado. */
 @media (min-width: 760px), (orientation: landscape) {
   .shell.playing {
-    /* una sola fila de cartas: solo se resta el chrome vertical una vez */
-    --card-d: min(38vw, calc(100dvh - 214px), 340px);
+    /* una sola fila de cartas, más grandes: se resta el chrome vertical una
+       vez y el ancho de las píldoras laterales */
+    --card-d: min(calc(50vw - 150px), calc(100dvh - 156px), 420px);
+  }
+
+  .play-board {
+    gap: 18px;
+  }
+
+  .stat-pill {
+    width: 76px;
+    padding: 10px 4px;
+    gap: 3px;
+  }
+
+  .stat-pill .sp-emoji {
+    font-size: 1.15rem;
+  }
+
+  .stat-pill .sp-value {
+    font-size: 0.95rem;
+  }
+
+  .stat-pill .sp-label {
+    font-size: 0.58rem;
   }
 
   .chain-area {
@@ -623,35 +679,15 @@ body {
 .shell.playing {
   height: 100dvh;
   overflow: hidden;
-  /* alto disponible ≈ 100dvh − (padding 32 + topbar 36 + HUD 66 + progreso
-     rotulado con su aire 62 + margen del tablero 16 + gap entre cartas 24)
-     → mitad para cada carta */
-  --card-d: min(88vw, calc(50dvh - 120px), 340px);
-}
-
-.shell.playing .topbar {
-  margin-top: 0;
-  grid-template-columns: 36px 1fr 36px;
+  max-width: 1200px;
+  /* Sin barra de título ni HUD arriba, las cartas toman el máximo:
+     ancho = 100vw − padding 32 − píldoras laterales 2×(52+6);
+     alto = (100dvh − franja de progreso y márgenes) / 2 − gap */
+  --card-d: min(calc(100vw - 152px), calc(50dvh - 64px), 340px);
 }
 
 .shell.playing .chain-area {
   margin-bottom: 8px;
-}
-
-.shell.playing .title {
-  font-size: 1.2rem;
-}
-
-.shell.playing .brand-icon {
-  width: 26px;
-  height: 26px;
-  border-radius: 7px;
-}
-
-.shell.playing .mute-btn {
-  width: 36px;
-  height: 36px;
-  font-size: 1rem;
 }
 
 /* ---------- Cartas circulares ---------- */

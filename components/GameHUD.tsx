@@ -1,38 +1,26 @@
 "use client";
 
-import { formatMs } from "@/lib/game";
-
 interface Props {
-  elapsedMs: number;
-  cardsLeft: number;
   deckSize: number;
-  errors: number;
+  cardsLeft: number;
+  muted: boolean;
+  onToggleMute: () => void;
 }
 
+/**
+ * Franja superior durante la partida: ronda actual, barra de progreso y el
+ * toggle de sonido. El resto de estadísticas vive a los lados del tablero.
+ */
 export default function GameHUD({
-  elapsedMs,
-  cardsLeft,
   deckSize,
-  errors,
+  cardsLeft,
+  muted,
+  onToggleMute,
 }: Props) {
   const spent = deckSize - cardsLeft;
 
   return (
-    <>
-      <div className="hud">
-        <div className="hud-item">
-          <span className="hud-label">Tiempo</span>
-          <span className="hud-value">{formatMs(elapsedMs)}</span>
-        </div>
-        <div className="hud-item">
-          <span className="hud-label">Cartas</span>
-          <span className="hud-value">{cardsLeft}</span>
-        </div>
-        <div className="hud-item">
-          <span className="hud-label">Errores</span>
-          <span className="hud-value">{errors}</span>
-        </div>
-      </div>
+    <div className="play-top">
       <div className="progress-wrap">
         <span className="progress-label">
           Ronda {Math.min(spent + 1, deckSize)} de {deckSize}
@@ -50,6 +38,14 @@ export default function GameHUD({
           />
         </div>
       </div>
-    </>
+      <button
+        type="button"
+        className="mute-btn"
+        onClick={onToggleMute}
+        aria-label={muted ? "Activar sonido" : "Silenciar"}
+      >
+        {muted ? "🔇" : "🔊"}
+      </button>
+    </div>
   );
 }

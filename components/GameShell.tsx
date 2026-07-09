@@ -259,25 +259,29 @@ export default function GameShell() {
 
   return (
     <main className={`shell${phase === "playing" ? " playing" : ""}`}>
-      <header className="topbar">
-        <span className="topbar-side" aria-hidden="true" />
-        <h1 className="title">
-          {/* En el inicio la avispa ya protagoniza como héroe: no se repite. */}
-          {phase !== "setup" && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src="/logo-avispate.png" alt="" className="brand-icon" />
-          )}
-          Avíspate
-        </h1>
-        <button
-          type="button"
-          className="mute-btn"
-          onClick={toggleMuted}
-          aria-label={muted ? "Activar sonido" : "Silenciar"}
-        >
-          {muted ? "🔇" : "🔊"}
-        </button>
-      </header>
+      {/* La marca vive en menús y resultados; durante la partida el HUD es
+          mínimo y la barra superior desaparece. */}
+      {phase !== "playing" && (
+        <header className="topbar">
+          <span className="topbar-side" aria-hidden="true" />
+          <h1 className="title">
+            {/* En el inicio la avispa ya protagoniza como héroe: no se repite. */}
+            {phase !== "setup" && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src="/logo-avispate.png" alt="" className="brand-icon" />
+            )}
+            Avíspate
+          </h1>
+          <button
+            type="button"
+            className="mute-btn"
+            onClick={toggleMuted}
+            aria-label={muted ? "Activar sonido" : "Silenciar"}
+          >
+            {muted ? "🔇" : "🔊"}
+          </button>
+        </header>
+      )}
 
       {phase === "setup" && (
         <>
@@ -319,35 +323,58 @@ export default function GameShell() {
       {phase === "playing" && (
         <>
           <GameHUD
-            elapsedMs={elapsedMs}
-            cardsLeft={cardsLeft}
             deckSize={deckSize}
-            errors={errors}
+            cardsLeft={cardsLeft}
+            muted={muted}
+            onToggleMute={toggleMuted}
           />
-          <div className="chain-area">
-            <span className="slot-tag slot-tag-base">Base</span>
-            <span className="slot-tag slot-tag-mine">Tu carta</span>
-            {cardsLeft > 1 && <div className="deck-stack" />}
-            {errors > 0 && (
-              <span key={errors} className="penalty-float">
-                +1s
-              </span>
-            )}
-            {cards.map((vc) => (
-              <div
-                key={vc.card.id}
-                className={`chain-card slot-${vc.role}${vc.fresh ? " fresh" : ""}`}
-              >
-                <CardView
-                  symbols={vc.card.symbols}
-                  flashSymbolId={flashSymbolFor(vc)}
-                  flashType={feedback?.type ?? null}
-                  shake={shakeCardId === vc.card.id}
-                  disabled={vc.role !== "incoming"}
-                  onTap={(symbolId) => handleTap(vc.card.id, symbolId)}
-                />
+          <div className="play-board">
+            <aside className="side-stats">
+              <div className="stat-pill">
+                <span className="sp-emoji">⏱️</span>
+                <span className="sp-value">
+                  {(elapsedMs / 1000).toFixed(1)}s
+                </span>
+                <span className="sp-label">tiempo</span>
               </div>
-            ))}
+            </aside>
+            <div className="chain-area">
+              <span className="slot-tag slot-tag-base">Base</span>
+              <span className="slot-tag slot-tag-mine">Tu carta</span>
+              {cardsLeft > 1 && <div className="deck-stack" />}
+              {errors > 0 && (
+                <span key={errors} className="penalty-float">
+                  +1s
+                </span>
+              )}
+              {cards.map((vc) => (
+                <div
+                  key={vc.card.id}
+                  className={`chain-card slot-${vc.role}${vc.fresh ? " fresh" : ""}`}
+                >
+                  <CardView
+                    symbols={vc.card.symbols}
+                    flashSymbolId={flashSymbolFor(vc)}
+                    flashType={feedback?.type ?? null}
+                    shake={shakeCardId === vc.card.id}
+                    disabled={vc.role !== "incoming"}
+                    onTap={(symbolId) => handleTap(vc.card.id, symbolId)}
+                  />
+                </div>
+              ))}
+            </div>
+            <aside className="side-stats">
+              <div className="stat-pill">
+                <span className="sp-emoji">🃏</span>
+                <span className="sp-value">{cardsLeft}</span>
+                <span className="sp-label">cartas</span>
+              </div>
+              <div className="stat-pill">
+                <span className="sp-emoji">💥</span>
+                <span className="sp-value">{errors}</span>
+                <span className="sp-label">errores</span>
+              </div>
+            </aside>
           </div>
         </>
       )}
