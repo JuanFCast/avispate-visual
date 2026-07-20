@@ -915,3 +915,96 @@ body {
   text-align: center;
   padding: 12px 0;
 }
+
+/* ---------- Barra de sesión (Privy) ---------- */
+
+.auth-bar {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  min-height: 44px;
+}
+
+.auth-bar-muted {
+  justify-content: center;
+  color: var(--gray);
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.auth-btn {
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 2px solid var(--gray-soft);
+  background: var(--white);
+  color: var(--ink);
+  box-shadow: 0 3px 0 var(--gray-soft);
+  cursor: pointer;
+  transition: transform 0.05s ease;
+}
+
+.auth-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--gray-soft);
+}
+
+.auth-btn-primary {
+  width: 100%;
+  background: var(--yellow);
+  border-color: var(--yellow-deep);
+  box-shadow: 0 3px 0 var(--yellow-press);
+}
+
+.auth-btn-primary:active {
+  box-shadow: 0 1px 0 var(--yellow-press);
+}
+
+.auth-address {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 2px solid var(--cyan-soft);
+  background: var(--cyan-soft);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.auth-address-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.auth-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--good);
+  box-shadow: 0 0 0 3px rgba(47, 191, 113, 0.2);
+}
+
+.auth-copy-hint {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+
+.auth-address-pending {
+  cursor: default;
+  color: var(--gray);
+  border-color: var(--gray-soft);
+  background: var(--gray-soft);
+}

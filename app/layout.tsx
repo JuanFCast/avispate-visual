@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fredoka, Nunito } from "next/font/google";
 import "./globals.css";
+import { Providers } from "@/lib/privy-provider";
 
 const fredoka = Fredoka({
   subsets: ["latin"],
@@ -32,7 +33,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${fredoka.variable} ${nunito.variable}`}>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   );
 }

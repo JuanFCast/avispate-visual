@@ -11,6 +11,7 @@ import {
 } from "@/lib/game";
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
+import AuthBar from "./AuthBar";
 import PlayerForm from "./PlayerForm";
 import CardView from "./CardView";
 import GameHUD from "./GameHUD";
@@ -285,6 +286,7 @@ export default function GameShell() {
 
       {phase === "setup" && (
         <>
+          <AuthBar />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-avispate.png" alt="Avíspate" className="hero-icon" />
           <p className="subtitle">
