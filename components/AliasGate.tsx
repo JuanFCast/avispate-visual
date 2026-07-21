@@ -5,26 +5,15 @@ import { useProfile } from "@/lib/profile-context";
 import { validateAlias, ALIAS_MAX } from "@/lib/alias";
 
 /**
- * Alias obligatorio tras iniciar sesión con Privy. Si el jugador aún no tiene
- * alias, muestra un formulario para elegirlo; una vez fijado, muestra con
- * quién está jugando. No aparece si no hay sesión (de eso se encarga AuthBar).
+ * Creación del alias (username) la primera vez. Es obligatorio para jugar y se
+ * elige una sola vez; luego se cambia desde el perfil (el lápiz en la barra de
+ * sesión). GameShell solo monta esto cuando el jugador aún no tiene alias.
  */
 export default function AliasGate() {
-  const { authenticated, loading, alias, setAlias } = useProfile();
+  const { setAlias } = useProfile();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  if (!authenticated) return null;
-  if (loading) return <div className="alias-gate alias-gate-muted">Cargando perfil…</div>;
-
-  if (alias) {
-    return (
-      <div className="alias-gate alias-gate-set">
-        Jugando como <strong>{alias}</strong>
-      </div>
-    );
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,29 +36,27 @@ export default function AliasGate() {
   }
 
   return (
-    <form className="alias-gate alias-gate-form" onSubmit={submit}>
-      <label className="alias-label" htmlFor="alias-input">
-        Elige tu alias para el ranking
-      </label>
-      <div className="alias-row">
+    <form className="panel alias-setup" onSubmit={submit}>
+      <div className="field">
+        <label htmlFor="alias-input">Crea tu alias</label>
         <input
           id="alias-input"
-          className="alias-input"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           maxLength={ALIAS_MAX}
-          placeholder="Tu nombre de jugador"
+          placeholder="Ej: Vale"
           autoComplete="off"
+          autoFocus
         />
-        <button
-          type="submit"
-          className="auth-btn auth-btn-primary alias-save"
-          disabled={saving}
-        >
-          {saving ? "Guardando…" : "Guardar"}
-        </button>
       </div>
+      <button type="submit" className="btn-primary" disabled={saving || !value.trim()}>
+        {saving ? "Guardando…" : "Guardar y continuar"}
+      </button>
       {error && <p className="alias-error">{error}</p>}
+      <p className="hint">
+        Así te verán en el ranking. Es único y lo eliges una vez; luego puedes
+        cambiarlo desde tu perfil. 🐝
+      </p>
     </form>
   );
 }

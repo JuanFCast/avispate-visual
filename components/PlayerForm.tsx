@@ -4,36 +4,19 @@ import { useState } from "react";
 import { DEFAULT_DECK_SIZE, DECK_OPTIONS } from "@/lib/game";
 
 interface Props {
-  initialName: string;
-  onStart: (name: string, deckSize: number) => void;
+  onStart: (deckSize: number) => void;
 }
 
-export default function PlayerForm({ initialName, onStart }: Props) {
-  const [name, setName] = useState(initialName);
+export default function PlayerForm({ onStart }: Props) {
   const [deckSize, setDeckSize] = useState(DEFAULT_DECK_SIZE);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    onStart(trimmed, deckSize);
+    onStart(deckSize);
   }
 
   return (
     <form className="panel" onSubmit={handleSubmit}>
-      <div className="field">
-        <label htmlFor="player-name">Tu nombre o alias</label>
-        <input
-          id="player-name"
-          type="text"
-          value={name}
-          maxLength={20}
-          placeholder="Ej: Vale"
-          autoComplete="off"
-          onChange={(e) => setName(e.target.value)}
-        />
-      </div>
-
       <div className="field">
         <label>Cartas del mazo</label>
         <div className="rounds-options">
@@ -50,7 +33,7 @@ export default function PlayerForm({ initialName, onStart }: Props) {
         </div>
       </div>
 
-      <button type="submit" className="btn-primary" disabled={!name.trim()}>
+      <button type="submit" className="btn-primary">
         Iniciar partida
       </button>
 

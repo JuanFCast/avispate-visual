@@ -1175,3 +1175,144 @@ body {
   font-size: 0.9rem;
   font-weight: 700;
 }
+
+/* ---------- Barra de perfil (alias editable) ---------- */
+
+.profile-bar {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.profile-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-alias {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--yellow-deep);
+  background: var(--yellow-soft);
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.profile-alias-name {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-edit {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.profile-edit-form {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-edit-input {
+  width: 130px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 2px solid var(--yellow-deep);
+  background: var(--white);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.9rem;
+  color: var(--ink);
+}
+
+.profile-edit-input:focus {
+  outline: none;
+  border-color: var(--cyan);
+}
+
+.profile-edit-ok,
+.profile-edit-cancel {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-soft);
+  background: var(--white);
+  font-weight: 800;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.profile-edit-ok {
+  border-color: var(--good);
+  color: var(--good);
+}
+
+.profile-edit-cancel {
+  color: var(--gray);
+}
+
+.profile-wallet {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 2px solid var(--cyan-soft);
+  background: var(--cyan-soft);
+  font-family: var(--font-body);
+  font-weight: 800;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.profile-wallet-value {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.profile-copy {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+
+.profile-wallet-pending {
+  cursor: default;
+  color: var(--gray);
+  border-color: var(--gray-soft);
+  background: var(--gray-soft);
+}
+
+.profile-logout {
+  padding: 8px 14px;
+  font-size: 0.9rem;
+}
+
+.profile-error {
+  width: 100%;
+  text-align: right;
+  margin-top: 2px;
+}
+
+.alias-setup .field {
+  text-align: left;
+}

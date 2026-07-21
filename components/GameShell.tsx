@@ -352,13 +352,12 @@ export default function GameShell() {
             <p className="access-note">Cargando…</p>
           ) : !profile.authenticated ? (
             <AccessCard />
+          ) : profile.loading ? (
+            <p className="access-note">Cargando perfil…</p>
+          ) : profile.alias ? (
+            <PlayerForm onStart={(deck) => startGame(profile.alias ?? "", deck)} />
           ) : (
-            <>
-              <AliasGate />
-              {profile.alias && (
-                <PlayerForm initialName={playerName} onStart={startGame} />
-              )}
-            </>
+            <AliasGate />
           )}
           <div style={{ width: "100%", maxWidth: 420 }}>
             <GlobalLeaderboard deckSize={deckSize} refreshKey={globalRefresh} />
@@ -441,7 +440,7 @@ export default function GameShell() {
             position={position}
             bestAverageMs={bestAverageMs}
             isNewRecord={isNewRecord}
-            onPlayAgain={() => startGame(playerName, deckSize)}
+            onPlayAgain={() => startGame(profile.alias ?? playerName, deckSize)}
             onChangePlayer={() => setPhase("setup")}
           />
           <div style={{ width: "100%", maxWidth: 420 }}>

@@ -63,7 +63,7 @@ export default function ResultsPanel({
         Jugar otra vez
       </button>
       <button type="button" className="btn-secondary" onClick={onChangePlayer}>
-        Cambiar jugador
+        Volver al menú
       </button>
     </div>
   );
