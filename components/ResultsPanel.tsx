@@ -4,7 +4,6 @@ import { formatMs, type GameResult } from "@/lib/game";
 
 interface Props {
   result: GameResult;
-  position: number;
   bestAverageMs: number;
   isNewRecord: boolean;
   onPlayAgain: () => void;
@@ -13,7 +12,6 @@ interface Props {
 
 export default function ResultsPanel({
   result,
-  position,
   bestAverageMs,
   isNewRecord,
   onPlayAgain,
@@ -24,11 +22,6 @@ export default function ResultsPanel({
       {isNewRecord && (
         <p className="rank-note">
           🔥 ¡Nuevo récord personal, {result.playerName}!
-        </p>
-      )}
-      {!isNewRecord && position > 0 && (
-        <p className="rank-note">
-          🏆 {result.playerName}, quedaste en el puesto #{position} del ranking
         </p>
       )}
 

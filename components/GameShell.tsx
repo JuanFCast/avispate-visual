@@ -19,7 +19,6 @@ import PlayerForm from "./PlayerForm";
 import CardView from "./CardView";
 import GameHUD from "./GameHUD";
 import ResultsPanel from "./ResultsPanel";
-import LocalLeaderboard from "./LocalLeaderboard";
 import GlobalLeaderboard from "./GlobalLeaderboard";
 
 type Phase = "setup" | "countdown" | "playing" | "results";
@@ -59,10 +58,8 @@ export default function GameShell() {
   const [feedback, setFeedback] = useState<Feedback | null>(null);
   const [shakeCardId, setShakeCardId] = useState<number | null>(null);
   const [result, setResult] = useState<GameResult | null>(null);
-  const [position, setPosition] = useState(-1);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [bestAverageMs, setBestAverageMs] = useState(0);
-  const [leaderboard, setLeaderboard] = useState<GameResult[]>([]);
   const [muted, setMutedState] = useState(false);
   const [globalRefresh, setGlobalRefresh] = useState(0);
 
@@ -80,7 +77,6 @@ export default function GameShell() {
   const finishedRef = useRef(false);
 
   useEffect(() => {
-    setLeaderboard(loadLeaderboard());
     setMutedState(isMuted());
   }, []);
 
@@ -144,7 +140,6 @@ export default function GameShell() {
     setFeedback(null);
     setShakeCardId(null);
     setResult(null);
-    setPosition(-1);
     setIsNewRecord(false);
     setCountdown(3);
     setPhase("countdown");
@@ -152,8 +147,8 @@ export default function GameShell() {
 
   /**
    * Envía el resultado al ranking global (best-effort). Solo si hay sesión con
-   * alias; si falla, el ranking local ya quedó guardado. El `clientGameId`
-   * hace el envío idempotente en el servidor.
+   * alias; si falla, no pasa nada (el récord personal ya quedó guardado). El
+   * `clientGameId` hace el envío idempotente en el servidor.
    */
   async function submitScore(r: GameResult) {
     if (!profile.authenticated || !profile.alias) return;
@@ -177,7 +172,7 @@ export default function GameShell() {
       });
       if (res.ok) setGlobalRefresh((n) => n + 1);
     } catch {
-      // El ranking global es best-effort; el local ya se guardó.
+      // El ranking global es best-effort; el récord personal ya se guardó.
     }
   }
 
@@ -196,11 +191,10 @@ export default function GameShell() {
       accuracy: computeAccuracy(deckSize, errorsRef.current),
       createdAt: new Date().toISOString(),
     };
-    const saved = saveResult(gameResult);
+    // Persiste para el récord personal de este dispositivo (no es un ranking).
+    saveResult(gameResult);
     void submitScore(gameResult);
     setResult(gameResult);
-    setPosition(saved.position);
-    setLeaderboard(saved.leaderboard);
     setBestAverageMs(Math.min(previousBest, averageMs));
     setIsNewRecord(averageMs < previousBest);
     if (averageMs < previousBest) {
@@ -361,7 +355,6 @@ export default function GameShell() {
           )}
           <div style={{ width: "100%", maxWidth: 420 }}>
             <GlobalLeaderboard deckSize={deckSize} refreshKey={globalRefresh} />
-            <LocalLeaderboard entries={leaderboard} />
           </div>
         </>
       )}
@@ -437,7 +430,6 @@ export default function GameShell() {
         <>
           <ResultsPanel
             result={result}
-            position={position}
             bestAverageMs={bestAverageMs}
             isNewRecord={isNewRecord}
             onPlayAgain={() => startGame(profile.alias ?? playerName, deckSize)}
@@ -445,10 +437,6 @@ export default function GameShell() {
           />
           <div style={{ width: "100%", maxWidth: 420 }}>
             <GlobalLeaderboard deckSize={deckSize} refreshKey={globalRefresh} />
-            <LocalLeaderboard
-              entries={leaderboard}
-              highlightPosition={position}
-            />
           </div>
         </>
       )}
