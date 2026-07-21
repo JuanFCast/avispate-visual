@@ -828,6 +828,11 @@ body {
   font-weight: 600;
 }
 
+.lb-tabs button {
+  padding: 8px 0;
+  font-size: 0.9rem;
+}
+
 .lb-list {
   list-style: none;
   display: flex;

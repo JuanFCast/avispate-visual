@@ -354,7 +354,7 @@ export default function GameShell() {
             <AliasGate />
           )}
           <div style={{ width: "100%", maxWidth: 420 }}>
-            <GlobalLeaderboard deckSize={deckSize} refreshKey={globalRefresh} />
+            <GlobalLeaderboard initialDeck={deckSize} refreshKey={globalRefresh} />
           </div>
         </>
       )}
@@ -436,7 +436,7 @@ export default function GameShell() {
             onChangePlayer={() => setPhase("setup")}
           />
           <div style={{ width: "100%", maxWidth: 420 }}>
-            <GlobalLeaderboard deckSize={deckSize} refreshKey={globalRefresh} />
+            <GlobalLeaderboard initialDeck={deckSize} refreshKey={globalRefresh} />
           </div>
         </>
       )}

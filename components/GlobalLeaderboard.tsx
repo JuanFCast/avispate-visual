@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { formatMs } from "@/lib/game";
+import { DECK_OPTIONS, formatMs } from "@/lib/game";
 import { shortAddress } from "@/lib/wallet";
 
 interface Entry {
@@ -13,22 +13,29 @@ interface Entry {
 }
 
 interface Props {
-  /** Tamaño de mazo del ranking a mostrar. */
-  deckSize: number;
+  /** Mazo con el que abre el ranking; el usuario puede cambiar de pestaña. */
+  initialDeck?: number;
   /** Cambiar este valor fuerza recargar (p. ej. tras subir un puntaje). */
   refreshKey?: number;
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export default function GlobalLeaderboard({ deckSize, refreshKey }: Props) {
+export default function GlobalLeaderboard({ initialDeck = 10, refreshKey }: Props) {
+  // El ranking tiene su propio mazo seleccionado, independiente de a qué juegas.
+  const [deck, setDeck] = useState(initialDeck);
   const [entries, setEntries] = useState<Entry[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+
+  // Si el mazo de contexto cambia (p. ej. acabas de jugar 20), abre esa pestaña.
+  useEffect(() => {
+    setDeck(initialDeck);
+  }, [initialDeck]);
 
   useEffect(() => {
     let alive = true;
     setStatus("loading");
-    fetch(`/api/leaderboard?deck=${deckSize}`)
+    fetch(`/api/leaderboard?deck=${deck}`)
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         if (!alive) return;
@@ -41,11 +48,25 @@ export default function GlobalLeaderboard({ deckSize, refreshKey }: Props) {
     return () => {
       alive = false;
     };
-  }, [deckSize, refreshKey]);
+  }, [deck, refreshKey]);
 
   return (
     <div className="panel">
-      <h2 className="lb-title">🌎 Ranking global · mazo {deckSize}</h2>
+      <h2 className="lb-title">🌎 Ranking global</h2>
+      <div className="rounds-options lb-tabs" role="tablist" aria-label="Tamaño de mazo">
+        {DECK_OPTIONS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            role="tab"
+            aria-selected={option === deck}
+            className={option === deck ? "selected" : ""}
+            onClick={() => setDeck(option)}
+          >
+            {option} cartas
+          </button>
+        ))}
+      </div>
       {status === "loading" && <p className="empty-note">Cargando ranking…</p>}
       {status === "error" && (
         <p className="empty-note">No se pudo cargar el ranking global.</p>
