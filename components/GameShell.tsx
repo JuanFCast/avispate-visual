@@ -11,12 +11,16 @@ import {
 } from "@/lib/game";
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
+import { useProfile } from "@/lib/profile-context";
 import AuthBar from "./AuthBar";
+import AccessCard from "./AccessCard";
+import AliasGate from "./AliasGate";
 import PlayerForm from "./PlayerForm";
 import CardView from "./CardView";
 import GameHUD from "./GameHUD";
 import ResultsPanel from "./ResultsPanel";
 import LocalLeaderboard from "./LocalLeaderboard";
+import GlobalLeaderboard from "./GlobalLeaderboard";
 
 type Phase = "setup" | "countdown" | "playing" | "results";
 type Role = "base" | "incoming" | "exiting";
@@ -60,6 +64,9 @@ export default function GameShell() {
   const [bestAverageMs, setBestAverageMs] = useState(0);
   const [leaderboard, setLeaderboard] = useState<GameResult[]>([]);
   const [muted, setMutedState] = useState(false);
+  const [globalRefresh, setGlobalRefresh] = useState(0);
+
+  const profile = useProfile();
 
   // Estado vivo de la partida: se lee dentro de timeouts/intervalos sin
   // preocuparse por closures viejos.
@@ -143,6 +150,37 @@ export default function GameShell() {
     setPhase("countdown");
   }
 
+  /**
+   * Envía el resultado al ranking global (best-effort). Solo si hay sesión con
+   * alias; si falla, el ranking local ya quedó guardado. El `clientGameId`
+   * hace el envío idempotente en el servidor.
+   */
+  async function submitScore(r: GameResult) {
+    if (!profile.authenticated || !profile.alias) return;
+    try {
+      const token = await profile.getToken();
+      if (!token) return;
+      const res = await fetch("/api/scores", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          clientGameId: crypto.randomUUID(),
+          deckSize,
+          totalMs: r.totalMs,
+          averageMs: r.averageMs,
+          errors: r.errors,
+          accuracy: r.accuracy,
+        }),
+      });
+      if (res.ok) setGlobalRefresh((n) => n + 1);
+    } catch {
+      // El ranking global es best-effort; el local ya se guardó.
+    }
+  }
+
   function finishGame(totalMs: number) {
     if (finishedRef.current) return;
     finishedRef.current = true;
@@ -159,6 +197,7 @@ export default function GameShell() {
       createdAt: new Date().toISOString(),
     };
     const saved = saveResult(gameResult);
+    void submitScore(gameResult);
     setResult(gameResult);
     setPosition(saved.position);
     setLeaderboard(saved.leaderboard);
@@ -307,8 +346,22 @@ export default function GameShell() {
               ¡Avíspate y repite!
             </div>
           </div>
-          <PlayerForm initialName={playerName} onStart={startGame} />
+          {/* Acceso obligatorio: correo con Privy → alias → jugar. Sin sesión
+              o sin alias no se llega al formulario de partida. */}
+          {!profile.ready ? (
+            <p className="access-note">Cargando…</p>
+          ) : !profile.authenticated ? (
+            <AccessCard />
+          ) : (
+            <>
+              <AliasGate />
+              {profile.alias && (
+                <PlayerForm initialName={playerName} onStart={startGame} />
+              )}
+            </>
+          )}
           <div style={{ width: "100%", maxWidth: 420 }}>
+            <GlobalLeaderboard deckSize={deckSize} refreshKey={globalRefresh} />
             <LocalLeaderboard entries={leaderboard} />
           </div>
         </>
@@ -392,6 +445,7 @@ export default function GameShell() {
             onChangePlayer={() => setPhase("setup")}
           />
           <div style={{ width: "100%", maxWidth: 420 }}>
+            <GlobalLeaderboard deckSize={deckSize} refreshKey={globalRefresh} />
             <LocalLeaderboard
               entries={leaderboard}
               highlightPosition={position}

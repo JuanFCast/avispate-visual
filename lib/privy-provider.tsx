@@ -3,6 +3,7 @@
 import { PrivyProvider } from "@privy-io/react-auth";
 import { celo } from "viem/chains";
 import type { ReactNode } from "react";
+import { ProfileProvider } from "./profile-context";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 
@@ -32,7 +33,7 @@ export function Providers({ children }: { children: ReactNode }) {
         },
       }}
     >
-      {children}
+      <ProfileProvider>{children}</ProfileProvider>
     </PrivyProvider>
   );
 }

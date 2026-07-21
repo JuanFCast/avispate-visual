@@ -5,32 +5,16 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useEmbeddedWallet, shortAddress } from "@/lib/wallet";
 
 /**
- * Barra de sesión (fase 1 de Privy): iniciar sesión con correo, ver la
- * dirección abreviada de la wallet embebida, copiarla y cerrar sesión.
- * Vive en el menú de inicio; no aparece durante la partida.
+ * Barra de sesión: muestra la dirección abreviada de la wallet embebida,
+ * permite copiarla y cerrar sesión. Solo aparece cuando hay sesión iniciada;
+ * el acceso (login) vive en <AccessCard>.
  */
 export default function AuthBar() {
-  const { ready, authenticated, login, logout } = usePrivy();
+  const { authenticated, logout } = usePrivy();
   const { address } = useEmbeddedWallet();
   const [copied, setCopied] = useState(false);
 
-  if (!ready) {
-    return <div className="auth-bar auth-bar-muted">Cargando sesión…</div>;
-  }
-
-  if (!authenticated) {
-    return (
-      <div className="auth-bar">
-        <button
-          type="button"
-          className="auth-btn auth-btn-primary"
-          onClick={login}
-        >
-          Iniciar sesión con correo
-        </button>
-      </div>
-    );
-  }
+  if (!authenticated) return null;
 
   async function copyAddress() {
     if (!address) return;
