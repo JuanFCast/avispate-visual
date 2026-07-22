@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   computeAccuracy,
   generateFirstCard,
@@ -12,6 +13,7 @@ import {
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
+import { usePayToPlay } from "@/lib/pay";
 import AuthBar from "./AuthBar";
 import AccessCard from "./AccessCard";
 import AliasGate from "./AliasGate";
@@ -21,7 +23,7 @@ import GameHUD from "./GameHUD";
 import ResultsPanel from "./ResultsPanel";
 import GlobalLeaderboard from "./GlobalLeaderboard";
 
-type Phase = "setup" | "countdown" | "playing" | "results";
+type Phase = "setup" | "paying" | "countdown" | "playing" | "results";
 type Role = "base" | "incoming" | "exiting";
 
 interface VisualCard {
@@ -46,6 +48,19 @@ function vibrate(pattern: number | number[]) {
   }
 }
 
+/** Traduce un error del flujo de pago a un mensaje corto para el jugador. */
+function describePayError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/rejected|denied|User rejected/i.test(msg))
+    return "Cancelaste el pago.";
+  if (/insufficient|exceeds balance|transfer amount/i.test(msg))
+    return "Saldo insuficiente de USDT (o gas) para pagar la jugada.";
+  if (/pot_not_configured/.test(msg))
+    return "El pago aún no está disponible (contrato no configurado).";
+  if (/no_wallet/.test(msg)) return "Conecta una wallet para pagar.";
+  return "No se pudo completar el pago. Inténtalo de nuevo.";
+}
+
 export default function GameShell() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [playerName, setPlayerName] = useState("");
@@ -61,9 +76,19 @@ export default function GameShell() {
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [bestAverageMs, setBestAverageMs] = useState(0);
   const [muted, setMutedState] = useState(false);
-  const [globalRefresh, setGlobalRefresh] = useState(0);
+  // Qué mazos aún tienen la jugada gratis de hoy; el resto se paga.
+  const [freeByDeck, setFreeByDeck] = useState<Record<number, boolean>>({});
+  const [payError, setPayError] = useState<string | null>(null);
 
   const profile = useProfile();
+  const queryClient = useQueryClient();
+  const { payForDeck, canPay } = usePayToPlay();
+
+  // Info de pago de la partida en curso (para enviar el puntaje por el camino
+  // correcto). Refs porque se leen dentro de timeouts.
+  const paidRef = useRef(false);
+  const txHashRef = useRef("");
+  const playerRef = useRef("");
 
   // Estado vivo de la partida: se lee dentro de timeouts/intervalos sin
   // preocuparse por closures viejos.
@@ -79,6 +104,26 @@ export default function GameShell() {
   useEffect(() => {
     setMutedState(isMuted());
   }, []);
+
+  /** Consulta al servidor qué mazos aún tienen jugada gratis hoy. */
+  const refreshEntitlement = useCallback(async () => {
+    try {
+      const token = profile.authenticated ? await profile.getToken() : null;
+      const res = await fetch("/api/entitlement", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      setFreeByDeck(data.free ?? {});
+    } catch {
+      // Sin info, el flujo asume pago (no regala jugadas).
+    }
+  }, [profile]);
+
+  useEffect(() => {
+    if (!profile.ready) return;
+    refreshEntitlement();
+  }, [profile.ready, profile.authenticated, profile.alias, refreshEntitlement]);
 
   function toggleMuted() {
     const next = !muted;
@@ -116,6 +161,44 @@ export default function GameShell() {
     return () => clearInterval(interval);
   }, [phase]);
 
+  /**
+   * Punto de entrada al iniciar: si al jugador le queda su jugada gratis del
+   * mazo, arranca directo; si no, cobra 0.10 USDT on-chain y, con el pago
+   * confirmado, arranca marcando la partida como paga.
+   */
+  async function handleStart(deck: number) {
+    setPayError(null);
+    const alias = profile.alias ?? playerName;
+
+    if (freeByDeck[deck]) {
+      paidRef.current = false;
+      txHashRef.current = "";
+      playerRef.current = "";
+      startGame(alias, deck);
+      return;
+    }
+
+    // Jugada paga.
+    if (!canPay) {
+      setPayError(
+        "El pago aún no está disponible (contrato no configurado o wallet sin conectar)."
+      );
+      return;
+    }
+    setDeckSize(deck);
+    setPhase("paying");
+    try {
+      const { txHash, player } = await payForDeck(deck);
+      paidRef.current = true;
+      txHashRef.current = txHash;
+      playerRef.current = player;
+      startGame(alias, deck);
+    } catch (err) {
+      setPayError(describePayError(err));
+      setPhase("setup");
+    }
+  }
+
   function startGame(name: string, deck: number) {
     unlockAudio();
     const base = generateFirstCard();
@@ -146,33 +229,55 @@ export default function GameShell() {
   }
 
   /**
-   * Envía el resultado al ranking global (best-effort). Solo si hay sesión con
-   * alias; si falla, no pasa nada (el récord personal ya quedó guardado). El
-   * `clientGameId` hace el envío idempotente en el servidor.
+   * Envía el resultado al ranking de la ronda. Camino PAGO (identidad = wallet
+   * probada por el txHash) o GRATIS (identidad = Privy). Best-effort: el récord
+   * local ya quedó guardado. `clientGameId` lo hace idempotente en el servidor.
    */
   async function submitScore(r: GameResult) {
-    if (!profile.authenticated || !profile.alias) return;
+    const base = {
+      clientGameId: crypto.randomUUID(),
+      deckSize,
+      totalMs: r.totalMs,
+      averageMs: r.averageMs,
+      errors: r.errors,
+      accuracy: r.accuracy,
+    };
     try {
-      const token = await profile.getToken();
-      if (!token) return;
-      const res = await fetch("/api/scores", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          clientGameId: crypto.randomUUID(),
-          deckSize,
-          totalMs: r.totalMs,
-          averageMs: r.averageMs,
-          errors: r.errors,
-          accuracy: r.accuracy,
-        }),
-      });
-      if (res.ok) setGlobalRefresh((n) => n + 1);
+      let res: Response | null = null;
+      if (paidRef.current) {
+        // Pago: no requiere token de Privy; el tx prueba la identidad.
+        res = await fetch("/api/scores", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...base,
+            mode: "paid",
+            txHash: txHashRef.current,
+            player: playerRef.current,
+            alias: profile.alias ?? undefined,
+          }),
+        });
+      } else {
+        // Gratis: requiere sesión Privy con alias.
+        if (!profile.authenticated || !profile.alias) return;
+        const token = await profile.getToken();
+        if (!token) return;
+        res = await fetch("/api/scores", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ ...base, mode: "free" }),
+        });
+      }
+      if (res && res.ok) {
+        // Refresca el ranking de la ronda y las jugadas gratis restantes.
+        queryClient.invalidateQueries({ queryKey: ["leaderboard", deckSize] });
+        void refreshEntitlement();
+      }
     } catch {
-      // El ranking global es best-effort; el récord personal ya se guardó.
+      // Best-effort; el récord personal ya se guardó.
     }
   }
 
@@ -349,14 +454,25 @@ export default function GameShell() {
           ) : profile.loading ? (
             <p className="access-note">Cargando perfil…</p>
           ) : profile.alias ? (
-            <PlayerForm onStart={(deck) => startGame(profile.alias ?? "", deck)} />
+            <PlayerForm
+              onStart={handleStart}
+              freeByDeck={freeByDeck}
+              payError={payError}
+            />
           ) : (
             <AliasGate />
           )}
           <div style={{ width: "100%", maxWidth: 420 }}>
-            <GlobalLeaderboard initialDeck={deckSize} refreshKey={globalRefresh} />
+            <GlobalLeaderboard initialDeck={deckSize} />
           </div>
         </>
+      )}
+
+      {phase === "paying" && (
+        <div className="countdown">
+          <p className="access-note">Procesando pago de 0.10 USDT…</p>
+          <p className="empty-note">Confirma en tu wallet. No cierres esta ventana.</p>
+        </div>
       )}
 
       {phase === "countdown" && (
@@ -432,11 +548,12 @@ export default function GameShell() {
             result={result}
             bestAverageMs={bestAverageMs}
             isNewRecord={isNewRecord}
-            onPlayAgain={() => startGame(profile.alias ?? playerName, deckSize)}
+            onPlayAgain={() => handleStart(deckSize)}
             onChangePlayer={() => setPhase("setup")}
           />
+          {payError && <p className="alias-error">{payError}</p>}
           <div style={{ width: "100%", maxWidth: 420 }}>
-            <GlobalLeaderboard initialDeck={deckSize} refreshKey={globalRefresh} />
+            <GlobalLeaderboard initialDeck={deckSize} />
           </div>
         </>
       )}

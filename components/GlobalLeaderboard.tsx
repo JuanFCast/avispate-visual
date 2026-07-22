@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { DECK_OPTIONS, formatMs } from "@/lib/game";
 import { shortAddress } from "@/lib/wallet";
 
@@ -15,40 +16,34 @@ interface Entry {
 interface Props {
   /** Mazo con el que abre el ranking; el usuario puede cambiar de pestaña. */
   initialDeck?: number;
-  /** Cambiar este valor fuerza recargar (p. ej. tras subir un puntaje). */
-  refreshKey?: number;
 }
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export default function GlobalLeaderboard({ initialDeck = 10, refreshKey }: Props) {
+async function fetchLeaderboard(deck: number): Promise<Entry[]> {
+  const res = await fetch(`/api/leaderboard?deck=${deck}`);
+  if (!res.ok) throw new Error("leaderboard_fetch_failed");
+  const data = await res.json();
+  return data.leaderboard ?? [];
+}
+
+export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
   // El ranking tiene su propio mazo seleccionado, independiente de a qué juegas.
   const [deck, setDeck] = useState(initialDeck);
-  const [entries, setEntries] = useState<Entry[]>([]);
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   // Si el mazo de contexto cambia (p. ej. acabas de jugar 20), abre esa pestaña.
   useEffect(() => {
     setDeck(initialDeck);
   }, [initialDeck]);
 
-  useEffect(() => {
-    let alive = true;
-    setStatus("loading");
-    fetch(`/api/leaderboard?deck=${deck}`)
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data) => {
-        if (!alive) return;
-        setEntries(data.leaderboard ?? []);
-        setStatus("ready");
-      })
-      .catch(() => {
-        if (alive) setStatus("error");
-      });
-    return () => {
-      alive = false;
-    };
-  }, [deck, refreshKey]);
+  // react-query cachea por mazo: cambiar de pestaña 10/15/20 es instantáneo tras
+  // la primera carga, y tras subir un puntaje invalidamos para refrescar.
+  const { data: entries = [], status } = useQuery({
+    queryKey: ["leaderboard", deck],
+    queryFn: () => fetchLeaderboard(deck),
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+  });
 
   return (
     <div className="panel">
@@ -67,14 +62,14 @@ export default function GlobalLeaderboard({ initialDeck = 10, refreshKey }: Prop
           </button>
         ))}
       </div>
-      {status === "loading" && <p className="empty-note">Cargando ranking…</p>}
+      {status === "pending" && <p className="empty-note">Cargando ranking…</p>}
       {status === "error" && (
         <p className="empty-note">No se pudo cargar el ranking global.</p>
       )}
-      {status === "ready" && entries.length === 0 && (
+      {status === "success" && entries.length === 0 && (
         <p className="empty-note">Aún no hay marcas para este mazo. ¡Sé el primero!</p>
       )}
-      {status === "ready" && entries.length > 0 && (
+      {status === "success" && entries.length > 0 && (
         <ol className="lb-list">
           {entries.map((entry, i) => {
             const classes = ["lb-row"];

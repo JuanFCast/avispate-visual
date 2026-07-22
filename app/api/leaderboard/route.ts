@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 
-export const dynamic = "force-dynamic";
-
 const DECK_SIZES = [10, 15, 20];
 const TOP_N = 20;
 
@@ -14,10 +12,15 @@ interface ScoreJoinRow {
   profiles: { alias: string | null; wallet_address: string | null } | null;
 }
 
+/** Fecha de la ronda actual (UTC), formato YYYY-MM-DD. */
+function currentRound(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /**
- * GET /api/leaderboard?deck=10 — ranking público: el MEJOR resultado de cada
- * jugador para ese tamaño de mazo (menor promedio; a igualdad, menos errores).
- * Lectura pública, no requiere sesión.
+ * GET /api/leaderboard?deck=10 — ranking público de la RONDA de hoy: el mejor
+ * resultado de cada jugador para ese mazo en el día (menor promedio; a igualdad,
+ * menos errores). El #1 se lleva el pozo diario. Lectura pública, sin sesión.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -28,12 +31,13 @@ export async function GET(req: Request) {
 
   try {
     const db = getSupabaseAdmin();
-    // Traemos las partidas de ese mazo ya ordenadas de mejor a peor y nos
-    // quedamos con la primera de cada jugador (su mejor marca).
+    // Partidas de ESTE mazo en la ronda de hoy, de mejor a peor; nos quedamos
+    // con la primera de cada jugador (su mejor marca del día).
     const { data, error } = await db
       .from("scores")
       .select("profile_id, average_ms, errors, total_ms, profiles!inner(alias, wallet_address)")
       .eq("deck_size", deck)
+      .eq("round_date", currentRound())
       .order("average_ms", { ascending: true })
       .order("errors", { ascending: true })
       .limit(1000);
@@ -55,7 +59,17 @@ export async function GET(req: Request) {
       if (leaderboard.length >= TOP_N) break;
     }
 
-    return NextResponse.json({ deck, leaderboard });
+    // Cache de CDN: el ranking no necesita ser al milisegundo. 15s frescos +
+    // servir viejo mientras revalida hace que las cargas repetidas sean rápidas.
+    return NextResponse.json(
+      { deck, leaderboard },
+      {
+        headers: {
+          "Cache-Control":
+            "public, s-maxage=15, stale-while-revalidate=300",
+        },
+      }
+    );
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }

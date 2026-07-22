@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useProfile } from "@/lib/profile-context";
-import { useEmbeddedWallet, shortAddress } from "@/lib/wallet";
+import { useActiveWallet, shortAddress } from "@/lib/wallet";
 import { validateAlias, ALIAS_MAX } from "@/lib/alias";
+import WalletConnect from "./WalletConnect";
 
 /**
  * Barra de perfil: alias (username) con edición inline vía lápiz, dirección de
@@ -13,7 +14,8 @@ import { validateAlias, ALIAS_MAX } from "@/lib/alias";
  */
 export default function AuthBar() {
   const { authenticated, logout } = usePrivy();
-  const { address } = useEmbeddedWallet();
+  // Wallet ACTIVA de wagmi: embebida por defecto, o la externa que conecte.
+  const { address } = useActiveWallet();
   const { alias, setAlias } = useProfile();
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -126,6 +128,12 @@ export default function AuthBar() {
           </span>
         )}
       </div>
+
+      <WalletConnect
+        className="auth-btn profile-logout"
+        label="Conectar wallet"
+        connectedLabel="Cambiar wallet"
+      />
 
       <button type="button" className="auth-btn profile-logout" onClick={logout}>
         Salir

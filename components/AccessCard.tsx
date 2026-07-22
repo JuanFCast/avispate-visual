@@ -1,17 +1,17 @@
 "use client";
 
-import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import WalletConnect from "./WalletConnect";
 
 /**
- * Tarjeta de acceso al juego. Para jugar es obligatorio iniciar sesión con
- * Privy (correo) y luego elegir alias. El botón "Conectar wallet" es por ahora
- * SOLO visual: no conecta nada ni permite entrar; muestra un aviso de "próximamente".
- * El orden de los botones se inspira en nerdos.fun/grammar, sin copiar su marca.
+ * Tarjeta de acceso al juego. La identidad para el ranking sigue siendo el
+ * correo (Privy): con correo se crea la wallet embebida y se elige alias. El
+ * botón "Conectar wallet" abre el modal de RainbowKit para usar una wallet
+ * externa como wallet activa (pagos/premios); no reemplaza al correo como
+ * identidad del ranking.
  */
 export default function AccessCard() {
   const { login } = usePrivy();
-  const [showWalletNote, setShowWalletNote] = useState(false);
 
   return (
     <div className="access-card">
@@ -27,19 +27,7 @@ export default function AccessCard() {
         <span>o</span>
       </div>
 
-      <button
-        type="button"
-        className="access-btn access-btn-secondary"
-        onClick={() => setShowWalletNote(true)}
-      >
-        Conectar wallet
-      </button>
-
-      {showWalletNote && (
-        <p className="access-wallet-note" role="status">
-          Conexión de wallet próximamente. Por ahora entra con tu correo. 🔜
-        </p>
-      )}
+      <WalletConnect />
     </div>
   );
 }

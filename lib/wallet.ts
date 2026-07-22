@@ -1,6 +1,7 @@
 "use client";
 
 import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { useAccount } from "wagmi";
 
 export interface EmbeddedWalletState {
   /** Privy terminó de hidratar el estado de sesión. */
@@ -24,6 +25,32 @@ export function useEmbeddedWallet(): EmbeddedWalletState {
     ready,
     authenticated,
     address: embedded?.address ?? "",
+  };
+}
+
+export interface ActiveWalletState {
+  /** Dirección de la wallet ACTIVA en wagmi (embebida o externa), en minúsculas. */
+  address: string;
+  /** Hay una wallet conectada en wagmi. */
+  isConnected: boolean;
+  /** Nombre del conector activo (p. ej. "MetaMask" o "Avíspate (Privy)"). */
+  connectorName: string;
+  /** Id de la red activa. */
+  chainId: number | undefined;
+}
+
+/**
+ * Wallet ACTIVA según wagmi: la que se usa para pagos, balances y premios. Es la
+ * embebida de Privy por defecto (auto-conectada) o la externa que el usuario
+ * conecte por RainbowKit. Siempre hay como máximo una activa.
+ */
+export function useActiveWallet(): ActiveWalletState {
+  const { address, isConnected, connector, chainId } = useAccount();
+  return {
+    address: address ? address.toLowerCase() : "",
+    isConnected,
+    connectorName: connector?.name ?? "",
+    chainId,
   };
 }
 
