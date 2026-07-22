@@ -46,6 +46,16 @@ export const AVISPATE_POT_ABI = [
     inputs: [{ name: "deck", type: "uint8" }],
     outputs: [{ name: "", type: "uint256" }],
   },
+  {
+    type: "function",
+    name: "settle",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "deck", type: "uint8" },
+      { name: "winner", type: "address" },
+    ],
+    outputs: [],
+  },
 ] as const;
 
 /** ABI mínimo de ERC-20 para approve/allowance de USDT. */

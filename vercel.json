@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/roll-day",
+      "schedule": "5 0 * * *"
+    }
+  ]
+}
