@@ -15,7 +15,8 @@ import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
 import { usePayToPlay } from "@/lib/pay";
 import { useActiveWallet } from "@/lib/wallet";
-import ProfilePanel from "./ProfilePanel";
+import Link from "next/link";
+import { useWalletAlias } from "@/lib/wallet-alias";
 import AccessCard from "./AccessCard";
 import AliasGate from "./AliasGate";
 import WalletAliasForm from "./WalletAliasForm";
@@ -87,28 +88,8 @@ export default function GameShell() {
   const queryClient = useQueryClient();
   const { payForDeck, canPay } = usePayToPlay();
 
-  // Alias local para jugadores SOLO-wallet (sin correo). Se reclama en el
-  // servidor al enviar la primera jugada paga.
-  const [walletAlias, setWalletAliasState] = useState<string | null>(null);
-  useEffect(() => {
-    if (!activeWallet.address) return;
-    try {
-      setWalletAliasState(
-        localStorage.getItem(`avispate_alias_${activeWallet.address}`)
-      );
-    } catch {
-      // localStorage bloqueado: se pedirá el alias en pantalla.
-    }
-  }, [activeWallet.address]);
-
-  function setWalletAlias(alias: string) {
-    setWalletAliasState(alias);
-    try {
-      localStorage.setItem(`avispate_alias_${activeWallet.address}`, alias);
-    } catch {
-      // No persiste, pero la sesión actual ya lo tiene.
-    }
-  }
+  // Alias local de jugadores solo-wallet (compartido con el perfil vía hook).
+  const { walletAlias, setWalletAlias } = useWalletAlias();
 
   /** Alias efectivo del jugador: Privy o el local de la wallet. */
   const currentAlias = profile.alias ?? walletAlias ?? "";
@@ -432,10 +413,18 @@ export default function GameShell() {
       {phase !== "playing" && (
         <header className="topbar">
           <span className="topbar-side">
-            <ProfilePanel
-              walletAlias={walletAlias}
-              onSetWalletAlias={setWalletAlias}
-            />
+            {(profile.authenticated || activeWallet.isConnected) && (
+              <Link
+                href="/perfil"
+                className="profile-trigger"
+                aria-label="Ver tu perfil"
+              >
+                <span aria-hidden="true">👤</span>
+                <span className="profile-trigger-name">
+                  {currentAlias || "Perfil"}
+                </span>
+              </Link>
+            )}
           </span>
           <h1 className="title">
             {/* En el inicio la avispa ya protagoniza como héroe: no se repite. */}
