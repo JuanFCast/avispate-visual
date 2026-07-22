@@ -56,6 +56,16 @@ export const AVISPATE_POT_ABI = [
     ],
     outputs: [],
   },
+  {
+    type: "function",
+    name: "seedPot",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "deck", type: "uint8" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
 ] as const;
 
 /** ABI mínimo de ERC-20 para approve/allowance de USDT. */

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readPot, settleDeck } from "@/lib/settle";
+import { seedPotFromFunder } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
   const results: Record<string, unknown>[] = [];
 
   for (const deck of DECKS) {
-    // 1. ¿Ya liquidado?
+    // 1. ¿Ya procesada esta ronda+mazo? (settle + resiembra ya hechos)
     const { data: existing } = await db
       .from("round_settlements")
       .select("deck_size")
@@ -50,48 +51,59 @@ export async function GET(req: Request) {
       continue;
     }
 
-    // 2. Sin fondos → no gastar gas en un tx que revertiría.
     const pot = await readPot(deck);
-    if (pot === 0n) {
-      results.push({ deck, skipped: "empty_pot" });
-      continue;
+    let winner: string | null = null;
+    let winnerProfileId: string | null = null;
+    let settleTx: string | undefined;
+
+    // 2. Liquidar la ronda si hay fondos y un ganador con wallet.
+    if (pot > 0n) {
+      const { data: rows, error } = await db
+        .from("scores")
+        .select("profile_id, profiles!inner(wallet_address)")
+        .eq("deck_size", deck)
+        .eq("round_date", round)
+        .order("average_ms", { ascending: true })
+        .order("errors", { ascending: true })
+        .limit(1);
+      if (error) {
+        results.push({ deck, error: "query_failed" });
+        continue; // sin registrar → reintenta la próxima corrida
+      }
+      const top = (rows ?? [])[0] as unknown as WinnerRow | undefined;
+      winner = top?.profiles?.wallet_address ?? null;
+      winnerProfileId = top?.profile_id ?? null;
+
+      if (winner) {
+        const settle = await settleDeck(deck, winner);
+        if (!settle.ok) {
+          results.push({ deck, error: settle.error });
+          continue; // no registrar → reintenta
+        }
+        settleTx = settle.txHash;
+      }
+      // pot>0 sin ganador con wallet: se deja rodar al siguiente día.
     }
 
-    // 3. Ganador: mejor marca del mazo en esa ronda.
-    const { data: rows, error } = await db
-      .from("scores")
-      .select("profile_id, profiles!inner(wallet_address)")
-      .eq("deck_size", deck)
-      .eq("round_date", round)
-      .order("average_ms", { ascending: true })
-      .order("errors", { ascending: true })
-      .limit(1);
-    if (error) {
-      results.push({ deck, error: "query_failed" });
-      continue;
-    }
-    const top = (rows ?? [])[0] as unknown as WinnerRow | undefined;
-    const winner = top?.profiles?.wallet_address ?? null;
-    if (!top || !winner) {
-      results.push({ deck, skipped: top ? "winner_no_wallet" : "no_players" });
-      continue;
-    }
+    // 3. Resembrar el pozo del NUEVO día desde el Funder.
+    const seed = await seedPotFromFunder(deck);
 
-    // 4. Liquidar on-chain y registrar.
-    const settle = await settleDeck(deck, winner);
-    if (!settle.ok) {
-      results.push({ deck, error: settle.error });
-      continue;
-    }
+    // 4. Registrar la transición (idempotencia por ronda+mazo).
     await db.from("round_settlements").insert({
       round_date: round,
       deck_size: deck,
-      winner_profile_id: top.profile_id,
+      winner_profile_id: winnerProfileId,
       winner_wallet: winner,
-      tx_hash: settle.txHash,
-      amount_units: pot.toString(),
+      tx_hash: settleTx,
+      amount_units: pot > 0n ? pot.toString() : null,
     });
-    results.push({ deck, winner, txHash: settle.txHash });
+    results.push({
+      deck,
+      winner,
+      settleTx: settleTx ?? null,
+      reseeded: seed.ok,
+      seedError: seed.ok ? undefined : seed.error,
+    });
   }
 
   return NextResponse.json({ round, results });

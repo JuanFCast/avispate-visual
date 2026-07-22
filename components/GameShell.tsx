@@ -14,9 +14,11 @@ import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
 import { usePayToPlay } from "@/lib/pay";
+import { useActiveWallet } from "@/lib/wallet";
 import AuthBar from "./AuthBar";
 import AccessCard from "./AccessCard";
 import AliasGate from "./AliasGate";
+import WalletAliasForm from "./WalletAliasForm";
 import PlayerForm from "./PlayerForm";
 import CardView from "./CardView";
 import GameHUD from "./GameHUD";
@@ -81,8 +83,35 @@ export default function GameShell() {
   const [payError, setPayError] = useState<string | null>(null);
 
   const profile = useProfile();
+  const activeWallet = useActiveWallet();
   const queryClient = useQueryClient();
   const { payForDeck, canPay } = usePayToPlay();
+
+  // Alias local para jugadores SOLO-wallet (sin correo). Se reclama en el
+  // servidor al enviar la primera jugada paga.
+  const [walletAlias, setWalletAliasState] = useState<string | null>(null);
+  useEffect(() => {
+    if (!activeWallet.address) return;
+    try {
+      setWalletAliasState(
+        localStorage.getItem(`avispate_alias_${activeWallet.address}`)
+      );
+    } catch {
+      // localStorage bloqueado: se pedirá el alias en pantalla.
+    }
+  }, [activeWallet.address]);
+
+  function setWalletAlias(alias: string) {
+    setWalletAliasState(alias);
+    try {
+      localStorage.setItem(`avispate_alias_${activeWallet.address}`, alias);
+    } catch {
+      // No persiste, pero la sesión actual ya lo tiene.
+    }
+  }
+
+  /** Alias efectivo del jugador: Privy o el local de la wallet. */
+  const currentAlias = profile.alias ?? walletAlias ?? "";
 
   // Info de pago de la partida en curso (para enviar el puntaje por el camino
   // correcto). Refs porque se leen dentro de timeouts.
@@ -168,7 +197,7 @@ export default function GameShell() {
    */
   async function handleStart(deck: number) {
     setPayError(null);
-    const alias = profile.alias ?? playerName;
+    const alias = currentAlias || playerName;
 
     if (freeByDeck[deck]) {
       paidRef.current = false;
@@ -254,7 +283,7 @@ export default function GameShell() {
             mode: "paid",
             txHash: txHashRef.current,
             player: playerRef.current,
-            alias: profile.alias ?? undefined,
+            alias: currentAlias || undefined,
           }),
         });
       } else {
@@ -445,22 +474,34 @@ export default function GameShell() {
               ¡Avíspate y repite!
             </div>
           </div>
-          {/* Acceso obligatorio: correo con Privy → alias → jugar. Sin sesión
-              o sin alias no se llega al formulario de partida. */}
+          {/* Dos caminos: correo (Privy → alias → jugar, con 1 gratis diaria) o
+              wallet (conectar → alias local → jugar pagando). */}
           {!profile.ready ? (
             <p className="access-note">Cargando…</p>
-          ) : !profile.authenticated ? (
-            <AccessCard />
-          ) : profile.loading ? (
-            <p className="access-note">Cargando perfil…</p>
-          ) : profile.alias ? (
-            <PlayerForm
-              onStart={handleStart}
-              freeByDeck={freeByDeck}
-              payError={payError}
-            />
+          ) : profile.authenticated ? (
+            profile.loading ? (
+              <p className="access-note">Cargando perfil…</p>
+            ) : profile.alias ? (
+              <PlayerForm
+                onStart={handleStart}
+                freeByDeck={freeByDeck}
+                payError={payError}
+              />
+            ) : (
+              <AliasGate />
+            )
+          ) : activeWallet.isConnected ? (
+            walletAlias ? (
+              <PlayerForm
+                onStart={handleStart}
+                freeByDeck={freeByDeck}
+                payError={payError}
+              />
+            ) : (
+              <WalletAliasForm onSet={setWalletAlias} />
+            )
           ) : (
-            <AliasGate />
+            <AccessCard />
           )}
           <div style={{ width: "100%", maxWidth: 420 }}>
             <GlobalLeaderboard initialDeck={deckSize} />
