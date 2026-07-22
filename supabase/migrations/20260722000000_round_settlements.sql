@@ -23,3 +23,8 @@ alter table public.round_settlements enable row level security;
 drop policy if exists round_settlements_public_read on public.round_settlements;
 create policy round_settlements_public_read on public.round_settlements
   for select using (true);
+
+-- GRANT de tabla (Supabase no los da por defecto; sin esto: 42501). El backend
+-- usa service_role; lectura pública vía anon/authenticated.
+grant all    on public.round_settlements to service_role;
+grant select on public.round_settlements to anon, authenticated;
