@@ -17,14 +17,31 @@ export default function WalletAliasForm({ onSet }: Props) {
   const { address } = useActiveWallet();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
 
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     const check = validateAlias(value);
     if (!check.ok || !check.value) {
       setError(check.error ?? "Alias inválido.");
       return;
     }
+    setChecking(true);
+    try {
+      const res = await fetch(
+        `/api/alias-available?alias=${encodeURIComponent(check.value)}`
+      );
+      const data = await res.json();
+      if (!data.available) {
+        setError("Ese alias ya está tomado, elige otro.");
+        setChecking(false);
+        return;
+      }
+    } catch {
+      // Si la verificación falla, seguimos: el servidor revalida al guardar.
+    }
+    setChecking(false);
     onSet(check.value);
   }
 
@@ -44,8 +61,8 @@ export default function WalletAliasForm({ onSet }: Props) {
           aria-label="Alias"
         />
       </div>
-      <button type="submit" className="btn-primary">
-        Continuar
+      <button type="submit" className="btn-primary" disabled={checking || !value.trim()}>
+        {checking ? "Verificando…" : "Continuar"}
       </button>
       {error && <p className="alias-error">{error}</p>}
     </form>

@@ -15,7 +15,7 @@ import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
 import { usePayToPlay } from "@/lib/pay";
 import { useActiveWallet } from "@/lib/wallet";
-import AuthBar from "./AuthBar";
+import ProfilePanel from "./ProfilePanel";
 import AccessCard from "./AccessCard";
 import AliasGate from "./AliasGate";
 import WalletAliasForm from "./WalletAliasForm";
@@ -431,7 +431,12 @@ export default function GameShell() {
           mínimo y la barra superior desaparece. */}
       {phase !== "playing" && (
         <header className="topbar">
-          <span className="topbar-side" aria-hidden="true" />
+          <span className="topbar-side">
+            <ProfilePanel
+              walletAlias={walletAlias}
+              onSetWalletAlias={setWalletAlias}
+            />
+          </span>
           <h1 className="title">
             {/* En el inicio la avispa ya protagoniza como héroe: no se repite. */}
             {phase !== "setup" && (
@@ -453,7 +458,6 @@ export default function GameShell() {
 
       {phase === "setup" && (
         <>
-          <AuthBar />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-avispate.png" alt="Avíspate" className="hero-icon" />
           <p className="subtitle">
