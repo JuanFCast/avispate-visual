@@ -849,6 +849,66 @@ body {
   font-size: 0.9rem;
 }
 
+.pot-banner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: linear-gradient(135deg, var(--cyan), #0f9fb2);
+  color: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 4px 0 rgba(13, 13, 15, 0.18);
+  text-align: center;
+}
+
+.pot-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.95;
+}
+
+.pot-amount {
+  font-family: var(--font-title);
+  font-size: 2.1rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.pot-timer {
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+.lb-you {
+  display: inline-block;
+  margin-left: 6px;
+  background: var(--cyan);
+  color: var(--white);
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+
+.profile-balance {
+  font-family: var(--font-nunito);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink);
+  background: var(--yellow-soft);
+  border: 2px solid var(--yellow);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
 .lb-list {
   list-style: none;
   display: flex;

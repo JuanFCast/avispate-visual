@@ -2,9 +2,12 @@
 
 import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import { useReadContract } from "wagmi";
+import { celo } from "viem/chains";
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet, shortAddress } from "@/lib/wallet";
 import { validateAlias, ALIAS_MAX } from "@/lib/alias";
+import { USDT_CELO_ADDRESS, ERC20_ABI, USDT_DECIMALS } from "@/lib/contracts";
 import WalletConnect from "./WalletConnect";
 
 /**
@@ -17,6 +20,20 @@ export default function AuthBar() {
   // Wallet ACTIVA de wagmi: embebida por defecto, o la externa que conecte.
   const { address } = useActiveWallet();
   const { alias, setAlias } = useProfile();
+
+  // Saldo de USDT de la wallet activa (para "recargar" y pagar jugadas).
+  const { data: usdtBal } = useReadContract({
+    address: USDT_CELO_ADDRESS as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: address ? [address as `0x${string}`] : undefined,
+    chainId: celo.id,
+    query: { enabled: Boolean(address), refetchInterval: 20_000 },
+  });
+  const usdt =
+    usdtBal !== undefined
+      ? (Number(usdtBal) / 10 ** USDT_DECIMALS).toFixed(2)
+      : null;
   const [copied, setCopied] = useState(false);
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
@@ -125,6 +142,12 @@ export default function AuthBar() {
         ) : (
           <span className="profile-wallet profile-wallet-pending">
             Creando wallet…
+          </span>
+        )}
+
+        {usdt !== null && (
+          <span className="profile-balance" title="Tu saldo de USDT">
+            💵 {usdt} USDT
           </span>
         )}
       </div>
