@@ -85,8 +85,15 @@ export async function GET(req: Request) {
       // pot>0 sin ganador con wallet: se deja rodar al siguiente día.
     }
 
-    // 3. Resembrar el pozo del NUEVO día desde el Funder.
-    const seed = await seedPotFromFunder(deck);
+    // 3. Resembrar SOLO si hubo pago (si no hubo ganador, el pozo se conserva;
+    //    así no se infla ni se drena el Funder en días sin jugadores).
+    let reseeded = false;
+    let seedError: string | undefined;
+    if (settleTx) {
+      const seed = await seedPotFromFunder(deck);
+      reseeded = seed.ok;
+      seedError = seed.ok ? undefined : seed.error;
+    }
 
     // 4. Registrar la transición (idempotencia por ronda+mazo).
     await db.from("round_settlements").insert({
@@ -101,8 +108,8 @@ export async function GET(req: Request) {
       deck,
       winner,
       settleTx: settleTx ?? null,
-      reseeded: seed.ok,
-      seedError: seed.ok ? undefined : seed.error,
+      reseeded,
+      seedError,
     });
   }
 
