@@ -33,6 +33,12 @@ alter table public.scores
 alter table public.scores
   add column if not exists is_paid boolean not null default false;
 
+-- Backfill: las partidas históricas usan su fecha real (no la de la migración),
+-- para que no aparezcan todas en la ronda de hoy.
+update public.scores
+  set round_date = (created_at at time zone 'utc')::date
+  where round_date <> (created_at at time zone 'utc')::date;
+
 -- tx_hash único: una jugada paga = un puntaje (idempotencia). Nulos permitidos.
 create unique index if not exists scores_tx_hash_key
   on public.scores (tx_hash) where tx_hash is not null;
@@ -41,8 +47,9 @@ create unique index if not exists scores_tx_hash_key
 create index if not exists scores_round_ranking_idx
   on public.scores (deck_size, round_date, average_ms asc, errors asc);
 
--- Una sola jugada GRATIS por perfil, mazo y ronda.
-create unique index if not exists scores_one_free_per_round
+-- Búsqueda de la jugada gratis del día por perfil/mazo (la unicidad "una gratis
+-- por ronda" se hace cumplir en el backend, para no romper el historial previo).
+create index if not exists scores_free_lookup_idx
   on public.scores (profile_id, deck_size, round_date)
   where is_paid = false;
 

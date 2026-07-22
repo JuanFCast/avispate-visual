@@ -20,6 +20,11 @@ function isInt(n: unknown): n is number {
   return typeof n === "number" && Number.isInteger(n);
 }
 
+/** Fecha de la ronda actual (UTC), YYYY-MM-DD. */
+function currentRound(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 interface ScoreCore {
   clientGameId: string;
   deckSize: number;
@@ -81,25 +86,43 @@ async function handleFree(req: Request, core: ScoreCore) {
     }
 
     const db = getSupabaseAdmin();
-    // onConflict clientGameId + ignoreDuplicates: reintento del MISMO juego no
-    // duplica. Un SEGUNDO juego gratis (mazo/ronda) viola scores_one_free_per_round
-    // → 23505 → "free_used".
-    const { error } = await db.from("scores").upsert(
-      {
-        profile_id: profile.id,
-        client_game_id: core.clientGameId,
-        deck_size: core.deckSize,
-        total_ms: core.totalMs,
-        average_ms: core.averageMs,
-        errors: core.errors,
-        accuracy: core.accuracy,
-        is_paid: false,
-      },
-      { onConflict: "client_game_id", ignoreDuplicates: true }
-    );
+    const round = currentRound();
+
+    // Reintento idempotente del MISMO juego (mismo clientGameId): ok.
+    const { data: same } = await db
+      .from("scores")
+      .select("id")
+      .eq("client_game_id", core.clientGameId)
+      .maybeSingle();
+    if (same) return NextResponse.json({ ok: true });
+
+    // Una sola jugada GRATIS por perfil/mazo/ronda (se hace cumplir aquí).
+    const { data: existing } = await db
+      .from("scores")
+      .select("id")
+      .eq("profile_id", profile.id)
+      .eq("deck_size", core.deckSize)
+      .eq("round_date", round)
+      .eq("is_paid", false)
+      .limit(1);
+    if (existing && existing.length > 0) {
+      return NextResponse.json({ error: "free_used" }, { status: 409 });
+    }
+
+    const { error } = await db.from("scores").insert({
+      profile_id: profile.id,
+      client_game_id: core.clientGameId,
+      deck_size: core.deckSize,
+      round_date: round,
+      total_ms: core.totalMs,
+      average_ms: core.averageMs,
+      errors: core.errors,
+      accuracy: core.accuracy,
+      is_paid: false,
+    });
     if (error) {
-      if (error.code === "23505")
-        return NextResponse.json({ error: "free_used" }, { status: 409 });
+      // Carrera rara: otro insert simultáneo (clientGameId duplicado) → ok.
+      if (error.code === "23505") return NextResponse.json({ ok: true });
       throw error;
     }
     return NextResponse.json({ ok: true });
