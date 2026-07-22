@@ -24,12 +24,12 @@ interface WinnerRow {
  * Idempotente por (round_date, deck) vía round_settlements.
  */
 export async function GET(req: Request) {
+  // Fail-closed: sin CRON_SECRET configurado, o con Bearer incorrecto, se bloquea
+  // SIEMPRE. Así nadie puede disparar liquidaciones desde afuera.
   const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    }
+  const auth = req.headers.get("authorization");
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const url = new URL(req.url);
