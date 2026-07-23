@@ -19,6 +19,7 @@ import Link from "next/link";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import AccessCard from "./AccessCard";
 import AliasGate from "./AliasGate";
+import { HowToPlay, useHowToPlay } from "./HowToPlay";
 import WalletAliasForm from "./WalletAliasForm";
 import PlayerForm from "./PlayerForm";
 import CardView from "./CardView";
@@ -90,6 +91,10 @@ export default function GameShell() {
 
   // Alias local de jugadores solo-wallet (compartido con el perfil vía hook).
   const { walletAlias, setWalletAlias } = useWalletAlias();
+
+  // Tutorial "Cómo se juega": aparece solo la primera visita y puede
+  // reabrirse desde el botón del inicio. Solo vive en la fase de setup.
+  const howTo = useHowToPlay();
 
   /** Alias efectivo del jugador: Privy o el local de la wallet. */
   const currentAlias = profile.alias ?? walletAlias ?? "";
@@ -445,6 +450,8 @@ export default function GameShell() {
         </header>
       )}
 
+      {phase === "setup" && howTo.open && <HowToPlay onClose={howTo.close} />}
+
       {phase === "setup" && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -467,6 +474,13 @@ export default function GameShell() {
               ¡Avíspate y repite!
             </div>
           </div>
+          <button
+            type="button"
+            className="howto-replay"
+            onClick={howTo.replay}
+          >
+            Cómo se juega
+          </button>
           {/* Dos caminos: correo (Privy → alias → jugar, con 1 gratis diaria) o
               wallet (conectar → alias local → jugar pagando). */}
           {!profile.ready ? (

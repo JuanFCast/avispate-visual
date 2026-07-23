@@ -2026,3 +2026,403 @@ body {
 .alias-setup .field {
   text-align: left;
 }
+
+/* ---------- Tutorial interactivo "Cómo se juega" ---------- */
+
+/*
+ * Overlay de primera visita. Reutiliza los tokens del juego (cartas, slots,
+ * botones y sus tiempos/easing) y solo aporta composición propia howto-*.
+ */
+.howto-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  justify-content: center;
+  background:
+    radial-gradient(560px 380px at 92% -6%, rgba(255, 194, 14, 0.22), transparent 65%),
+    radial-gradient(480px 340px at -8% 108%, rgba(0, 199, 214, 0.14), transparent 65%),
+    var(--bg);
+  padding: calc(10px + env(safe-area-inset-top)) 16px
+    calc(12px + env(safe-area-inset-bottom));
+  animation: howto-in 0.18s ease-out;
+  --card-d: clamp(118px, 36vw, 148px);
+}
+
+@keyframes howto-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+.howto-inner {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.howto-top {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.howto-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.howto-progress {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.howto-pill {
+  width: 26px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--gray-soft);
+  border: 2px solid transparent;
+}
+
+.howto-pill.active {
+  background: var(--yellow);
+  border-color: var(--ink);
+}
+
+.howto-skip {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 14px;
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--white);
+  border: 2px solid var(--gray-soft);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--gray-soft);
+  cursor: pointer;
+}
+
+.howto-skip:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--gray-soft);
+}
+
+/* El centro hace scroll si falta altura; encabezado y CTA quedan fijos. */
+.howto-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.howto-step {
+  width: 100%;
+  margin: auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  animation: howto-step-in 0.22s ease-out;
+}
+
+@keyframes howto-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.howto-kicker {
+  font-family: var(--font-title);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  opacity: 0.55;
+}
+
+.howto-title {
+  font-family: var(--font-title);
+  font-size: 1.55rem;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.howto-text {
+  max-width: 30rem;
+  text-align: center;
+  line-height: 1.5;
+  font-weight: 600;
+  opacity: 0.78;
+}
+
+.howto-overlay .chain-area {
+  flex-shrink: 0;
+  margin: 12px 0 4px;
+}
+
+/* Mini cartas del paso 1: solo ilustran que la manzana se repite. */
+.howto-minis {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 6px;
+}
+
+.howto-mini {
+  position: relative;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  background: var(--white);
+  border: 4px solid var(--yellow);
+  box-shadow: 0 8px 18px rgba(13, 13, 15, 0.1);
+}
+
+.howto-mini.mine {
+  border-color: var(--cyan);
+}
+
+.howto-mini span {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 1.35rem;
+  line-height: 1;
+}
+
+.howto-mini .howto-mini-match {
+  background: rgba(47, 191, 113, 0.28);
+  border-radius: 50%;
+  padding: 5px;
+}
+
+/* Pista tras 2.5 s: halo alrededor de la manzana sin mover el layout. */
+.howto-halo {
+  position: absolute;
+  z-index: 6;
+  width: 52px;
+  height: 52px;
+  transform: translate(-50%, -50%);
+  border: 3px solid var(--yellow);
+  border-radius: 50%;
+  box-shadow: 0 0 0 5px rgba(255, 194, 14, 0.3);
+  pointer-events: none;
+  animation: howto-halo 0.9s ease-in-out 2;
+}
+
+@keyframes howto-halo {
+  50% {
+    box-shadow: 0 0 0 12px rgba(255, 194, 14, 0.12);
+  }
+}
+
+/* Rastro de avispa: tres puntos que acompañan a la carta entrante. */
+.howto-trail {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.howto-trail i {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--yellow);
+  opacity: 0;
+  animation: howto-trail-v 0.5s ease-out 0.14s;
+}
+
+.howto-trail i:nth-child(2) {
+  background: var(--cyan);
+  animation-delay: 0.24s;
+}
+
+.howto-trail i:nth-child(3) {
+  animation-delay: 0.34s;
+}
+
+@keyframes howto-trail-v {
+  0% {
+    opacity: 0;
+    transform: translate(calc(var(--card-d) * 0.55), calc(var(--card-d) * 2.35));
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--card-d) * 0.3), calc(var(--card-d) * 1.35));
+  }
+}
+
+.howto-feedback {
+  min-height: 1.5em;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1rem;
+}
+
+.howto-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.howto-chip {
+  padding: 7px 13px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.howto-note {
+  font-size: 0.78rem;
+  text-align: center;
+  font-weight: 600;
+  opacity: 0.6;
+}
+
+.howto-cta {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.howto-btn {
+  width: 100%;
+  max-width: 420px;
+}
+
+.howto-again {
+  min-height: 44px;
+  padding: 4px 16px;
+  font-family: var(--font-title);
+  font-weight: 500;
+  color: var(--ink);
+  opacity: 0.7;
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Botón permanente del inicio para reabrir el tutorial. */
+.howto-replay {
+  margin-top: 12px;
+  min-height: 44px;
+  padding: 9px 20px;
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--white);
+  border: 2px solid var(--cyan);
+  border-radius: 999px;
+  box-shadow: 0 3px 0 var(--cyan-soft);
+  cursor: pointer;
+}
+
+.howto-replay:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--cyan-soft);
+}
+
+/* Cartas lado a lado en horizontal/tablet; el rastro cambia de trayectoria. */
+@media (min-width: 760px), (orientation: landscape) {
+  .howto-overlay {
+    --card-d: clamp(140px, 21vw, 190px);
+  }
+
+  .howto-inner {
+    max-width: 620px;
+  }
+
+  .howto-trail i {
+    animation-name: howto-trail-h;
+  }
+}
+
+@keyframes howto-trail-h {
+  0% {
+    opacity: 0;
+    transform: translate(calc(var(--card-d) * 2.55), calc(var(--card-d) * 0.3));
+  }
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--card-d) * 1.55), calc(var(--card-d) * 0.1));
+  }
+}
+
+@media (min-width: 1024px) {
+  .howto-overlay {
+    --card-d: clamp(180px, 15vw, 220px);
+  }
+
+  .howto-inner {
+    max-width: 720px;
+  }
+}
+
+/* Alturas muy cortas: compactar espacios, nunca el área táctil de 44 px. */
+@media (max-height: 650px) {
+  .howto-overlay {
+    --card-d: clamp(105px, 16vh, 125px);
+  }
+
+  .howto-step {
+    gap: 8px;
+  }
+
+  .howto-title {
+    font-size: 1.25rem;
+  }
+
+  .howto-body {
+    padding: 6px 0;
+  }
+}
+
+/* Movimiento reducido: cambios de opacidad breves, sin vuelos ni halos. */
+@media (prefers-reduced-motion: reduce) {
+  .howto-overlay,
+  .howto-step {
+    animation: howto-fade 0.12s ease-out;
+  }
+
+  .howto-halo {
+    animation: none;
+  }
+
+  .howto-trail {
+    display: none;
+  }
+}
+
+@keyframes howto-fade {
+  from {
+    opacity: 0;
+  }
+}

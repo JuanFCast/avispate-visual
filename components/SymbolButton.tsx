@@ -21,6 +21,15 @@ export default function SymbolButton({ placed, flash, disabled, onTap }: Props) 
       className={`symbol-btn${flashClass}`}
       style={{ left: `${placed.x}%`, top: `${placed.y}%` }}
       onPointerDown={() => !disabled && onTap(placed.symbolId)}
+      onKeyDown={(e) => {
+        // Enter/Espacio activan por teclado sin duplicar el toque de puntero.
+        if (disabled || e.repeat) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onTap(placed.symbolId);
+        }
+      }}
+      tabIndex={disabled ? -1 : undefined}
       aria-label={symbol.label}
     >
       <span
