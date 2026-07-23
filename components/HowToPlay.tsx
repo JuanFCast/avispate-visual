@@ -49,9 +49,19 @@ function markSeen() {
  * Apertura del tutorial. En SSR el snapshot es "visto" para evitar flash e
  * hydration mismatch; el cliente corrige justo después de hidratar. replay()
  * reabre aunque la clave exista (el componente remonta y vuelve al paso 1).
+ *
+ * `resolved` indica que localStorage ya se leyó en el cliente: mientras sea
+ * falso, la decisión primera-visita/lobby aún no se conoce y el llamador debe
+ * mostrar solo el fondo de marca (ni "Cargando…", ni acceso, ni lobby).
  */
 export function useHowToPlay() {
   const seen = useSyncExternalStore(subscribe, readSeen, () => true);
+  // false en SSR/hidratación, true apenas el cliente toma el control.
+  const resolved = useSyncExternalStore(
+    subscribe,
+    () => true,
+    () => false
+  );
   const [replaying, setReplaying] = useState(false);
 
   const close = useCallback(() => {
@@ -61,7 +71,7 @@ export function useHowToPlay() {
 
   const replay = useCallback(() => setReplaying(true), []);
 
-  return { open: replaying || !seen, close, replay };
+  return { open: replaying || !seen, close, replay, resolved };
 }
 
 /* ---------------------------------------------------------------------- */
@@ -159,11 +169,11 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
     return () => timers.forEach(clearTimeout);
   }, []);
 
-  // Foco al abrir; al cerrar vuelve al botón permanente "Cómo se juega".
+  // Foco al abrir; al cerrar vuelve al enlace "Ver cómo se juega" del lobby.
   useEffect(() => {
     skipRef.current?.focus();
     return () => {
-      document.querySelector<HTMLElement>(".howto-replay")?.focus();
+      document.querySelector<HTMLElement>("[data-howto-trigger]")?.focus();
     };
   }, []);
 

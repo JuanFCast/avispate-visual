@@ -2426,3 +2426,459 @@ body {
     opacity: 0;
   }
 }
+
+/* ---------- Lobby "Reto de hoy" ---------- */
+
+/*
+ * El lobby abandona la columna de 420 px: la topbar, la tarjeta y la barra
+ * inferior comparten el mismo ancho máximo (hasta 920 px en escritorio).
+ */
+.shell.lobby {
+  max-width: 952px;
+}
+
+.shell.with-nav {
+  padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+/* Primera pintura: solo fondo de marca mientras se resuelve localStorage. */
+.lobby-boot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lobby-boot-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  box-shadow: 0 10px 26px rgba(255, 194, 14, 0.45);
+}
+
+.lobby-wrap {
+  width: 100%;
+  max-width: 460px;
+  margin: 14px auto 0;
+}
+
+/* Una sola tarjeta autosuficiente: reto, premio, mazo, entrada, CTA y top 3. */
+.lobby-card {
+  background: var(--white);
+  border: 2px solid var(--gray-soft);
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(13, 13, 15, 0.07);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lobby-action {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lobby-tag {
+  align-self: flex-start;
+  font-family: var(--font-title);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0b6d77; /* cyan oscurecido: contraste AA sobre el fondo suave */
+  border: 2px solid var(--cyan);
+  background: var(--cyan-soft);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
+.lobby-title {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.lobby-support {
+  font-weight: 600;
+  opacity: 0.75;
+  line-height: 1.45;
+}
+
+/* Premio + cierre. min-height reserva el alto mientras llega el monto. */
+.lobby-prize {
+  min-height: 98px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: linear-gradient(135deg, var(--cyan), #0f9fb2);
+  color: var(--white);
+  border: 2px solid var(--ink);
+  border-radius: 18px;
+  padding: 12px 16px;
+  box-shadow: 0 4px 0 rgba(13, 13, 15, 0.18);
+  text-align: center;
+}
+
+.lobby-prize-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.lobby-prize-amount {
+  font-family: var(--font-title);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.lobby-prize-close {
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.95;
+}
+
+/* Estado de entrada: gratis, pagada o comprobando. Altura reservada. */
+.lobby-entry {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.92rem;
+  background: var(--yellow-soft);
+  border: 2px solid var(--yellow-deep);
+  border-radius: 14px;
+  padding: 8px 12px;
+}
+
+.lobby-cta {
+  width: 100%;
+}
+
+.lobby-howto {
+  align-self: center;
+  min-height: 44px;
+  padding: 6px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-weight: 500;
+  font-size: 0.95rem;
+  color: #0b6d77;
+  text-decoration: underline;
+}
+
+.lobby-side {
+  display: flex;
+  flex-direction: column;
+}
+
+/* --- Top 3 del día --- */
+
+.lobby-top3 {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lobby-top3-title {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.lobby-rows {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lobby-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  padding: 10px 12px;
+  background: var(--white);
+  min-height: 56px;
+}
+
+.lobby-row.me {
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+}
+
+.lobby-rank {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: var(--gray-soft);
+  border-radius: 50%;
+}
+
+.lobby-row:first-child .lobby-rank {
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+}
+
+.lobby-row-mine .lobby-rank {
+  width: auto;
+  min-width: 30px;
+  padding: 0 8px;
+  border-radius: 999px;
+}
+
+.lobby-row-name {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  font-weight: 800;
+}
+
+.lobby-row-name small {
+  font-weight: 600;
+  opacity: 0.6;
+  font-size: 0.72rem;
+}
+
+.lobby-row-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: var(--font-title);
+  font-weight: 600;
+}
+
+.lobby-row-time small {
+  font-family: var(--font-body);
+  font-weight: 600;
+  opacity: 0.6;
+  font-size: 0.68rem;
+}
+
+.lobby-row-skeleton {
+  align-items: center;
+}
+
+.lobby-skeleton-line {
+  width: 100%;
+  height: 16px;
+}
+
+.lobby-note {
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.78;
+}
+
+.lobby-note a {
+  color: #0b6d77;
+}
+
+.lobby-ranking-link {
+  align-self: center;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-title);
+  font-weight: 500;
+  color: #0b6d77;
+  text-decoration: underline;
+  padding: 4px 12px;
+}
+
+/* --- Modal de acceso contextual --- */
+
+.lobby-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgba(13, 13, 15, 0.45);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  animation: howto-fade 0.18s ease-out;
+}
+
+.lobby-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  position: relative;
+  background: var(--bg);
+  border: 2px solid var(--ink);
+  border-radius: 24px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: lobby-modal-in 0.18s ease-out;
+}
+
+@keyframes lobby-modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+}
+
+.lobby-modal-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  min-width: 44px;
+  min-height: 44px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 1.05rem;
+  color: var(--ink);
+  opacity: 0.65;
+}
+
+.lobby-modal-title {
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  font-weight: 600;
+  padding-right: 44px;
+}
+
+.lobby-modal-text {
+  font-weight: 600;
+  opacity: 0.78;
+  line-height: 1.5;
+}
+
+.lobby-modal-later {
+  align-self: center;
+  min-height: 44px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-weight: 500;
+  color: var(--ink);
+  opacity: 0.65;
+  text-decoration: underline;
+}
+
+/* AliasGate/WalletAliasForm dentro del modal: sin doble tarjeta. */
+.lobby-modal .panel {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-top: 0;
+  max-width: none;
+  background: transparent;
+}
+
+/* Foco visible por teclado en las acciones del lobby y la navegación. */
+.lobby-cta:focus-visible,
+.lobby-howto:focus-visible,
+.lobby-ranking-link:focus-visible,
+.lobby-modal-close:focus-visible,
+.lobby-modal-later:focus-visible,
+.rounds-options button:focus-visible,
+.bottom-nav-item:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/* --- Responsive del lobby --- */
+
+/* Tablet vertical: una columna más aireada; crecen filas, no el logo. */
+@media (min-width: 600px) {
+  .lobby-wrap {
+    max-width: 680px;
+  }
+
+  .lobby-card {
+    padding: 26px;
+  }
+
+  .lobby-modal-backdrop {
+    align-items: center;
+  }
+}
+
+/* Escritorio: la misma tarjeta se abre en dos columnas (acción | top 3). */
+@media (min-width: 860px) {
+  .lobby-wrap {
+    max-width: 920px;
+  }
+
+  .lobby-card {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 26px;
+    padding: 28px;
+  }
+
+  .lobby-action {
+    flex: 1.1;
+    min-width: 0;
+  }
+
+  .lobby-side {
+    flex: 0.9;
+    min-width: 0;
+    border-left: 2px solid var(--gray-soft);
+    padding-left: 26px;
+  }
+
+  .shell.lobby .bottom-nav-inner {
+    max-width: 920px;
+  }
+}
+
+/* Horizontal con poca altura: menos aire, texto nunca por debajo de 14 px. */
+@media (max-height: 600px) and (orientation: landscape) {
+  .lobby-wrap {
+    margin-top: 6px;
+  }
+
+  .lobby-card {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .lobby-action {
+    gap: 8px;
+  }
+
+  .lobby-prize {
+    min-height: 78px;
+  }
+
+  .lobby-title {
+    font-size: 1.3rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-modal-backdrop,
+  .lobby-modal {
+    animation: howto-fade 0.12s ease-out;
+  }
+}

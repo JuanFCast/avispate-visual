@@ -17,15 +17,13 @@ import { usePayToPlay } from "@/lib/pay";
 import { useActiveWallet } from "@/lib/wallet";
 import Link from "next/link";
 import { useWalletAlias } from "@/lib/wallet-alias";
-import AccessCard from "./AccessCard";
-import AliasGate from "./AliasGate";
 import { HowToPlay, useHowToPlay } from "./HowToPlay";
-import WalletAliasForm from "./WalletAliasForm";
-import PlayerForm from "./PlayerForm";
+import HomeLobby from "./lobby/HomeLobby";
+import StartAccessModal from "./lobby/StartAccessModal";
+import ProfileBottomNav from "./profile/ProfileBottomNav";
 import CardView from "./CardView";
 import GameHUD from "./GameHUD";
 import ResultsPanel from "./ResultsPanel";
-import GlobalLeaderboard from "./GlobalLeaderboard";
 
 type Phase = "setup" | "paying" | "countdown" | "playing" | "results";
 type Role = "base" | "incoming" | "exiting";
@@ -82,7 +80,12 @@ export default function GameShell() {
   const [muted, setMutedState] = useState(false);
   // Qué mazos aún tienen la jugada gratis de hoy; el resto se paga.
   const [freeByDeck, setFreeByDeck] = useState<Record<number, boolean>>({});
+  // La consulta de jugadas gratis ya respondió al menos una vez: el CTA del
+  // lobby muestra "Comprobando tu entrada…" mientras tanto.
+  const [entitlementReady, setEntitlementReady] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  // Modal contextual de acceso (correo/wallet/alias) del lobby.
+  const [accessOpen, setAccessOpen] = useState(false);
 
   const profile = useProfile();
   const activeWallet = useActiveWallet();
@@ -132,6 +135,8 @@ export default function GameShell() {
       setFreeByDeck(data.free ?? {});
     } catch {
       // Sin info, el flujo asume pago (no regala jugadas).
+    } finally {
+      setEntitlementReady(true);
     }
   }, [profile]);
 
@@ -411,11 +416,18 @@ export default function GameShell() {
       : null;
   }
 
+  const withNav = phase === "setup" || phase === "results";
+
   return (
-    <main className={`shell${phase === "playing" ? " playing" : ""}`}>
+    <main
+      className={`shell${phase === "playing" ? " playing" : ""}${
+        phase === "setup" ? " lobby" : ""
+      }${withNav ? " with-nav" : ""}`}
+    >
       {/* La marca vive en menús y resultados; durante la partida el HUD es
-          mínimo y la barra superior desaparece. */}
-      {phase !== "playing" && (
+          mínimo y la barra superior desaparece. En el setup, la topbar espera
+          a saber si toca tutorial o lobby para no parpadear. */}
+      {phase !== "playing" && (phase !== "setup" || howTo.resolved) && (
         <header className="topbar">
           <span className="topbar-side">
             {(profile.authenticated || activeWallet.isConnected) && (
@@ -432,11 +444,8 @@ export default function GameShell() {
             )}
           </span>
           <h1 className="title">
-            {/* En el inicio la avispa ya protagoniza como héroe: no se repite. */}
-            {phase !== "setup" && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src="/logo-avispate.png" alt="" className="brand-icon" />
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-avispate.png" alt="" className="brand-icon" />
             Avíspate
           </h1>
           <button
@@ -450,69 +459,40 @@ export default function GameShell() {
         </header>
       )}
 
-      {phase === "setup" && howTo.open && <HowToPlay onClose={howTo.close} />}
-
-      {phase === "setup" && (
-        <>
+      {/* Primera pintura: hasta resolver localStorage solo se ve el fondo de
+          marca. Sin "Cargando…", sin acceso y sin lobby intermedio. */}
+      {phase === "setup" && !howTo.resolved && (
+        <div className="lobby-boot" aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-avispate.png" alt="Avíspate" className="hero-icon" />
-          <p className="subtitle">
-            ¡Despierta esos ojos! Gasta tu mazo de cartas en el menor tiempo
-            posible.
-          </p>
-          <div className="steps">
-            <div className="step">
-              <span className="step-emoji">👀</span>
-              Encuentra el símbolo común
-            </div>
-            <div className="step">
-              <span className="step-emoji">👆</span>
-              Tócalo en tu carta
-            </div>
-            <div className="step">
-              <span className="step-emoji">⚡</span>
-              ¡Avíspate y repite!
-            </div>
-          </div>
-          <button
-            type="button"
-            className="howto-replay"
-            onClick={howTo.replay}
-          >
-            Cómo se juega
-          </button>
-          {/* Dos caminos: correo (Privy → alias → jugar, con 1 gratis diaria) o
-              wallet (conectar → alias local → jugar pagando). */}
-          {!profile.ready ? (
-            <p className="access-note">Cargando…</p>
-          ) : profile.authenticated ? (
-            profile.loading ? (
-              <p className="access-note">Cargando perfil…</p>
-            ) : profile.alias ? (
-              <PlayerForm
-                onStart={handleStart}
-                freeByDeck={freeByDeck}
-                payError={payError}
-              />
-            ) : (
-              <AliasGate />
-            )
-          ) : activeWallet.isConnected ? (
-            walletAlias ? (
-              <PlayerForm
-                onStart={handleStart}
-                freeByDeck={freeByDeck}
-                payError={payError}
-              />
-            ) : (
-              <WalletAliasForm onSet={setWalletAlias} />
-            )
-          ) : (
-            <AccessCard />
+          <img src="/logo-avispate.png" alt="" className="lobby-boot-logo" />
+        </div>
+      )}
+
+      {phase === "setup" && howTo.resolved && howTo.open && (
+        <HowToPlay onClose={howTo.close} />
+      )}
+
+      {phase === "setup" && howTo.resolved && (
+        <>
+          <HomeLobby
+            deckSize={deckSize}
+            onDeckChange={setDeckSize}
+            freeByDeck={freeByDeck}
+            entitlementReady={entitlementReady}
+            walletAlias={walletAlias}
+            payError={payError}
+            onStart={handleStart}
+            onRequestAccess={() => setAccessOpen(true)}
+            onShowHowTo={howTo.replay}
+          />
+          {accessOpen && (
+            <StartAccessModal
+              walletAlias={walletAlias}
+              onSetWalletAlias={setWalletAlias}
+              onClose={() => setAccessOpen(false)}
+            />
           )}
-          <div style={{ width: "100%", maxWidth: 420 }}>
-            <GlobalLeaderboard initialDeck={deckSize} />
-          </div>
+          <ProfileBottomNav active="inicio" />
         </>
       )}
 
@@ -600,9 +580,7 @@ export default function GameShell() {
             onChangePlayer={() => setPhase("setup")}
           />
           {payError && <p className="alias-error">{payError}</p>}
-          <div style={{ width: "100%", maxWidth: 420 }}>
-            <GlobalLeaderboard initialDeck={deckSize} />
-          </div>
+          <ProfileBottomNav active="inicio" />
         </>
       )}
     </main>
