@@ -37,26 +37,45 @@ function getFunder() {
 }
 
 export interface SeedResult {
+  deck: number;
   ok: boolean;
   txHash?: string;
   error?: string;
 }
 
-/** Siembra el pozo de un mazo con SEED_AMOUNT desde el Funder. */
-export async function seedPotFromFunder(deck: number): Promise<SeedResult> {
+function errMsg(e: unknown, fallback: string): string {
+  return e instanceof Error ? e.message : fallback;
+}
+
+/**
+ * Siembra VARIOS pozos de una sola vez. Mismo patrón que `settleDecks`: envíos
+ * seguidos con nonce propio (todas salen del Funder) y confirmaciones en
+ * paralelo, para no encadenar tres esperas de bloque.
+ */
+export async function seedPots(decks: number[]): Promise<SeedResult[]> {
+  if (decks.length === 0) return [];
   const f = getFunder();
-  if (!f) return { ok: false, error: "funder_not_configured" };
+  if (!f) {
+    return decks.map((deck) => ({
+      deck,
+      ok: false,
+      error: "funder_not_configured",
+    }));
+  }
   const pot = AVISPATE_POT_ADDRESS as `0x${string}`;
   const usdt = USDT_CELO_ADDRESS as `0x${string}`;
+
+  let nonce: number;
   try {
-    // Aprobar el pozo una vez (seedPot hace transferFrom del Funder).
+    // Aprobar el pozo una vez (seedPot hace transferFrom del Funder). Esto sí
+    // va antes y confirmado: sin allowance, las siembras revertirían.
     const allowance = (await f.pub.readContract({
       address: usdt,
       abi: ERC20_ABI,
       functionName: "allowance",
       args: [f.account.address, pot],
     })) as bigint;
-    if (allowance < SEED_AMOUNT) {
+    if (allowance < SEED_AMOUNT * BigInt(decks.length)) {
       const approveHash = await f.wallet.writeContract({
         address: usdt,
         abi: ERC20_ABI,
@@ -65,16 +84,48 @@ export async function seedPotFromFunder(deck: number): Promise<SeedResult> {
       });
       await f.pub.waitForTransactionReceipt({ hash: approveHash as Hash });
     }
-
-    const hash = await f.wallet.writeContract({
-      address: pot,
-      abi: AVISPATE_POT_ABI,
-      functionName: "seedPot",
-      args: [deck, SEED_AMOUNT],
+    nonce = await f.pub.getTransactionCount({
+      address: f.account.address,
+      blockTag: "pending",
     });
-    await f.pub.waitForTransactionReceipt({ hash: hash as Hash });
-    return { ok: true, txHash: hash };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "seed_failed" };
+    return decks.map((deck) => ({
+      deck,
+      ok: false,
+      error: errMsg(e, "seed_prepare_failed"),
+    }));
   }
+
+  const failed: SeedResult[] = [];
+  const sent: { deck: number; hash: Hash }[] = [];
+  for (const deck of decks) {
+    try {
+      const hash = await f.wallet.writeContract({
+        address: pot,
+        abi: AVISPATE_POT_ABI,
+        functionName: "seedPot",
+        args: [deck, SEED_AMOUNT],
+        nonce,
+      });
+      nonce++;
+      sent.push({ deck, hash: hash as Hash });
+    } catch (e) {
+      failed.push({ deck, ok: false, error: errMsg(e, "seed_failed") });
+    }
+  }
+
+  const confirmed = await Promise.all(
+    sent.map(async ({ deck, hash }): Promise<SeedResult> => {
+      try {
+        const receipt = await f.pub.waitForTransactionReceipt({ hash });
+        return receipt.status === "success"
+          ? { deck, ok: true, txHash: hash }
+          : { deck, ok: false, txHash: hash, error: "seed_reverted" };
+      } catch (e) {
+        return { deck, ok: false, txHash: hash, error: errMsg(e, "receipt_failed") };
+      }
+    })
+  );
+
+  return [...confirmed, ...failed];
 }

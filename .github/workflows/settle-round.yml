@@ -1,19 +1,19 @@
 # Despertador confiable del pago diario de premios (7:00 p. m. Colombia).
 #
-# El cron de Vercel Hobby es impuntual (a veces dispara tarde, a veces nunca),
-# así que este workflow llama /api/cron/roll-day desde GitHub Actions varias
-# veces seguidas a partir de las 00:01 UTC (7:01 p. m. COL). El endpoint es
-# idempotente por (ronda, mazo): el primer intento que llegue paga y los
-# demás no hacen nada. El de Vercel (00:05) queda como respaldo adicional.
+# El reloj puntual es el pg_cron de Supabase (00:00 UTC = 7:00 p. m. COL).
+# Este workflow es la red de seguridad: llama /api/cron/roll-day varias veces
+# seguidas a partir de las 00:00 UTC. El endpoint es idempotente por
+# (ronda, mazo): el primer intento que llegue paga y los demás no hacen nada.
+# El cron de Vercel (00:05) queda como respaldo adicional.
 #
 # Requiere el secret CRON_SECRET en el repo (Settings → Secrets → Actions).
 name: settle-round
 
 on:
   schedule:
-    # 00:01, 00:04, 00:08 y 00:15 UTC — GitHub puede demorar unos minutos un
+    # 00:00, 00:04, 00:08 y 00:15 UTC — GitHub puede demorar unos minutos un
     # schedule; cuatro intentos escalonados cubren esa varianza.
-    - cron: "1 0 * * *"
+    - cron: "0 0 * * *"
     - cron: "4 0 * * *"
     - cron: "8 0 * * *"
     - cron: "15 0 * * *"

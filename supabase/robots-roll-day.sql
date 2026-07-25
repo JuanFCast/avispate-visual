@@ -1,13 +1,17 @@
 -- Avíspate · robot puntual del pago de premios DENTRO de Supabase (pg_cron)
 --
 -- Patrón copiado de TypeRush (gamev2_robots.sql): pg_cron es el reloj puntual
--- de Supabase; a las 00:01 UTC (7:01 p. m. Colombia) dispara vía pg_net el
--- endpoint /api/cron/roll-day de Vercel, que liquida la ronda y resiembra.
+-- de Supabase; a las 00:00 UTC EN PUNTO (7:00 p. m. Colombia) dispara vía pg_net
+-- el endpoint /api/cron/roll-day de Vercel, que liquida la ronda y resiembra.
+-- El endpoint espera unos segundos de colchón (SETTLE_GRACE_SECONDS) para que
+-- la última partida del día alcance a registrarse, y paga los tres mazos en
+-- paralelo: el premio suele caer sobre las 7:00:15 p. m.
 --
 -- Capas de respaldo (todas idempotentes, correr doble no paga doble):
---   1. ESTE cron de Supabase ............ 00:01 UTC (principal, puntual)
---   2. GitHub Actions settle-round ...... 00:01/00:04/00:08/00:15 UTC
---   3. Cron de Vercel ................... 00:05 UTC (impuntual, da igual)
+--   1. ESTE cron de Supabase ............ 00:00 UTC (principal, puntual)
+--   2. Reintento de Supabase ............ 00:03 UTC (por si el principal falla)
+--   3. GitHub Actions settle-round ...... 00:00/00:04/00:08/00:15 UTC
+--   4. Cron de Vercel ................... 00:05 UTC (impuntual, da igual)
 --
 -- PREREQUISITOS (una sola vez, en Database → Extensions): pg_cron y pg_net.
 --
@@ -19,7 +23,15 @@
 do $$
 declare
   cron_secret text := '__CRON_SECRET__';
-  job_name    text := 'avispate-roll-day';
+  -- nombre de job → horario UTC. El primero paga; el segundo solo actúa si el
+  -- primero no dejó fila en round_settlements.
+  jobs        text[][] := array[
+    ['avispate-roll-day',       '0 0 * * *'],
+    ['avispate-roll-day-retry', '3 0 * * *']
+  ];
+  job_name    text;
+  job_sched   text;
+  i           int;
 begin
   if not exists (select 1 from pg_extension where extname = 'pg_cron') then
     raise exception 'pg_cron no está activo. Actívalo en Database → Extensions.';
@@ -31,22 +43,28 @@ begin
     raise exception 'Reemplaza __CRON_SECRET__ por el CRON_SECRET real antes de ejecutar.';
   end if;
 
-  if exists (select 1 from cron.job where jobname = job_name) then
-    perform cron.unschedule(job_name);
-  end if;
+  for i in 1 .. array_length(jobs, 1) loop
+    job_name  := jobs[i][1];
+    job_sched := jobs[i][2];
 
-  -- timeout largo: roll-day hace hasta 3 settles + resiembras on-chain (~30 s).
-  perform cron.schedule(
-    job_name,
-    '1 0 * * *',  -- 00:01 UTC = 7:01 p. m. Colombia (UTC−5 fija)
-    format(
-      'select net.http_get(url => %L, headers => jsonb_build_object(''Authorization'', %L), timeout_milliseconds => 58000);',
-      'https://avispate-visual.vercel.app/api/cron/roll-day',
-      'Bearer ' || cron_secret
-    )
-  );
+    if exists (select 1 from cron.job where jobname = job_name) then
+      perform cron.unschedule(job_name);
+    end if;
 
-  raise notice 'Robot programado: % (00:01 UTC diario).', job_name;
+    -- timeout largo: roll-day espera el colchón de cierre y hace hasta 3
+    -- settles + resiembras on-chain (en paralelo, ~20 s en total).
+    perform cron.schedule(
+      job_name,
+      job_sched,  -- 00:00 UTC = 7:00 p. m. Colombia (UTC−5 fija)
+      format(
+        'select net.http_get(url => %L, headers => jsonb_build_object(''Authorization'', %L), timeout_milliseconds => 58000);',
+        'https://avispate-visual.vercel.app/api/cron/roll-day',
+        'Bearer ' || cron_secret
+      )
+    );
+
+    raise notice 'Robot programado: % (% UTC diario).', job_name, job_sched;
+  end loop;
 end
 $$;
 
