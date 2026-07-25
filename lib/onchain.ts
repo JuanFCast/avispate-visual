@@ -12,12 +12,15 @@ export interface PlayVerification {
   player?: string;
   /** Mazo jugado si la verificación pasó. */
   deck?: number;
+  /** La jugada consumió la gratis del día (según el evento del contrato). */
+  wasFree?: boolean;
 }
 
 /**
  * Verifica ON-CHAIN que `txHash` es una jugada `play(deck)` confirmada del
- * `expectedPlayer` en el contrato AvispatePot. El pago on-chain es la prueba de
- * identidad: no confiamos en la dirección que envía el cliente sin este cheque.
+ * `expectedPlayer` en el contrato AvispatePot, y si fue gratis o paga. La
+ * transacción es la prueba de identidad de TODAS las jugadas: no confiamos en
+ * la dirección que envía el cliente sin este cheque.
  */
 export async function verifyPlayTx(
   txHash: string,
@@ -48,6 +51,7 @@ export async function verifyPlayTx(
       ok: true,
       player: expectedPlayer.toLowerCase(),
       deck: expectedDeck,
+      wasFree: Boolean(match.args.wasFree),
     };
   } catch {
     return { ok: false };

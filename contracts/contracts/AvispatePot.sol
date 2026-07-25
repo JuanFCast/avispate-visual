@@ -8,20 +8,26 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 
 /**
  * @title AvispatePot
- * @notice Pozo por mazo para Avíspate. Cada re-jugada paga una comisión en USDT
- *         (por defecto 0.10): un % va a la wallet de comisión y el resto al pozo
- *         del mazo. Al cierre de cada ronda diaria, el owner (el backend) paga el
+ * @notice Pozo por mazo para Avíspate. TODA jugada pasa por `play(deck)`: la
+ *         primera del día UTC por (mazo, wallet) es GRATIS (no cobra USDT ni
+ *         alimenta el pozo, pero cuenta para el ranking); las siguientes pagan
+ *         `feeAmount` en USDT: un % va a la wallet de comisión y el resto al
+ *         pozo del mazo. Al cierre de cada ronda diaria, el operator paga el
  *         pozo completo al ganador (#1) y este se reinicia.
  *
- * Diseño para MVP:
- *  - La 1ª jugada gratis por día NO pasa por aquí: se maneja off-chain vía Privy.
- *    Este contrato solo procesa jugadas PAGAS, cuya prueba on-chain sirve además
- *    de identidad del jugador.
- *  - `settle` confía en que el owner/backend elige al #1 real (lo calcula desde
- *    Supabase). Es un punto de confianza aceptable para el MVP: el owner es el
- *    dueño del juego.
- *  - USDT en Celo es ERC-20 estándar (6 decimales); el jugador debe `approve`
- *    este contrato por `feeAmount` antes de `play`.
+ * Diseño (v2):
+ *  - La jugada gratis vive ON-CHAIN (`lastFreePlayDay`): así funciona igual
+ *    para correo (wallet embebida), wallet externa y MiniPay, y el txHash es
+ *    la prueba de identidad de TODAS las jugadas, gratis incluidas.
+ *  - El "día" es block.timestamp / 1 days (medianoche UTC = 7 p. m. Colombia),
+ *    exactamente el mismo corte que usa el backend para `round_date` y el cron
+ *    de liquidación. No depende de que el operator llame nada: en mazos sin
+ *    ganador el pozo rueda y la gratis igual se renueva a medianoche.
+ *  - `settle` confía en que el operator/backend elige al #1 real (lo calcula
+ *    desde Supabase). Punto de confianza aceptable: el owner es el dueño del
+ *    juego y el operator solo puede pagar, no retirar ni cambiar config.
+ *  - USDT en Celo es ERC-20 estándar (6 decimales); para jugadas pagas el
+ *    jugador debe `approve` este contrato por al menos `feeAmount`.
  */
 contract AvispatePot is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -49,9 +55,18 @@ contract AvispatePot is Ownable, ReentrancyGuard {
     /// @notice Saldo del pozo por mazo (incluye lo sembrado + 80% de las jugadas).
     mapping(uint8 => uint256) public pot;
 
+    /// @notice Último día UTC en que cada wallet usó su jugada gratis del mazo.
+    mapping(uint8 => mapping(address => uint256)) public lastFreePlayDay;
+
     uint16 private constant BPS_DENOMINATOR = 10_000;
 
-    event Played(address indexed player, uint8 indexed deck, uint256 toPot, uint256 commission);
+    event Played(
+        address indexed player,
+        uint8 indexed deck,
+        uint256 toPot,
+        uint256 commission,
+        bool wasFree
+    );
     event Seeded(uint8 indexed deck, address indexed from, uint256 amount);
     event Settled(uint8 indexed deck, address indexed winner, uint256 amount);
     event CommissionWalletUpdated(address indexed wallet);
@@ -99,23 +114,50 @@ contract AvispatePot is Ownable, ReentrancyGuard {
         _;
     }
 
+    /// @notice Día UTC actual: cambia a medianoche UTC (7 p. m. Colombia).
+    function currentDay() public view returns (uint256) {
+        return block.timestamp / 1 days;
+    }
+
+    /// @notice ¿La wallet aún tiene su jugada gratis de hoy en este mazo?
+    function hasFreePlayToday(uint8 deck, address user)
+        external
+        view
+        validDeck(deck)
+        returns (bool)
+    {
+        return lastFreePlayDay[deck][user] < currentDay();
+    }
+
     /**
-     * @notice Paga una jugada del mazo `deck`. Requiere `approve` previo por
-     *         `feeAmount`. La comisión va a `commissionWallet` y el resto al pozo.
+     * @notice Juega el mazo `deck`. La primera vez del día UTC por wallet es
+     *         gratis: no mueve USDT ni alimenta el pozo (solo deja constancia
+     *         para el ranking). Las siguientes cobran `feeAmount` (requiere
+     *         `approve` previo): la comisión va a `commissionWallet` y el
+     *         resto al pozo.
+     * @return wasFree true si esta jugada consumió la gratis del día.
      */
-    function play(uint8 deck) external nonReentrant validDeck(deck) {
-        uint256 fee = feeAmount;
-        uint256 commission = (fee * commissionBps) / BPS_DENOMINATOR;
-        uint256 toPot = fee - commission;
+    function play(uint8 deck) external nonReentrant validDeck(deck) returns (bool wasFree) {
+        uint256 day = currentDay();
+        if (lastFreePlayDay[deck][msg.sender] < day) {
+            // Jugada gratis del día: cuenta para el ranking, no toca fondos.
+            lastFreePlayDay[deck][msg.sender] = day;
+            wasFree = true;
+            emit Played(msg.sender, deck, 0, 0, true);
+        } else {
+            uint256 fee = feeAmount;
+            uint256 commission = (fee * commissionBps) / BPS_DENOMINATOR;
+            uint256 toPot = fee - commission;
 
-        // Un solo transferFrom del jugador a este contrato; luego repartimos.
-        token.safeTransferFrom(msg.sender, address(this), fee);
-        if (commission > 0) {
-            token.safeTransfer(commissionWallet, commission);
+            // Un solo transferFrom del jugador a este contrato; luego repartimos.
+            token.safeTransferFrom(msg.sender, address(this), fee);
+            if (commission > 0) {
+                token.safeTransfer(commissionWallet, commission);
+            }
+            pot[deck] += toPot;
+
+            emit Played(msg.sender, deck, toPot, commission, false);
         }
-        pot[deck] += toPot;
-
-        emit Played(msg.sender, deck, toPot, commission);
     }
 
     /**

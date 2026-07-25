@@ -37,15 +37,37 @@ export default function HomeLobby({
   const profile = useProfile();
   const wallet = useActiveWallet();
 
+  const checking: CtaState = {
+    support: "Comprobando tu entrada…",
+    label: "Preparando…",
+    disabled: true,
+    action: "start",
+  };
+
+  function playCta(): CtaState {
+    // La jugada gratis del día la decide el CONTRATO por wallet y mazo:
+    // aplica igual para correo (wallet embebida), wallet externa y MiniPay.
+    if (!entitlementReady) return checking;
+    if (freeByDeck[deckSize]) {
+      return {
+        support: "Tu partida gratis de hoy en este mazo está lista.",
+        label: "Jugar gratis",
+        disabled: false,
+        action: "start",
+      };
+    }
+    return {
+      support: "Entrada 0.10 USDT · 80% va al premio.",
+      label: "Jugar por 0.10 USDT",
+      disabled: false,
+      action: "start",
+    };
+  }
+
   function computeCta(): CtaState {
     // Sesión resolviendo: el lobby ya es visible, solo el CTA espera.
     if (!profile.ready || (profile.authenticated && profile.loading)) {
-      return {
-        support: "Comprobando tu entrada…",
-        label: "Preparando…",
-        disabled: true,
-        action: "start",
-      };
+      return checking;
     }
     if (profile.authenticated) {
       if (!profile.alias) {
@@ -56,28 +78,10 @@ export default function HomeLobby({
           action: "access",
         };
       }
-      if (!entitlementReady) {
-        return {
-          support: "Comprobando tu entrada…",
-          label: "Preparando…",
-          disabled: true,
-          action: "start",
-        };
-      }
-      if (freeByDeck[deckSize]) {
-        return {
-          support: "Tu partida gratis de hoy en este mazo está lista.",
-          label: "Jugar gratis",
-          disabled: false,
-          action: "start",
-        };
-      }
-      return {
-        support: "Entrada 0.10 USDT · 80% va al premio.",
-        label: "Jugar por 0.10 USDT",
-        disabled: false,
-        action: "start",
-      };
+      // La embebida de Privy se conecta sola a wagmi; un instante después
+      // de entrar puede no estar lista todavía.
+      if (!wallet.isConnected) return checking;
+      return playCta();
     }
     if (wallet.isConnected) {
       if (!walletAlias) {
@@ -88,12 +92,7 @@ export default function HomeLobby({
           action: "access",
         };
       }
-      return {
-        support: "Entrada 0.10 USDT · el ganador se lleva el premio.",
-        label: "Jugar por 0.10 USDT",
-        disabled: false,
-        action: "start",
-      };
+      return playCta();
     }
     return {
       support: "Inicia sesión para revisar tu jugada gratis.",

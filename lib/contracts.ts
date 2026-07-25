@@ -20,7 +20,14 @@ export const FEE_AMOUNT = BigInt(
   process.env.NEXT_PUBLIC_AVISPATE_FEE_AMOUNT || "100000"
 );
 
-/** ABI mínimo que usa el frontend/backend del contrato AvispatePot. */
+/**
+ * Allowance que se aprueba de una vez: varias jugadas por adelantado, NUNCA
+ * ilimitado. MiniPay limita el monto que una Mini App puede pedir en approve y
+ * auto-rechaza `maxUint256` con -32604 sin mostrar la hoja de firma.
+ */
+export const APPROVE_UNITS = FEE_AMOUNT * 10n;
+
+/** ABI mínimo que usa el frontend/backend del contrato AvispatePot (v2). */
 export const AVISPATE_POT_ABI = [
   {
     type: "event",
@@ -30,6 +37,7 @@ export const AVISPATE_POT_ABI = [
       { name: "deck", type: "uint8", indexed: true },
       { name: "toPot", type: "uint256", indexed: false },
       { name: "commission", type: "uint256", indexed: false },
+      { name: "wasFree", type: "bool", indexed: false },
     ],
   },
   {
@@ -37,7 +45,24 @@ export const AVISPATE_POT_ABI = [
     name: "play",
     stateMutability: "nonpayable",
     inputs: [{ name: "deck", type: "uint8" }],
-    outputs: [],
+    outputs: [{ name: "wasFree", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "hasFreePlayToday",
+    stateMutability: "view",
+    inputs: [
+      { name: "deck", type: "uint8" },
+      { name: "user", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "currentDay",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
   },
   {
     type: "function",

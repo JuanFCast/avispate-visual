@@ -2882,3 +2882,43 @@ body {
     animation: howto-fade 0.12s ease-out;
   }
 }
+
+/* Deeplink de recarga dentro del error de saldo (solo MiniPay). */
+.lobby-addcash {
+  color: #0b6d77;
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+/* --- Captcha del welcome gas (Turnstile) --- */
+
+.turnstile-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 98;
+  background: rgba(13, 13, 15, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: howto-fade 0.18s ease-out;
+}
+
+.turnstile-panel {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg);
+  border: 2px solid var(--ink);
+  border-radius: 20px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.turnstile-text {
+  text-align: center;
+  font-weight: 700;
+  line-height: 1.45;
+}

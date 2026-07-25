@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireIdentity } from "@/lib/http";
 import {
-  ensureProfile,
   ensureProfileByWallet,
   setAliasIfEmpty,
 } from "@/lib/supabase/profiles";
@@ -18,11 +16,6 @@ const ADDR_RE = /^0x[0-9a-f]{40}$/i;
 
 function isInt(n: unknown): n is number {
   return typeof n === "number" && Number.isInteger(n);
-}
-
-/** Fecha de la ronda actual (UTC), YYYY-MM-DD. */
-function currentRound(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 interface ScoreCore {
@@ -55,11 +48,12 @@ function validateCore(body: Record<string, unknown>): ScoreCore | string {
 }
 
 /**
- * POST: registra una partida terminada.
- *   - mode "free" (por defecto): jugada gratis, autenticada por Privy (correo).
- *     Una por mazo y ronda (día).
- *   - mode "paid": jugada paga, identidad = wallet probada por el pago on-chain
- *     (txHash verificado). Idempotente por tx_hash / clientGameId.
+ * POST: registra una partida terminada. Desde el contrato v2 TODA jugada
+ * (gratis o paga) es una transacción `play(deck)` on-chain: el txHash es la
+ * prueba de identidad de la wallet y el evento `Played` dice si fue gratis
+ * (`wasFree`) o paga. El límite de una gratis por mazo/día lo hace cumplir el
+ * propio contrato; aquí solo se refleja en `is_paid`. Idempotente por
+ * tx_hash / clientGameId.
  */
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -69,74 +63,6 @@ export async function POST(req: Request) {
   if (typeof core === "string")
     return NextResponse.json({ error: core }, { status: 400 });
 
-  return body.mode === "paid"
-    ? handlePaid(req, body, core)
-    : handleFree(req, core);
-}
-
-/** Jugada GRATIS: Privy + una por mazo/ronda. */
-async function handleFree(req: Request, core: ScoreCore) {
-  const auth = await requireIdentity(req);
-  if ("response" in auth) return auth.response;
-
-  try {
-    const profile = await ensureProfile(auth.identity);
-    if (!profile.alias) {
-      return NextResponse.json({ error: "alias_required" }, { status: 409 });
-    }
-
-    const db = getSupabaseAdmin();
-    const round = currentRound();
-
-    // Reintento idempotente del MISMO juego (mismo clientGameId): ok.
-    const { data: same } = await db
-      .from("scores")
-      .select("id")
-      .eq("client_game_id", core.clientGameId)
-      .maybeSingle();
-    if (same) return NextResponse.json({ ok: true });
-
-    // Una sola jugada GRATIS por perfil/mazo/ronda (se hace cumplir aquí).
-    const { data: existing } = await db
-      .from("scores")
-      .select("id")
-      .eq("profile_id", profile.id)
-      .eq("deck_size", core.deckSize)
-      .eq("round_date", round)
-      .eq("is_paid", false)
-      .limit(1);
-    if (existing && existing.length > 0) {
-      return NextResponse.json({ error: "free_used" }, { status: 409 });
-    }
-
-    const { error } = await db.from("scores").insert({
-      profile_id: profile.id,
-      client_game_id: core.clientGameId,
-      deck_size: core.deckSize,
-      round_date: round,
-      total_ms: core.totalMs,
-      average_ms: core.averageMs,
-      errors: core.errors,
-      accuracy: core.accuracy,
-      is_paid: false,
-    });
-    if (error) {
-      // Carrera rara: otro insert simultáneo (clientGameId duplicado) → ok.
-      if (error.code === "23505") return NextResponse.json({ ok: true });
-      throw error;
-    }
-    return NextResponse.json({ ok: true });
-  } catch {
-    return NextResponse.json({ error: "server_error" }, { status: 500 });
-  }
-}
-
-/** Jugada PAGA: wallet + txHash verificado on-chain. */
-async function handlePaid(
-  req: Request,
-  body: Record<string, unknown>,
-  core: ScoreCore
-) {
   const { txHash, player, alias } = body;
   if (typeof txHash !== "string" || !TX_RE.test(txHash))
     return NextResponse.json({ error: "invalid_tx_hash" }, { status: 400 });
@@ -144,11 +70,13 @@ async function handlePaid(
     return NextResponse.json({ error: "invalid_player" }, { status: 400 });
 
   try {
-    // El pago on-chain ES la prueba de identidad de la wallet.
+    // La transacción on-chain ES la prueba de identidad de la wallet.
     const check = await verifyPlayTx(txHash, player, core.deckSize);
     if (!check.ok || !check.player)
       return NextResponse.json({ error: "invalid_payment" }, { status: 400 });
 
+    // Los perfiles de correo también se encuentran aquí: su wallet embebida
+    // quedó guardada en el perfil al iniciar sesión.
     const profile = await ensureProfileByWallet(check.player);
 
     // Alias: si la wallet aún no tiene, hay que enviarlo en esta jugada.
@@ -178,7 +106,7 @@ async function handlePaid(
         average_ms: core.averageMs,
         errors: core.errors,
         accuracy: core.accuracy,
-        is_paid: true,
+        is_paid: !check.wasFree,
         tx_hash: txHash.toLowerCase(),
       },
       { onConflict: "client_game_id", ignoreDuplicates: true }

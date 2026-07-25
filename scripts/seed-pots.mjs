@@ -1,5 +1,6 @@
 // Siembra inicial de los 3 pozos (1 USDT cada uno) desde el Funder Rewards.
-// Lee FUNDER_PRIVATE_KEY de contracts/.env. Correr: node scripts/seed-pots.mjs
+// Lee FUNDER_PRIVATE_KEY de contracts/.env.
+// Correr: node scripts/seed-pots.mjs 0xDIRECCION_DEL_CONTRATO
 import { readFileSync } from "fs";
 import {
   createPublicClient,
@@ -10,7 +11,11 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { celo } from "viem/chains";
 
-const POT = "0x28B239a1b85fc2d87a0248B0EC319Ae3e6EB43f7";
+const POT = process.argv[2];
+if (!POT || !/^0x[0-9a-fA-F]{40}$/.test(POT)) {
+  console.log("Uso: node scripts/seed-pots.mjs 0xDIRECCION_DEL_CONTRATO");
+  process.exit(1);
+}
 const USDT = "0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e";
 const SEED = 1_000_000n; // 1 USDT (6 decimales)
 const DECKS = [10, 15, 20];

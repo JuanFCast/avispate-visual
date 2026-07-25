@@ -49,7 +49,8 @@ export default function WalletAliasForm({ onSet }: Props) {
     <form className="panel" onSubmit={submit}>
       <p className="hint">
         Wallet conectada: <strong>{shortAddress(address)}</strong>. Elige tu
-        alias para el ranking. Con wallet, cada jugada se paga (0.10 USDT).
+        alias para el ranking. Tienes una jugada gratis al día por mazo; las
+        extras cuestan 0.10 USDT.
       </p>
       <div className="field">
         <label>Tu alias</label>

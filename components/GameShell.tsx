@@ -14,6 +14,7 @@ import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
 import { usePayToPlay } from "@/lib/pay";
+import { useFreePlays } from "@/lib/round";
 import { useActiveWallet } from "@/lib/wallet";
 import Link from "next/link";
 import { useWalletAlias } from "@/lib/wallet-alias";
@@ -50,17 +51,17 @@ function vibrate(pattern: number | number[]) {
   }
 }
 
-/** Traduce un error del flujo de pago a un mensaje corto para el jugador. */
+/** Traduce un error del flujo de jugada a un mensaje corto para el jugador. */
 function describePayError(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (/rejected|denied|User rejected/i.test(msg))
-    return "Cancelaste el pago.";
+    return "Cancelaste la firma de la jugada.";
   if (/insufficient|exceeds balance|transfer amount/i.test(msg))
-    return "Saldo insuficiente de USDT (o gas) para pagar la jugada.";
+    return "Saldo insuficiente de USDT (o gas) para esta jugada.";
   if (/pot_not_configured/.test(msg))
-    return "El pago aún no está disponible (contrato no configurado).";
-  if (/no_wallet/.test(msg)) return "Conecta una wallet para pagar.";
-  return "No se pudo completar el pago. Inténtalo de nuevo.";
+    return "El juego aún no está disponible (contrato no configurado).";
+  if (/no_wallet/.test(msg)) return "Conecta una wallet o entra con tu correo.";
+  return "No se pudo registrar la jugada. Inténtalo de nuevo.";
 }
 
 export default function GameShell() {
@@ -78,11 +79,6 @@ export default function GameShell() {
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [bestAverageMs, setBestAverageMs] = useState(0);
   const [muted, setMutedState] = useState(false);
-  // Qué mazos aún tienen la jugada gratis de hoy; el resto se paga.
-  const [freeByDeck, setFreeByDeck] = useState<Record<number, boolean>>({});
-  // La consulta de jugadas gratis ya respondió al menos una vez: el CTA del
-  // lobby muestra "Comprobando tu entrada…" mientras tanto.
-  const [entitlementReady, setEntitlementReady] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
   // Modal contextual de acceso (correo/wallet/alias) del lobby.
   const [accessOpen, setAccessOpen] = useState(false);
@@ -90,7 +86,14 @@ export default function GameShell() {
   const profile = useProfile();
   const activeWallet = useActiveWallet();
   const queryClient = useQueryClient();
-  const { payForDeck, canPay } = usePayToPlay();
+  const { playForDeck, canPlay } = usePayToPlay();
+
+  // Jugadas gratis del día según el CONTRATO (una por mazo por wallet).
+  const {
+    freeByDeck,
+    ready: entitlementReady,
+    refetch: refetchFreePlays,
+  } = useFreePlays(activeWallet.address);
 
   // Alias local de jugadores solo-wallet (compartido con el perfil vía hook).
   const { walletAlias, setWalletAlias } = useWalletAlias();
@@ -102,9 +105,8 @@ export default function GameShell() {
   /** Alias efectivo del jugador: Privy o el local de la wallet. */
   const currentAlias = profile.alias ?? walletAlias ?? "";
 
-  // Info de pago de la partida en curso (para enviar el puntaje por el camino
-  // correcto). Refs porque se leen dentro de timeouts.
-  const paidRef = useRef(false);
+  // Info on-chain de la partida en curso: toda jugada tiene su transacción.
+  // Refs porque se leen dentro de timeouts.
   const txHashRef = useRef("");
   const playerRef = useRef("");
 
@@ -122,28 +124,6 @@ export default function GameShell() {
   useEffect(() => {
     setMutedState(isMuted());
   }, []);
-
-  /** Consulta al servidor qué mazos aún tienen jugada gratis hoy. */
-  const refreshEntitlement = useCallback(async () => {
-    try {
-      const token = profile.authenticated ? await profile.getToken() : null;
-      const res = await fetch("/api/entitlement", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!res.ok) return;
-      const data = await res.json();
-      setFreeByDeck(data.free ?? {});
-    } catch {
-      // Sin info, el flujo asume pago (no regala jugadas).
-    } finally {
-      setEntitlementReady(true);
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    if (!profile.ready) return;
-    refreshEntitlement();
-  }, [profile.ready, profile.authenticated, profile.alias, refreshEntitlement]);
 
   function toggleMuted() {
     const next = !muted;
@@ -182,34 +162,24 @@ export default function GameShell() {
   }, [phase]);
 
   /**
-   * Punto de entrada al iniciar: si al jugador le queda su jugada gratis del
-   * mazo, arranca directo; si no, cobra 0.10 USDT on-chain y, con el pago
-   * confirmado, arranca marcando la partida como paga.
+   * Punto de entrada al iniciar: TODA jugada (gratis o paga) firma `play(deck)`
+   * on-chain. El contrato decide si consume la gratis del día o cobra 0.10
+   * USDT; con la transacción confirmada arranca la partida.
    */
   async function handleStart(deck: number) {
     setPayError(null);
     const alias = currentAlias || playerName;
 
-    if (freeByDeck[deck]) {
-      paidRef.current = false;
-      txHashRef.current = "";
-      playerRef.current = "";
-      startGame(alias, deck);
-      return;
-    }
-
-    // Jugada paga.
-    if (!canPay) {
+    if (!canPlay) {
       setPayError(
-        "El pago aún no está disponible (contrato no configurado o wallet sin conectar)."
+        "El juego aún no está disponible (contrato no configurado o wallet sin conectar)."
       );
       return;
     }
     setDeckSize(deck);
     setPhase("paying");
     try {
-      const { txHash, player } = await payForDeck(deck);
-      paidRef.current = true;
+      const { txHash, player } = await playForDeck(deck);
       txHashRef.current = txHash;
       playerRef.current = player;
       startGame(alias, deck);
@@ -249,52 +219,33 @@ export default function GameShell() {
   }
 
   /**
-   * Envía el resultado al ranking de la ronda. Camino PAGO (identidad = wallet
-   * probada por el txHash) o GRATIS (identidad = Privy). Best-effort: el récord
-   * local ya quedó guardado. `clientGameId` lo hace idempotente en el servidor.
+   * Envía el resultado al ranking de la ronda. La identidad de TODA jugada es
+   * la wallet probada por el txHash de `play(deck)`; el servidor lee del
+   * evento si fue gratis o paga. Best-effort: el récord local ya quedó
+   * guardado. `clientGameId` lo hace idempotente en el servidor.
    */
   async function submitScore(r: GameResult) {
-    const base = {
-      clientGameId: crypto.randomUUID(),
-      deckSize,
-      totalMs: r.totalMs,
-      averageMs: r.averageMs,
-      errors: r.errors,
-      accuracy: r.accuracy,
-    };
+    if (!txHashRef.current || !playerRef.current) return;
     try {
-      let res: Response | null = null;
-      if (paidRef.current) {
-        // Pago: no requiere token de Privy; el tx prueba la identidad.
-        res = await fetch("/api/scores", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...base,
-            mode: "paid",
-            txHash: txHashRef.current,
-            player: playerRef.current,
-            alias: currentAlias || undefined,
-          }),
-        });
-      } else {
-        // Gratis: requiere sesión Privy con alias.
-        if (!profile.authenticated || !profile.alias) return;
-        const token = await profile.getToken();
-        if (!token) return;
-        res = await fetch("/api/scores", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ ...base, mode: "free" }),
-        });
-      }
-      if (res && res.ok) {
+      const res = await fetch("/api/scores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clientGameId: crypto.randomUUID(),
+          deckSize,
+          totalMs: r.totalMs,
+          averageMs: r.averageMs,
+          errors: r.errors,
+          accuracy: r.accuracy,
+          txHash: txHashRef.current,
+          player: playerRef.current,
+          alias: currentAlias || undefined,
+        }),
+      });
+      if (res.ok) {
         // Refresca el ranking de la ronda y las jugadas gratis restantes.
         queryClient.invalidateQueries({ queryKey: ["leaderboard", deckSize] });
-        void refreshEntitlement();
+        refetchFreePlays();
       }
     } catch {
       // Best-effort; el récord personal ya se guardó.
@@ -498,7 +449,11 @@ export default function GameShell() {
 
       {phase === "paying" && (
         <div className="countdown">
-          <p className="access-note">Procesando pago de 0.10 USDT…</p>
+          <p className="access-note">
+            {freeByDeck[deckSize]
+              ? "Registrando tu jugada gratis…"
+              : "Procesando pago de 0.10 USDT…"}
+          </p>
           <p className="empty-note">Confirma en tu wallet. No cierres esta ventana.</p>
         </div>
       )}

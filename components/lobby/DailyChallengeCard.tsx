@@ -2,7 +2,11 @@
 
 import type { ReactNode } from "react";
 import { fmtUsdt, useDeckPot, useRoundCountdown } from "@/lib/round";
+import { useIsMiniPay } from "@/lib/minipay";
 import DeckSelector from "./DeckSelector";
+
+/** Deeplink oficial de MiniPay para recargar USDT sin salir de la app. */
+const MINIPAY_ADD_CASH = "https://link.minipay.xyz/add_cash?tokens=USDT";
 
 /** Estado calculado del CTA según la matriz de elegibilidad del lobby. */
 export interface CtaState {
@@ -43,6 +47,7 @@ export default function DailyChallengeCard({
 }: Props) {
   const { potUnits, potEnabled } = useDeckPot(deckSize);
   const countdown = useRoundCountdown();
+  const inMiniPay = useIsMiniPay();
 
   return (
     <section className="lobby-card" aria-label="Reto de hoy">
@@ -92,6 +97,14 @@ export default function DailyChallengeCard({
         {payError && (
           <p className="alias-error" aria-live="polite">
             {payError}
+            {inMiniPay && /insuficiente/i.test(payError) && (
+              <>
+                {" "}
+                <a className="lobby-addcash" href={MINIPAY_ADD_CASH}>
+                  Recargar USDT
+                </a>
+              </>
+            )}
           </p>
         )}
 

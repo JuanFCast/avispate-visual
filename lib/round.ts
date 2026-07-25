@@ -8,8 +8,9 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useReadContract } from "wagmi";
+import { useReadContract, useReadContracts } from "wagmi";
 import { celo } from "viem/chains";
+import { DECK_OPTIONS } from "./game";
 import {
   AVISPATE_POT_ADDRESS,
   AVISPATE_POT_ABI,
@@ -88,4 +89,45 @@ export function useDeckPot(deck: number): {
     query: { enabled: potEnabled, refetchInterval: 15_000 },
   });
   return { potUnits: data as bigint | undefined, potEnabled };
+}
+
+/**
+ * Jugadas gratis del día según el CONTRATO para la wallet dada: una por mazo
+ * por día UTC. Sin wallet aún, asume optimista que la gratis está disponible
+ * (una wallet nueva siempre la tiene). `refetch` se llama al volver de una
+ * partida para refrescar la elegibilidad.
+ */
+export function useFreePlays(address: string): {
+  freeByDeck: Record<number, boolean>;
+  /** La consulta ya respondió (o no aplica todavía). */
+  ready: boolean;
+  refetch: () => void;
+} {
+  const enabled = Boolean(AVISPATE_POT_ADDRESS) && Boolean(address);
+  const { data, isSuccess, isError, refetch } = useReadContracts({
+    contracts: DECK_OPTIONS.map((deck) => ({
+      address: AVISPATE_POT_ADDRESS as `0x${string}`,
+      abi: AVISPATE_POT_ABI,
+      functionName: "hasFreePlayToday",
+      args: [deck, address as `0x${string}`],
+      chainId: celo.id,
+    })),
+    query: { enabled, refetchInterval: 60_000 },
+  });
+
+  const freeByDeck = Object.fromEntries(
+    DECK_OPTIONS.map((deck, i) => {
+      const result = data?.[i];
+      // Optimista por defecto: wallet nueva (o sin conectar) = gratis lista.
+      const free =
+        result && result.status === "success" ? Boolean(result.result) : true;
+      return [deck, free];
+    })
+  );
+
+  return {
+    freeByDeck,
+    ready: !enabled || isSuccess || isError,
+    refetch,
+  };
 }

@@ -10,6 +10,7 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { wagmiConfig } from "./wagmi";
 import { useMiniPayAutoConnect } from "./minipay";
 import { ProfileProvider } from "./profile-context";
+import WelcomeGasBridge from "@/components/WelcomeGasBridge";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 
@@ -122,6 +123,7 @@ export function Providers({ children }: { children: ReactNode }) {
           <RainbowKitProvider modalSize="compact">
             <PrivyEmbeddedBridge />
             <MiniPayBridge />
+            <WelcomeGasBridge />
             <ProfileProvider>{children}</ProfileProvider>
           </RainbowKitProvider>
         </WagmiProvider>
