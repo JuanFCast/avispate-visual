@@ -1,0 +1,34 @@
+# Despertador confiable del pago diario de premios (7:00 p. m. Colombia).
+#
+# El cron de Vercel Hobby es impuntual (a veces dispara tarde, a veces nunca),
+# así que este workflow llama /api/cron/roll-day desde GitHub Actions varias
+# veces seguidas a partir de las 00:01 UTC (7:01 p. m. COL). El endpoint es
+# idempotente por (ronda, mazo): el primer intento que llegue paga y los
+# demás no hacen nada. El de Vercel (00:05) queda como respaldo adicional.
+#
+# Requiere el secret CRON_SECRET en el repo (Settings → Secrets → Actions).
+name: settle-round
+
+on:
+  schedule:
+    # 00:01, 00:04, 00:08 y 00:15 UTC — GitHub puede demorar unos minutos un
+    # schedule; cuatro intentos escalonados cubren esa varianza.
+    - cron: "1 0 * * *"
+    - cron: "4 0 * * *"
+    - cron: "8 0 * * *"
+    - cron: "15 0 * * *"
+  # Disparo manual desde la pestaña Actions por si algún día hace falta.
+  workflow_dispatch:
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Liquidar la ronda
+        run: |
+          curl -fsS --max-time 120 --retry 3 --retry-delay 10 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://avispate-visual.vercel.app/api/cron/roll-day"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
