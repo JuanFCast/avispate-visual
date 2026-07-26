@@ -16,7 +16,6 @@ import { useProfile } from "@/lib/profile-context";
 import { usePayToPlay } from "@/lib/pay";
 import { useFreePlays } from "@/lib/round";
 import { useActiveWallet } from "@/lib/wallet";
-import Link from "next/link";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import { HowToPlay, useHowToPlay } from "./HowToPlay";
 import HomeLobby from "./lobby/HomeLobby";
@@ -380,20 +379,9 @@ export default function GameShell() {
           a saber si toca tutorial o lobby para no parpadear. */}
       {phase !== "playing" && (phase !== "setup" || howTo.resolved) && (
         <header className="topbar">
-          <span className="topbar-side">
-            {(profile.authenticated || activeWallet.isConnected) && (
-              <Link
-                href="/perfil"
-                className="profile-trigger"
-                aria-label="Ver tu perfil"
-              >
-                <span aria-hidden="true">👤</span>
-                <span className="profile-trigger-name">
-                  {currentAlias || "Perfil"}
-                </span>
-              </Link>
-            )}
-          </span>
+          {/* Hueco simétrico al botón de sonido: el perfil vive en la barra
+              inferior, no aquí. */}
+          <span className="topbar-side" aria-hidden="true" />
           <h1 className="title">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-avispate.png" alt="" className="brand-icon" />

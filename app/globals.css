@@ -910,29 +910,7 @@ body {
   white-space: nowrap;
 }
 
-/* --- Botón y panel de Perfil --- */
-.profile-trigger {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: 140px;
-  padding: 6px 12px;
-  border: 2px solid var(--ink);
-  border-radius: 999px;
-  background: var(--white);
-  font-family: var(--font-title);
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--ink);
-  cursor: pointer;
-}
-
-.profile-trigger-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+/* --- Panel de Perfil --- */
 .profile-overlay {
   position: fixed;
   inset: 0;
