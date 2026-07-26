@@ -2047,7 +2047,28 @@ body {
   padding: calc(10px + env(safe-area-inset-top)) 16px
     calc(12px + env(safe-area-inset-bottom));
   animation: howto-in 0.18s ease-out;
-  --card-d: clamp(118px, 36vw, 148px);
+
+  /*
+   * Las cartas se dimensionan como en la partida real: no con un clamp por
+   * ancho, sino restando el chrome propio al alto del viewport dinámico. Con
+   * el clamp anterior (tope 148 px) el tutorial enseñaba cartas de la mitad
+   * del tamaño que el jugador iba a encontrarse, y los símbolos, que miden
+   * `--card-d * 0.115`, quedaban ilegibles.
+   *
+   * --howto-chrome es lo que ocupan cabecera, textos, CTA y safe-areas; lo que
+   * queda, menos el hueco entre cartas (--card-gap de .chain-area), se reparte
+   * entre las dos cartas apiladas. El tope de 340 px es el mismo del juego, así
+   * que ninguna pantalla ve el tutorial más grande que la partida.
+   */
+  --howto-chrome: 360px;
+  --card-d: max(
+    132px,
+    min(
+      calc(100vw - 40px),
+      calc((100dvh - var(--howto-chrome) - 24px) / 2),
+      340px
+    )
+  );
 }
 
 @keyframes howto-in {
@@ -2126,16 +2147,18 @@ body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 12px 0;
+  padding: 10px 0;
 }
 
+/* Los espacios son ajustados a propósito: cada píxel que no gasta el texto se
+   lo quedan las cartas, que es lo que el jugador tiene que aprender a mirar. */
 .howto-step {
   width: 100%;
   margin: auto 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   animation: howto-step-in 0.22s ease-out;
 }
 
@@ -2156,10 +2179,11 @@ body {
 
 .howto-title {
   font-family: var(--font-title);
-  font-size: 1.55rem;
+  font-size: 1.4rem;
   font-weight: 600;
   line-height: 1.15;
   text-align: center;
+  text-wrap: balance;
 }
 
 .howto-text {
@@ -2172,21 +2196,26 @@ body {
 
 .howto-overlay .chain-area {
   flex-shrink: 0;
-  margin: 12px 0 4px;
+  margin: 8px 0 4px;
 }
 
-/* Mini cartas del paso 1: solo ilustran que la manzana se repite. */
+/*
+ * Mini cartas del paso 1: solo ilustran que la manzana se repite, así que van
+ * más pequeñas que las de verdad, pero PROPORCIONALES a ellas. Con un tamaño
+ * fijo, el paso 1 y el paso 2 parecían dos juegos distintos.
+ */
 .howto-minis {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: clamp(14px, 4vw, 24px);
   margin-top: 6px;
 }
 
 .howto-mini {
   position: relative;
-  width: 112px;
-  height: 112px;
+  /* 42vw es el techo: dos minis y su hueco tienen que caber a lo ancho. */
+  width: min(calc(var(--card-d) * 0.62), 42vw);
+  aspect-ratio: 1;
   border-radius: 50%;
   background: var(--white);
   border: 4px solid var(--yellow);
@@ -2197,10 +2226,11 @@ body {
   border-color: var(--cyan);
 }
 
+/* Mismo criterio que .symbol-btn en la partida: el emoji sigue al diámetro. */
 .howto-mini span {
   position: absolute;
   transform: translate(-50%, -50%);
-  font-size: 1.35rem;
+  font-size: calc(var(--card-d) * 0.115);
   line-height: 1;
 }
 
@@ -2214,8 +2244,9 @@ body {
 .howto-halo {
   position: absolute;
   z-index: 6;
-  width: 52px;
-  height: 52px;
+  /* Rodea un símbolo, así que crece con la carta como el símbolo mismo. */
+  width: max(44px, calc(var(--card-d) * 0.2));
+  height: max(44px, calc(var(--card-d) * 0.2));
   transform: translate(-50%, -50%);
   border: 3px solid var(--yellow);
   border-radius: 50%;
@@ -2351,11 +2382,33 @@ body {
 /* Cartas lado a lado en horizontal/tablet; el rastro cambia de trayectoria. */
 @media (min-width: 760px), (orientation: landscape) {
   .howto-overlay {
-    --card-d: clamp(140px, 21vw, 190px);
+    /* Una sola fila: el alto ya no se divide entre dos cartas y el límite pasa
+       a ser el ancho. El término de 50vw es el mismo del juego, y el tope de
+       272 px es lo que cabe en `.howto-inner` (620) con dos cartas y su hueco
+       máximo de 72 px. */
+    --card-d: max(
+      132px,
+      min(calc(50vw - 150px), calc(100dvh - 200px), 272px)
+    );
   }
 
   .howto-inner {
     max-width: 620px;
+  }
+
+  /* En horizontal sobra ancho y falta alto: el texto se aprieta para que la
+     carta siga siendo lo más grande de la pantalla. */
+  .howto-step {
+    gap: 8px;
+  }
+
+  .howto-title {
+    font-size: 1.25rem;
+  }
+
+  .howto-text {
+    font-size: 0.9rem;
+    line-height: 1.4;
   }
 
   .howto-trail i {
@@ -2379,18 +2432,31 @@ body {
 
 @media (min-width: 1024px) {
   .howto-overlay {
-    --card-d: clamp(180px, 15vw, 220px);
+    /* Tope 320 px: lo que cabe en `.howto-inner` (720) con las dos cartas. */
+    --card-d: max(
+      160px,
+      min(calc(50vw - 150px), calc(100dvh - 220px), 320px)
+    );
   }
 
   .howto-inner {
     max-width: 720px;
   }
+
+  .howto-title {
+    font-size: 1.5rem;
+  }
 }
 
-/* Alturas muy cortas: compactar espacios, nunca el área táctil de 44 px. */
-@media (max-height: 650px) {
+/*
+ * Móviles cortos en vertical. Se recorta el chrome (no el diámetro con un
+ * clamp fijo, que era lo que dejaba las cartas diminutas) y la fórmula reparte
+ * lo que quede. Va limitado a `portrait` a propósito: sin eso pisaba el cálculo
+ * del horizontal, donde las cartas van en una sola fila.
+ */
+@media (max-height: 720px) and (orientation: portrait) {
   .howto-overlay {
-    --card-d: clamp(105px, 16vh, 125px);
+    --howto-chrome: 296px;
   }
 
   .howto-step {
@@ -2398,11 +2464,22 @@ body {
   }
 
   .howto-title {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
+  }
+
+  .howto-text {
+    font-size: 0.9rem;
+    line-height: 1.4;
   }
 
   .howto-body {
     padding: 6px 0;
+  }
+
+  /* El área táctil de 44 px no se toca nunca. */
+  .howto-logo {
+    width: 28px;
+    height: 28px;
   }
 }
 
