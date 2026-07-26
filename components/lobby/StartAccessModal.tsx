@@ -145,8 +145,8 @@ export default function StartAccessModal({
               Guarda tu marca y compite
             </h2>
             <p className="lobby-modal-text">
-              Entra para guardar tu tiempo, aparecer en el ranking y recibir
-              premios.
+              Necesitas entrar con correo o wallet para guardar tu tiempo,
+              aparecer en el ranking y recibir premios.
             </p>
             <button
               type="button"
@@ -161,7 +161,7 @@ export default function StartAccessModal({
               className="lobby-modal-later"
               onClick={onClose}
             >
-              Ahora no
+              Cerrar
             </button>
           </>
         )}
