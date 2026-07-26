@@ -4,11 +4,17 @@ import Link from "next/link";
 
 const ITEMS = [
   { key: "inicio", label: "Jugar", emoji: "🐝", href: "/visual-rush" },
-  { key: "ranking", label: "Ranking", emoji: "🏆", href: "/ranking" },
+  { key: "historial", label: "Historial", emoji: "🏆", href: "/historial" },
   { key: "perfil", label: "Perfil", emoji: "👤", href: "/perfil" },
 ];
 
-/** Barra inferior fija: Jugar · Ranking · Perfil. Respeta el safe-area. */
+/**
+ * Barra inferior fija: Jugar · Historial · Perfil. Tres destinos y no cuatro:
+ * el ranking del día ya se alcanza desde "Ver ranking completo" en el lobby y
+ * desde /historial, así que no necesita botón propio aquí. Respeta el
+ * safe-area. Una `active` que no coincida con ninguno (p. ej. en /ranking)
+ * deja la barra sin resaltar, que es lo correcto.
+ */
 export default function ProfileBottomNav({ active }: { active: string }) {
   return (
     <nav className="bottom-nav" aria-label="Navegación principal">

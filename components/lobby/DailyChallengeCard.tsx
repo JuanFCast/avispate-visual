@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { fmtUsdt, useDeckPot, useRoundCountdown } from "@/lib/round";
+import { fmtUsdt, roundCopy, useDeckPot, useRoundClock } from "@/lib/round";
 import { useIsMiniPay } from "@/lib/minipay";
 import DeckSelector from "./DeckSelector";
 
@@ -46,7 +46,8 @@ export default function DailyChallengeCard({
   children,
 }: Props) {
   const { potUnits, potEnabled } = useDeckPot(deckSize);
-  const countdown = useRoundCountdown();
+  const clock = useRoundClock(deckSize);
+  const clockCopy = roundCopy(clock);
   const inMiniPay = useIsMiniPay();
 
   return (
@@ -66,9 +67,22 @@ export default function DailyChallengeCard({
               <span className="lobby-prize-amount">
                 {fmtUsdt(potUnits)} USDT
               </span>
-              <span className="lobby-prize-close">
-                Cierra hoy · 7:00 p. m. COL · faltan {countdown || "…"}
-              </span>
+              {/* El principal cambia cada segundo: sin aria-live para no
+                  convertir el lector de pantalla en un metrónomo. */}
+              <span className="lobby-prize-close">{clockCopy.primary}</span>
+              {clockCopy.retry ? (
+                <button
+                  type="button"
+                  className="lobby-prize-retry"
+                  onClick={clock.refetch}
+                >
+                  {clockCopy.secondary}
+                </button>
+              ) : (
+                <span className="lobby-prize-hint" aria-live="polite">
+                  {clockCopy.secondary}
+                </span>
+              )}
             </>
           ) : (
             <span className="lobby-prize-label">Premio en preparación</span>

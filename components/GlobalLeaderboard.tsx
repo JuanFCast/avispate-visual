@@ -6,9 +6,10 @@ import { shortAddress, useActiveWallet } from "@/lib/wallet";
 import { useProfile } from "@/lib/profile-context";
 import {
   fmtUsdt,
+  roundCopy,
   useDeckPot,
   useLeaderboard,
-  useRoundCountdown,
+  useRoundClock,
   type LeaderboardEntry as Entry,
 } from "@/lib/round";
 
@@ -28,7 +29,8 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
   const { alias } = useProfile();
   const { address } = useActiveWallet();
   const me = (address || "").toLowerCase();
-  const countdown = useRoundCountdown();
+  const clock = useRoundClock(deck);
+  const clockCopy = roundCopy(clock);
 
   const { data: entries = [], status } = useLeaderboard(deck);
   const { potUnits, potEnabled } = useDeckPot(deck);
@@ -60,7 +62,22 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
         <div className="pot-banner">
           <span className="pot-label">🏆 Premio de hoy · el #1 se lo lleva todo</span>
           <span className="pot-amount">{fmtUsdt(potUnits as bigint | undefined)} USDT</span>
-          <span className="pot-timer">⏳ cierra en {countdown} · 7pm (Col)</span>
+          <span className="pot-timer">⏳ {clockCopy.primary}</span>
+          {clockCopy.retry ? (
+            <button
+              type="button"
+              className="pot-retry"
+              onClick={clock.refetch}
+            >
+              {clockCopy.secondary}
+            </button>
+          ) : (
+            clockCopy.secondary && (
+              <span className="pot-hint" aria-live="polite">
+                {clockCopy.secondary}
+              </span>
+            )
+          )}
         </div>
       )}
 

@@ -6,6 +6,10 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    // Los scripts de `scripts/` los ejecuta Node quitando los tipos, y ahí la
+    // extensión .ts en el import es obligatoria. Solo la permite; nada del
+    // código de la app la usa.
+    "allowImportingTsExtensions": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
