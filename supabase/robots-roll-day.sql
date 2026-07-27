@@ -58,7 +58,7 @@ begin
       job_sched,  -- 00:00 UTC = 7:00 p. m. Colombia (UTC−5 fija)
       format(
         'select net.http_get(url => %L, headers => jsonb_build_object(''Authorization'', %L), timeout_milliseconds => 58000);',
-        'https://avispate-visual.vercel.app/api/cron/roll-day',
+        'https://avispate.fun/api/cron/roll-day',
         'Bearer ' || cron_secret
       )
     );

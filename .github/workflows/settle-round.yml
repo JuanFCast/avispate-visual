@@ -29,6 +29,6 @@ jobs:
         run: |
           curl -fsS --max-time 120 --retry 3 --retry-delay 10 \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://avispate-visual.vercel.app/api/cron/roll-day"
+            "https://avispate.fun/api/cron/roll-day"
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
