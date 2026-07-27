@@ -3328,6 +3328,234 @@ body {
   }
 }
 
+/* ============== Cartera: agregar dinero y enviar (modales) ================= */
+
+/* Heredan la caja de .lobby-modal; solo cambia lo que llevan dentro. */
+.fund-modal,
+.send-modal {
+  gap: 14px;
+}
+
+.fund-cta {
+  text-align: center;
+}
+
+.fund-options {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Separador fino entre caminos: se leen como tres alternativas, no como una
+   sola columna larga de instrucciones. */
+.fund-option + .fund-option {
+  border-top: 2px solid var(--gray-soft);
+  padding-top: 14px;
+}
+
+.fund-option {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fund-option-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-title);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.fund-option-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.fund-option-hint {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gray);
+  line-height: 1.4;
+}
+
+.fund-option-hint strong {
+  color: var(--ink);
+}
+
+.fund-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 2px solid var(--yellow);
+  border-radius: 14px;
+  background: var(--yellow-soft);
+  cursor: pointer;
+  text-align: left;
+}
+
+.fund-copy-label {
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+/* La dirección completa, partida: nunca debe desbordar el modal. */
+.fund-copy-addr {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gray);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}
+
+.fund-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 2px solid var(--cyan);
+  border-radius: 14px;
+  background: var(--cyan-soft);
+  color: #0b6d77;
+  font-family: var(--font-title);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+
+.fund-foot {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--gray);
+  line-height: 1.4;
+}
+
+/* --- Enviar --- */
+
+.send-available {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--gray-soft);
+}
+
+.send-available-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray);
+}
+
+.send-available-value {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.send-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.send-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray);
+}
+
+.send-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 14px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 14px;
+  background: var(--white);
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  color: var(--ink);
+}
+
+/* La dirección va en monoespaciada y más pequeña: se compara carácter a
+   carácter antes de mandar dinero. */
+.send-input-addr {
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.send-input:focus-visible {
+  outline: none;
+  border-color: var(--cyan);
+}
+
+.send-input.is-bad {
+  border-color: var(--bad);
+}
+
+.send-amount-row {
+  display: flex;
+  gap: 8px;
+}
+
+.send-max {
+  flex-shrink: 0;
+}
+
+.send-warn {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--bad);
+}
+
+.send-note {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--gray);
+  line-height: 1.4;
+}
+
+.send-note strong {
+  color: var(--ink);
+}
+
+.send-done {
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #12894f;
+}
+
+.fund-copy:focus-visible,
+.fund-link:focus-visible,
+.fund-cta:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
 /* ==================== Panel público de estadísticas (/stats) ================ */
 
 .stats-head {

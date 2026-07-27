@@ -2,15 +2,23 @@
 
 import { useState } from "react";
 import { shortAddress } from "@/lib/wallet";
+import { useIsMiniPay } from "@/lib/minipay";
 
 interface Props {
   address: string;
 }
 
-/** Tarjeta de cartera: dirección real, ver completa y copiar con feedback. */
+/**
+ * Tarjeta de cartera: dirección real, ver completa y copiar con feedback.
+ *
+ * Dentro de MiniPay no se muestra: sus reglas de publicación piden no exponer
+ * la dirección ahí, porque MiniPay ya tiene sus propias pantallas de recibir
+ * y enviar.
+ */
 export default function WalletCard({ address }: Props) {
   const [copied, setCopied] = useState(false);
   const [full, setFull] = useState(false);
+  const inMiniPay = useIsMiniPay();
 
   async function copy() {
     if (!address) return;
@@ -22,6 +30,8 @@ export default function WalletCard({ address }: Props) {
       // Portapapeles bloqueado.
     }
   }
+
+  if (inMiniPay) return null;
 
   return (
     <section className="profile-section wallet-card">

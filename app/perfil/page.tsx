@@ -4,22 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
-import { useBalance, useReadContract, useDisconnect } from "wagmi";
-import { celo } from "viem/chains";
-import { formatUnits } from "viem";
-import { useActiveWallet, shortAddress } from "@/lib/wallet";
-import {
-  USDT_CELO_ADDRESS,
-  ERC20_ABI,
-  USDT_DECIMALS,
-  COPM_CELO_ADDRESS,
-  COPM_DECIMALS,
-} from "@/lib/contracts";
+import { useDisconnect } from "wagmi";
+import { useActiveWallet } from "@/lib/wallet";
+import { USDT_DECIMALS } from "@/lib/contracts";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileStats from "@/components/profile/ProfileStats";
 import WonPrizes, { type Prize } from "@/components/profile/WonPrizes";
 import WalletCard from "@/components/profile/WalletCard";
-import TokenBalanceCard from "@/components/profile/TokenBalanceCard";
+import WalletTokens from "@/components/profile/WalletTokens";
 import ProfileBottomNav from "@/components/profile/ProfileBottomNav";
 
 interface Stats {
@@ -74,46 +66,7 @@ export default function PerfilPage() {
     else setStatsLoading(false);
   }, [ready, loggedIn, loadStats]);
 
-  // Saldos reales de la wallet conectada.
-  const celoBal = useBalance({
-    address: address as `0x${string}` | undefined,
-    chainId: celo.id,
-    query: { enabled: Boolean(address) },
-  });
-  const usdtRead = useReadContract({
-    address: USDT_CELO_ADDRESS as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: "balanceOf",
-    args: address ? [address as `0x${string}`] : undefined,
-    chainId: celo.id,
-    query: { enabled: Boolean(address), refetchInterval: 20_000 },
-  });
-  const copmRead = useReadContract({
-    address: COPM_CELO_ADDRESS as `0x${string}`,
-    abi: ERC20_ABI,
-    functionName: "balanceOf",
-    args: address ? [address as `0x${string}`] : undefined,
-    chainId: celo.id,
-    query: { enabled: Boolean(address), refetchInterval: 20_000 },
-  });
-
-  const celoValue =
-    celoBal.data !== undefined
-      ? Number(celoBal.data.formatted).toFixed(4)
-      : null;
-  const usdtValue =
-    usdtRead.data !== undefined
-      ? (Number(usdtRead.data as bigint) / 10 ** USDT_DECIMALS).toFixed(2)
-      : null;
-  // COPm tiene 18 decimales y montos grandes (miles de pesos), así que se
-  // divide con formatUnits (exacto sobre el bigint) y se muestra con
-  // separador de miles colombiano. Sin centavos: nadie cuenta pesos así.
-  const copmValue =
-    copmRead.data !== undefined
-      ? Number(
-          formatUnits(copmRead.data as bigint, COPM_DECIMALS)
-        ).toLocaleString("es-CO", { maximumFractionDigits: 2 })
-      : null;
+  // Los saldos y sus acciones (agregar / enviar) viven en WalletTokens.
   const totalWonUsdt = (
     Number(stats.totalWonUnits) / 10 ** USDT_DECIMALS
   ).toFixed(2);
@@ -177,47 +130,7 @@ export default function PerfilPage() {
             <>
               <WalletCard address={address} />
 
-              <section className="token-grid" aria-label="Saldos">
-                <TokenBalanceCard
-                  symbol="CELO"
-                  tint="celo"
-                  balance={celoValue}
-                  loading={celoBal.isLoading}
-                  error={celoBal.isError}
-                  description="Se usa para pagar las tarifas de la red."
-                  actions={
-                    <button type="button" className="btn-ghost" disabled>
-                      Agregar CELO · próximamente
-                    </button>
-                  }
-                />
-                <TokenBalanceCard
-                  symbol="USDT"
-                  tint="usdt"
-                  balance={usdtValue}
-                  loading={usdtRead.isLoading}
-                  error={usdtRead.isError}
-                  description="Para entrar a partidas pagadas y recibir premios."
-                  actions={
-                    <>
-                      <button type="button" className="btn-ghost" disabled>
-                        Enviar · próximamente
-                      </button>
-                      <button type="button" className="btn-ghost" disabled>
-                        Agregar · próximamente
-                      </button>
-                    </>
-                  }
-                />
-                <TokenBalanceCard
-                  symbol="COPm"
-                  tint="copm"
-                  balance={copmValue}
-                  loading={copmRead.isLoading}
-                  error={copmRead.isError}
-                  description="Peso colombiano digital en Celo. Todavía no se juega con él: las entradas se cobran en USDT."
-                />
-              </section>
+              <WalletTokens address={address} />
             </>
           ) : (
             <p className="empty-note">Creando tu wallet…</p>

@@ -24,6 +24,33 @@ import { isMiniPay } from "./minipay";
 // wallets embebidas de Privy y MiniPay suelen tener 0 CELO.
 const MIN_CELO_FOR_GAS = parseEther("0.01");
 
+/** Lo mínimo que necesitamos de un cliente público para decidir el gas. */
+interface BalanceReader {
+  getBalance: (args: { address: `0x${string}` }) => Promise<bigint>;
+}
+
+/**
+ * Con qué se paga el gas de una transacción firmada por el jugador.
+ *
+ * En MiniPay SIEMPRE en USDT (su CELO es 0 por diseño). Fuera de MiniPay,
+ * solo si la wallet casi no tiene CELO. Vive aquí y no repetido en cada
+ * pantalla: jugar, enviar y cualquier firma futura deben decidirlo igual, o
+ * un día una de ellas se queda sin gas mientras las otras funcionan.
+ */
+export async function resolveFeeCurrency(
+  publicClient: BalanceReader,
+  address: `0x${string}`
+): Promise<{ feeCurrency?: `0x${string}` }> {
+  let payGasInUsdt = isMiniPay();
+  if (!payGasInUsdt) {
+    const celoBalance = await publicClient.getBalance({ address });
+    payGasInUsdt = celoBalance < MIN_CELO_FOR_GAS;
+  }
+  return payGasInUsdt
+    ? { feeCurrency: CIP64_FEE_ADAPTER as `0x${string}` }
+    : {};
+}
+
 export interface PlayResult {
   /** Hash de la transacción `play(deck)` confirmada. */
   txHash: string;
@@ -69,16 +96,7 @@ export function usePayToPlay() {
         args: [deck, address],
       })) as boolean;
 
-      // CIP-64: en MiniPay SIEMPRE (su CELO es 0 por diseño; el gas sale del
-      // USDT). Fuera de MiniPay, solo si la wallet casi no tiene CELO.
-      let payGasInUsdt = isMiniPay();
-      if (!payGasInUsdt) {
-        const celoBalance = await publicClient.getBalance({ address });
-        payGasInUsdt = celoBalance < MIN_CELO_FOR_GAS;
-      }
-      const feeCurrency = payGasInUsdt
-        ? { feeCurrency: CIP64_FEE_ADAPTER as `0x${string}` }
-        : {};
+      const feeCurrency = await resolveFeeCurrency(publicClient, address);
 
       // Allowance solo para jugadas pagas: la gratis no mueve USDT.
       if (!wasFree) {
