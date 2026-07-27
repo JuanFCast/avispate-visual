@@ -6,11 +6,14 @@ import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { useBalance, useReadContract, useDisconnect } from "wagmi";
 import { celo } from "viem/chains";
+import { formatUnits } from "viem";
 import { useActiveWallet, shortAddress } from "@/lib/wallet";
 import {
   USDT_CELO_ADDRESS,
   ERC20_ABI,
   USDT_DECIMALS,
+  COPM_CELO_ADDRESS,
+  COPM_DECIMALS,
 } from "@/lib/contracts";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileStats from "@/components/profile/ProfileStats";
@@ -85,6 +88,14 @@ export default function PerfilPage() {
     chainId: celo.id,
     query: { enabled: Boolean(address), refetchInterval: 20_000 },
   });
+  const copmRead = useReadContract({
+    address: COPM_CELO_ADDRESS as `0x${string}`,
+    abi: ERC20_ABI,
+    functionName: "balanceOf",
+    args: address ? [address as `0x${string}`] : undefined,
+    chainId: celo.id,
+    query: { enabled: Boolean(address), refetchInterval: 20_000 },
+  });
 
   const celoValue =
     celoBal.data !== undefined
@@ -93,6 +104,15 @@ export default function PerfilPage() {
   const usdtValue =
     usdtRead.data !== undefined
       ? (Number(usdtRead.data as bigint) / 10 ** USDT_DECIMALS).toFixed(2)
+      : null;
+  // COPm tiene 18 decimales y montos grandes (miles de pesos), así que se
+  // divide con formatUnits (exacto sobre el bigint) y se muestra con
+  // separador de miles colombiano. Sin centavos: nadie cuenta pesos así.
+  const copmValue =
+    copmRead.data !== undefined
+      ? Number(
+          formatUnits(copmRead.data as bigint, COPM_DECIMALS)
+        ).toLocaleString("es-CO", { maximumFractionDigits: 2 })
       : null;
   const totalWonUsdt = (
     Number(stats.totalWonUnits) / 10 ** USDT_DECIMALS
@@ -192,10 +212,10 @@ export default function PerfilPage() {
                 <TokenBalanceCard
                   symbol="COPm"
                   tint="copm"
-                  balance={null}
-                  loading={false}
-                  description="Peso colombiano digital para jugar y ganar en Avíspate."
-                  soon
+                  balance={copmValue}
+                  loading={copmRead.isLoading}
+                  error={copmRead.isError}
+                  description="Peso colombiano digital en Celo. Todavía no se juega con él: las entradas se cobran en USDT."
                 />
               </section>
             </>

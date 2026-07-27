@@ -7,6 +7,17 @@
 export const USDT_CELO_ADDRESS = "0x48065fbBE25f71C9282ddf5e1cD6D6A887483D5e";
 export const USDT_DECIMALS = 6;
 
+/**
+ * COPm (Mento Colombian Peso) en Celo mainnet: el peso colombiano digital.
+ *
+ * Verificado leyendo el propio contrato el 2026-07-26: `name()` devuelve
+ * "Mento Colombian Peso", `symbol()` devuelve "COPm" y `decimals()` devuelve
+ * 18 — OJO, no 6 como USDT. En CoinGecko aparece como COPM y en Coinbase como
+ * cCOP; es el mismo token.
+ */
+export const COPM_CELO_ADDRESS = "0x8a567e2ae79ca692bd748ab832081c45de4041ea";
+export const COPM_DECIMALS = 18;
+
 /** Adaptador CIP-64 para pagar gas en USDT (sin necesitar CELO). */
 export const CIP64_FEE_ADAPTER = "0x0e2a3e05bc9a16f5292a6170456a710cb89c6f72";
 
