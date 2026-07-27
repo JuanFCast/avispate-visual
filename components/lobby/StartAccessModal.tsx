@@ -10,6 +10,8 @@ import WalletConnect from "../WalletConnect";
 
 interface Props {
   walletAlias: string | null;
+  /** Ya sabemos si la wallet conectada tiene alias en el servidor. */
+  walletAliasReady: boolean;
   onSetWalletAlias: (alias: string) => void;
   onClose: () => void;
 }
@@ -21,6 +23,7 @@ interface Props {
  */
 export default function StartAccessModal({
   walletAlias,
+  walletAliasReady,
   onSetWalletAlias,
   onClose,
 }: Props) {
@@ -90,8 +93,14 @@ export default function StartAccessModal({
 
   const needsEmailAlias =
     profile.authenticated && !profile.loading && !profile.alias;
+  // Solo se pide alias cuando ya se confirmó que la wallet no tiene ninguno.
   const needsWalletAlias =
-    !profile.authenticated && wallet.isConnected && !walletAlias;
+    !profile.authenticated &&
+    wallet.isConnected &&
+    walletAliasReady &&
+    !walletAlias;
+  const checkingWalletAlias =
+    !profile.authenticated && wallet.isConnected && !walletAliasReady;
 
   return (
     <div
@@ -130,7 +139,7 @@ export default function StartAccessModal({
             </h2>
             <WalletAliasForm onSet={onSetWalletAlias} />
           </>
-        ) : profile.authenticated && profile.loading ? (
+        ) : checkingWalletAlias || (profile.authenticated && profile.loading) ? (
           <>
             <h2 id="access-modal-title" className="lobby-modal-title">
               Guarda tu marca y compite

@@ -13,6 +13,8 @@ interface Props {
   /** La consulta de jugadas gratis ya respondió al menos una vez. */
   entitlementReady: boolean;
   walletAlias: string | null;
+  /** Ya sabemos si la wallet conectada tiene alias en el servidor. */
+  walletAliasReady: boolean;
   /** Jugada en curso: el lobby no se va, solo cambia el CTA. */
   payStage: PlayStage | null;
   payError: string | null;
@@ -32,6 +34,7 @@ export default function HomeLobby({
   freeByDeck,
   entitlementReady,
   walletAlias,
+  walletAliasReady,
   payStage,
   payError,
   onStart,
@@ -88,6 +91,9 @@ export default function HomeLobby({
       return playCta();
     }
     if (wallet.isConnected) {
+      // Antes de pedir alias hay que saber si la wallet ya tiene uno; si no,
+      // a quien vuelve desde otro dispositivo le pediríamos el que ya es suyo.
+      if (!walletAliasReady) return checking;
       if (!walletAlias) {
         return {
           support: "Elige tu alias para guardar tu marca.",

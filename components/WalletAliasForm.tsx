@@ -29,8 +29,10 @@ export default function WalletAliasForm({ onSet }: Props) {
     }
     setChecking(true);
     try {
+      // Va la wallet: un alias que ya es de ella no cuenta como "tomado".
       const res = await fetch(
-        `/api/alias-available?alias=${encodeURIComponent(check.value)}`
+        `/api/alias-available?alias=${encodeURIComponent(check.value)}` +
+          (address ? `&wallet=${address}` : "")
       );
       const data = await res.json();
       if (!data.available) {

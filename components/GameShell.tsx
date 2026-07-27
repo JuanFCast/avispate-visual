@@ -121,7 +121,11 @@ export default function GameShell() {
   } = useFreePlays(activeWallet.address);
 
   // Alias local de jugadores solo-wallet (compartido con el perfil vía hook).
-  const { walletAlias, setWalletAlias } = useWalletAlias();
+  const {
+    walletAlias,
+    ready: walletAliasReady,
+    setWalletAlias,
+  } = useWalletAlias();
 
   // Tutorial "Cómo se juega": aparece solo la primera visita y puede
   // reabrirse desde el botón del inicio. Solo vive en la fase de setup.
@@ -481,6 +485,7 @@ export default function GameShell() {
             freeByDeck={freeByDeck}
             entitlementReady={entitlementReady}
             walletAlias={walletAlias}
+            walletAliasReady={walletAliasReady}
             payStage={payStage}
             payError={payError}
             onStart={handleStart}
@@ -490,6 +495,7 @@ export default function GameShell() {
           {accessOpen && (
             <StartAccessModal
               walletAlias={walletAlias}
+              walletAliasReady={walletAliasReady}
               onSetWalletAlias={setWalletAlias}
               onClose={() => setAccessOpen(false)}
             />
