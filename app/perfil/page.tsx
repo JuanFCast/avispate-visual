@@ -82,7 +82,7 @@ export default function PerfilPage() {
 
   if (!ready) {
     return (
-      <main className="app-shell profile-page">
+      <main className="app-shell profile-page page-stack">
         <p className="access-note">Cargando…</p>
       </main>
     );
@@ -90,7 +90,7 @@ export default function PerfilPage() {
 
   if (!loggedIn) {
     return (
-      <main className="app-shell profile-page">
+      <main className="app-shell profile-page page-stack">
         <div className="profile-guard">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-avispate.png" alt="" className="profile-avatar" />
@@ -108,11 +108,11 @@ export default function PerfilPage() {
   }
 
   return (
-    <main className="app-shell profile-page">
+    <main className="app-shell profile-page page-stack">
       <ProfileHeader />
 
-      {/* Dos columnas en pantallas anchas (juego a la izquierda, cartera y
-          ajustes a la derecha); en móvil se apila en el mismo orden. */}
+      {/* Una sola columna en todos los tamaños: juego arriba, cartera y
+          ajustes debajo, en el mismo orden en móvil y en escritorio. */}
       <div className="page-grid">
         <div className="page-col">
           <ProfileStats

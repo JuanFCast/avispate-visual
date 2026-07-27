@@ -16,7 +16,7 @@ export const metadata: Metadata = {
  */
 export default function HistorialPage() {
   return (
-    <main className="app-shell profile-page">
+    <main className="app-shell profile-page page-stack">
       <h1 className="page-title">Historial de ganadores</h1>
       <p className="page-lead">
         Cada ronda cierra a las 7:00 p. m. (Colombia) y el #1 de cada mazo se

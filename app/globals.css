@@ -31,6 +31,12 @@
   --app-pad: 16px;
   /* Texto corrido (términos, privacidad): tope de lectura, no de app. */
   --read-w: 640px;
+  /*
+   * Listados verticales (Historial, Perfil): una sola tarjeta por fila a
+   * cualquier ancho. Más estrecho que --app-w para que las tarjetas no se
+   * estiren de lado a lado en escritorio.
+   */
+  --stack-w: 720px;
 }
 
 @media (min-width: 760px), (orientation: landscape) {
@@ -1054,6 +1060,17 @@ body {
 /* Páginas de texto corrido: la app es ancha, la lectura no. */
 .app-shell.profile-page.page-narrow {
   max-width: calc(var(--read-w) + var(--app-pad) * 2);
+}
+
+/*
+ * Páginas que se leen como una lista vertical continua (Historial, Perfil):
+ * columna única y centrada en móvil, tablet y escritorio. `min()` evita que
+ * en tablet la columna se pase del ancho de la app.
+ */
+.app-shell.profile-page.page-stack {
+  max-width: calc(min(var(--app-w), var(--stack-w)) + var(--app-pad) * 2);
+  /* La barra inferior es fija: la última tarjeta no puede quedar debajo. */
+  padding-bottom: calc(124px + env(safe-area-inset-bottom));
 }
 
 .page-title {
@@ -3280,6 +3297,11 @@ body {
     flex: 1;
   }
 
+  /* …salvo en las páginas apiladas, que siguen en una sola columna. */
+  .page-stack .page-grid {
+    flex-direction: column;
+  }
+
   .page-title {
     font-size: 1.9rem;
   }
@@ -3320,10 +3342,8 @@ body {
     font-size: 2.1rem;
   }
 
-  /* Historial: dos tarjetas por fila en vez de una columna estirada. */
+  /* Historial: una tarjeta por fila a cualquier ancho; solo respira más. */
   .hist-list {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
   }
 }
