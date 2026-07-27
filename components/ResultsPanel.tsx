@@ -1,11 +1,15 @@
 "use client";
 
 import { formatMs, type GameResult } from "@/lib/game";
+import type { PlayStage } from "@/lib/pay";
+import PlayButton from "./PlayButton";
 
 interface Props {
   result: GameResult;
   bestAverageMs: number;
   isNewRecord: boolean;
+  /** Revancha en curso: los resultados siguen a la vista. */
+  payStage: PlayStage | null;
   onPlayAgain: () => void;
   onChangePlayer: () => void;
 }
@@ -14,6 +18,7 @@ export default function ResultsPanel({
   result,
   bestAverageMs,
   isNewRecord,
+  payStage,
   onPlayAgain,
   onChangePlayer,
 }: Props) {
@@ -52,10 +57,17 @@ export default function ResultsPanel({
         </div>
       </div>
 
-      <button type="button" className="btn-primary" onClick={onPlayAgain}>
-        Jugar otra vez
-      </button>
-      <button type="button" className="btn-secondary" onClick={onChangePlayer}>
+      <PlayButton
+        label="Jugar otra vez"
+        stage={payStage}
+        onClick={onPlayAgain}
+      />
+      <button
+        type="button"
+        className="btn-secondary"
+        disabled={payStage !== null}
+        onClick={onChangePlayer}
+      >
         Volver al menú
       </button>
     </div>

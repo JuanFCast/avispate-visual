@@ -7,13 +7,20 @@ interface Props {
   onChange: (deck: number) => void;
   /** Qué mazos aún tienen la jugada gratis de hoy. */
   freeByDeck: Record<number, boolean>;
+  /** Bloqueado mientras se procesa una jugada de este mazo. */
+  disabled?: boolean;
 }
 
 /**
  * Selector único de mazo. Es controlado: GameShell posee el deckSize y todo el
  * lobby (premio, elegibilidad, top 3) cambia junto con esta única elección.
  */
-export default function DeckSelector({ value, onChange, freeByDeck }: Props) {
+export default function DeckSelector({
+  value,
+  onChange,
+  freeByDeck,
+  disabled,
+}: Props) {
   return (
     <div className="field">
       <label id="deck-selector-label">Cartas del mazo</label>
@@ -29,6 +36,7 @@ export default function DeckSelector({ value, onChange, freeByDeck }: Props) {
             role="radio"
             aria-checked={option === value}
             className={option === value ? "selected" : ""}
+            disabled={disabled}
             onClick={() => onChange(option)}
           >
             {option}

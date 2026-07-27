@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { fmtUsdt, roundCopy, useDeckPot, useRoundClock } from "@/lib/round";
 import { useIsMiniPay } from "@/lib/minipay";
+import type { PlayStage } from "@/lib/pay";
+import PlayButton from "../PlayButton";
 import DeckSelector from "./DeckSelector";
 
 /** Deeplink oficial de MiniPay para recargar USDT sin salir de la app. */
@@ -23,6 +25,8 @@ interface Props {
   onDeckChange: (deck: number) => void;
   freeByDeck: Record<number, boolean>;
   cta: CtaState;
+  /** Jugada en curso: el lobby sigue visible y solo el CTA cambia. */
+  payStage: PlayStage | null;
   payError: string | null;
   onPress: () => void;
   onShowHowTo: () => void;
@@ -40,6 +44,7 @@ export default function DailyChallengeCard({
   onDeckChange,
   freeByDeck,
   cta,
+  payStage,
   payError,
   onPress,
   onShowHowTo,
@@ -93,20 +98,21 @@ export default function DailyChallengeCard({
           value={deckSize}
           onChange={onDeckChange}
           freeByDeck={freeByDeck}
+          /* Con la firma en curso el mazo ya está decidido. */
+          disabled={payStage !== null}
         />
 
         <p className="lobby-entry" aria-live="polite">
           {cta.support}
         </p>
 
-        <button
-          type="button"
-          className="btn-primary lobby-cta"
+        <PlayButton
+          className="lobby-cta"
+          label={cta.label}
+          stage={payStage}
           disabled={cta.disabled}
           onClick={onPress}
-        >
-          {cta.label}
-        </button>
+        />
 
         {payError && (
           <p className="alias-error" aria-live="polite">

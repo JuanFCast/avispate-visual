@@ -13,7 +13,7 @@ import {
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
-import { usePayToPlay } from "@/lib/pay";
+import { usePayToPlay, type PlayStage } from "@/lib/pay";
 import { useFreePlays } from "@/lib/round";
 import { useActiveWallet } from "@/lib/wallet";
 import { useWalletAlias } from "@/lib/wallet-alias";
@@ -25,7 +25,12 @@ import CardView from "./CardView";
 import GameHUD from "./GameHUD";
 import ResultsPanel from "./ResultsPanel";
 
-type Phase = "setup" | "paying" | "countdown" | "playing" | "results";
+/**
+ * No hay fase de "pagando": la jugada se procesa sobre la pantalla en la que
+ * empezó (lobby o resultados), que sigue montada mientras `payStage` cuenta
+ * el avance en el botón. Sin pantalla intermedia y sin perder el contexto.
+ */
+type Phase = "setup" | "countdown" | "playing" | "results";
 type Role = "base" | "incoming" | "exiting";
 
 interface VisualCard {
@@ -43,6 +48,11 @@ interface Feedback {
 
 const EXIT_ANIMATION_MS = 600;
 const FINAL_CARD_DELAY_MS = 650;
+/**
+ * Transición entre la transacción confirmada y el 3, 2, 1. Lo justo para leer
+ * "Preparando partida…" en el botón; la cuenta regresiva arranca sola.
+ */
+const HANDOFF_MS = 450;
 
 function vibrate(pattern: number | number[]) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
@@ -79,6 +89,9 @@ export default function GameShell() {
   const [bestAverageMs, setBestAverageMs] = useState(0);
   const [muted, setMutedState] = useState(false);
   const [payError, setPayError] = useState<string | null>(null);
+  // Paso de la jugada en curso (null = no hay ninguna). Vive aquí porque lo
+  // pintan tanto el lobby como los resultados.
+  const [payStage, setPayStage] = useState<PlayStage | null>(null);
   // Modal contextual de acceso (correo/wallet/alias) del lobby.
   const [accessOpen, setAccessOpen] = useState(false);
 
@@ -164,8 +177,12 @@ export default function GameShell() {
    * Punto de entrada al iniciar: TODA jugada (gratis o paga) firma `play(deck)`
    * on-chain. El contrato decide si consume la gratis del día o cobra 0.10
    * USDT; con la transacción confirmada arranca la partida.
+   *
+   * La pantalla no cambia mientras tanto: quien llamó (lobby o resultados)
+   * sigue visible y `payStage` va contando el paso en su propio botón.
    */
   async function handleStart(deck: number) {
+    if (payStage) return;
     setPayError(null);
     const alias = currentAlias || playerName;
 
@@ -176,15 +193,19 @@ export default function GameShell() {
       return;
     }
     setDeckSize(deck);
-    setPhase("paying");
+    setPayStage("confirm");
     try {
-      const { txHash, player } = await playForDeck(deck);
+      const { txHash, player } = await playForDeck(deck, setPayStage);
       txHashRef.current = txHash;
       playerRef.current = player;
-      startGame(alias, deck);
+      setPayStage("starting");
+      setTimeout(() => {
+        setPayStage(null);
+        startGame(alias, deck);
+      }, HANDOFF_MS);
     } catch (err) {
       setPayError(describePayError(err));
-      setPhase("setup");
+      setPayStage(null);
     }
   }
 
@@ -419,6 +440,7 @@ export default function GameShell() {
             freeByDeck={freeByDeck}
             entitlementReady={entitlementReady}
             walletAlias={walletAlias}
+            payStage={payStage}
             payError={payError}
             onStart={handleStart}
             onRequestAccess={() => setAccessOpen(true)}
@@ -433,17 +455,6 @@ export default function GameShell() {
           )}
           <ProfileBottomNav active="inicio" />
         </>
-      )}
-
-      {phase === "paying" && (
-        <div className="countdown">
-          <p className="access-note">
-            {freeByDeck[deckSize]
-              ? "Registrando tu jugada gratis…"
-              : "Procesando pago de 0.10 USDT…"}
-          </p>
-          <p className="empty-note">Confirma en tu wallet. No cierres esta ventana.</p>
-        </div>
       )}
 
       {phase === "countdown" && (
@@ -519,6 +530,7 @@ export default function GameShell() {
             result={result}
             bestAverageMs={bestAverageMs}
             isNewRecord={isNewRecord}
+            payStage={payStage}
             onPlayAgain={() => handleStart(deckSize)}
             onChangePlayer={() => setPhase("setup")}
           />

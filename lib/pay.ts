@@ -51,6 +51,27 @@ export async function resolveFeeCurrency(
     : {};
 }
 
+/**
+ * Paso visible del flujo de jugada. Existe para que el botón cuente lo que
+ * está pasando sin tapar el lobby: cada valor es un texto de botón, no un
+ * estado del contrato. `starting` no lo emite este hook — lo pone la pantalla
+ * cuando la transacción ya está confirmada y solo falta repartir.
+ */
+export type PlayStage =
+  | "switching"
+  | "confirm"
+  | "approving"
+  | "registering"
+  | "starting";
+
+export const PLAY_STAGE_LABEL: Record<PlayStage, string> = {
+  switching: "Cambiando a Celo…",
+  confirm: "Confirma en tu wallet…",
+  approving: "Autorizando USDT…",
+  registering: "Registrando jugada…",
+  starting: "Preparando partida…",
+};
+
 export interface PlayResult {
   /** Hash de la transacción `play(deck)` confirmada. */
   txHash: string;
@@ -66,6 +87,8 @@ export interface PlayResult {
  * (`hasFreePlayToday`); para las pagas asegura antes un allowance ACOTADO de
  * USDT (varias jugadas, nunca ilimitado: MiniPay rechaza maxUint256). El
  * txHash devuelto es la prueba de identidad que verifica el backend.
+ *
+ * `onStage` es solo para la UI: avisa en qué paso va sin cambiar el flujo.
  */
 export function usePayToPlay() {
   const { address, chainId } = useAccount();
@@ -74,15 +97,23 @@ export function usePayToPlay() {
   const { switchChainAsync } = useSwitchChain();
 
   const playForDeck = useCallback(
-    async (deck: number): Promise<PlayResult> => {
+    async (
+      deck: number,
+      onStage: (stage: PlayStage) => void = () => {}
+    ): Promise<PlayResult> => {
       if (!address) throw new Error("no_wallet");
       if (!AVISPATE_POT_ADDRESS) throw new Error("pot_not_configured");
       if (!publicClient) throw new Error("no_client");
 
       // Asegurar que estamos en Celo antes de firmar.
       if (chainId !== celo.id) {
+        onStage("switching");
         await switchChainAsync({ chainId: celo.id });
       }
+
+      // A partir de aquí todo termina en una firma: las lecturas previas son
+      // instantáneas al lado de lo que tarda el jugador en confirmar.
+      onStage("confirm");
 
       const pot = AVISPATE_POT_ADDRESS as `0x${string}`;
       const usdt = USDT_CELO_ADDRESS as `0x${string}`;
@@ -118,7 +149,10 @@ export function usePayToPlay() {
             chainId: celo.id,
             ...feeCurrency,
           });
+          onStage("approving");
           await publicClient.waitForTransactionReceipt({ hash: approveHash });
+          // Falta la firma de la jugada: vuelve a tocarle al jugador.
+          onStage("confirm");
         }
       }
 
@@ -130,6 +164,7 @@ export function usePayToPlay() {
         chainId: celo.id,
         ...feeCurrency,
       });
+      onStage("registering");
       await publicClient.waitForTransactionReceipt({ hash: playHash });
 
       return { txHash: playHash, player: address.toLowerCase(), wasFree };

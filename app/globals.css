@@ -270,6 +270,12 @@ body {
   gap: 1px;
 }
 
+/* Bloqueado mientras se firma la jugada: el mazo ya está decidido. */
+.rounds-options button:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
 .deck-price {
   font-family: var(--font-nunito);
   font-size: 0.6rem;
@@ -303,6 +309,43 @@ body {
 .btn-primary:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/*
+ * Botón trabajando (jugada firmándose): sigue siendo el mismo botón en el
+ * mismo sitio, solo con spinner y el texto del paso. No hay pantalla de carga
+ * detrás, así que el lobby no se mueve.
+ */
+.btn-primary[aria-busy="true"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  /* El paso más largo ("Confirma en tu wallet…") no debe romper el botón. */
+  font-size: 1.05rem;
+  opacity: 0.85;
+}
+
+.btn-spinner {
+  flex: none;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 999px;
+  animation: btn-spin 0.7s linear infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn-spinner {
+    animation-duration: 2.4s;
+  }
 }
 
 .btn-secondary {

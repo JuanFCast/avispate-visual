@@ -2,6 +2,7 @@
 
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
+import type { PlayStage } from "@/lib/pay";
 import DailyChallengeCard, { type CtaState } from "./DailyChallengeCard";
 import LeaderboardPreview from "./LeaderboardPreview";
 
@@ -12,6 +13,8 @@ interface Props {
   /** La consulta de jugadas gratis ya respondió al menos una vez. */
   entitlementReady: boolean;
   walletAlias: string | null;
+  /** Jugada en curso: el lobby no se va, solo cambia el CTA. */
+  payStage: PlayStage | null;
   payError: string | null;
   onStart: (deck: number) => void;
   onRequestAccess: () => void;
@@ -29,6 +32,7 @@ export default function HomeLobby({
   freeByDeck,
   entitlementReady,
   walletAlias,
+  payStage,
   payError,
   onStart,
   onRequestAccess,
@@ -102,7 +106,19 @@ export default function HomeLobby({
     };
   }
 
-  const cta = computeCta();
+  // Con la jugada en curso, el mensaje de apoyo explica qué se está firmando:
+  // el jugador tiene el lobby delante y la wallet pidiéndole confirmación.
+  function payingCta(base: CtaState): CtaState {
+    return {
+      ...base,
+      support: freeByDeck[deckSize]
+        ? "Esta jugada es gratis. Solo debes confirmar en tu wallet."
+        : "Confirma el pago de 0,10 USDT en tu wallet.",
+    };
+  }
+
+  const baseCta = computeCta();
+  const cta = payStage ? payingCta(baseCta) : baseCta;
 
   return (
     <div className="lobby-wrap">
@@ -111,6 +127,7 @@ export default function HomeLobby({
         onDeckChange={onDeckChange}
         freeByDeck={freeByDeck}
         cta={cta}
+        payStage={payStage}
         payError={payError}
         onPress={() =>
           cta.action === "access" ? onRequestAccess() : onStart(deckSize)
