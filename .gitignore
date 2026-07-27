@@ -10,3 +10,5 @@ next-env.d.ts
 !.env.example
 docs/~$*
 *.local.sql
+# Archivo privado de pendientes
+docs/Pendientes de Avíspate.txt
