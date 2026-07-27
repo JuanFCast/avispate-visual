@@ -20,8 +20,8 @@ export default function HistorialPage() {
       <h1 className="page-title">Historial de ganadores</h1>
       <p className="page-lead">
         Cada ronda cierra a las 7:00 p. m. (Colombia) y el #1 de cada mazo se
-        lleva el pozo.{" "}
-        <Link href="/ranking">Ver el ranking de hoy</Link>
+        lleva el pozo. <Link href="/ranking">Ver el ranking de hoy</Link> ·{" "}
+        <Link href="/stats">Estadísticas en vivo</Link>
       </p>
 
       <WinnersHistory />

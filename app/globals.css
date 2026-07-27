@@ -3327,3 +3327,360 @@ body {
     gap: 14px;
   }
 }
+
+/* ==================== Panel público de estadísticas (/stats) ================ */
+
+.stats-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* Punto verde + "En vivo": la señal de que la página se refresca sola. */
+.stats-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1c6b45;
+  background: rgba(47, 191, 113, 0.16);
+  border: 1px solid var(--good);
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.stats-live::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--good);
+  animation: stats-pulse 2s ease-in-out infinite;
+}
+
+@keyframes stats-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* --- Cifras --- */
+
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.stats-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 2px solid var(--gray-soft);
+  background: var(--bg);
+  min-width: 0;
+}
+
+.stats-tile.tint-yellow {
+  background: var(--yellow-soft);
+  border-color: var(--yellow);
+}
+.stats-tile.tint-cyan {
+  background: var(--cyan-soft);
+  border-color: var(--cyan);
+}
+.stats-tile.tint-good {
+  background: #e8f8ef;
+  border-color: var(--good);
+}
+
+.stats-tile-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray);
+}
+
+.stats-tile-value {
+  font-family: var(--font-title);
+  font-size: 1.7rem;
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.stats-tile-hint {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--gray);
+  line-height: 1.35;
+}
+
+.stats-tile-skeleton {
+  width: 70%;
+  height: 1.7rem;
+}
+
+.stats-trend-skeleton {
+  width: 100%;
+  height: 150px;
+  border-radius: 16px;
+}
+
+.stats-subtitle {
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* --- Tendencia de 30 días --- */
+
+.trend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Las barras se estiran a lo ancho; con 30 columnas cada una es finita, así
+   que el gap se mide en píxeles y no en % para que no desaparezcan. */
+.trend-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 150px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+}
+
+.trend-col {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+/* Un día sin partidas deja una marca mínima: el hueco también es información. */
+.trend-bar {
+  position: relative;
+  width: 100%;
+  min-height: 2px;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--cyan-soft);
+  border: 1px solid var(--cyan);
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+
+.trend-bar-paid {
+  width: 100%;
+  background: var(--cyan);
+}
+
+.trend-axis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+.trend-legend {
+  display: flex;
+  gap: 14px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+.trend-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.trend-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--cyan);
+}
+
+.trend-swatch.is-paid {
+  background: var(--cyan);
+}
+
+.trend-swatch.is-free {
+  background: var(--cyan-soft);
+}
+
+/* --- Distribución en barras horizontales --- */
+
+.stats-bars {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stats-bar-row {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.stats-bar-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.stats-bar-track {
+  height: 12px;
+  border-radius: 999px;
+  background: var(--gray-soft);
+  overflow: hidden;
+}
+
+.stats-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--yellow);
+  transition: width 0.3s ease-out;
+}
+
+.stats-bar-value {
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stats-bar-value small {
+  font-family: var(--font-body);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+/* --- Tablas --- */
+
+/* La tabla de mazos tiene 6 columnas: en móvil se desplaza ella sola, sin
+   arrastrar la página entera a lo ancho. */
+.stats-table-wrap {
+  overflow-x: auto;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.stats-table th,
+.stats-table td {
+  padding: 9px 8px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.stats-table thead th {
+  font-size: 0.66rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray);
+  border-bottom: 2px solid var(--gray-soft);
+}
+
+.stats-table tbody th,
+.stats-table thead th:first-child {
+  text-align: left;
+  font-weight: 700;
+}
+
+.stats-table tbody tr + tr th,
+.stats-table tbody tr + tr td {
+  border-top: 1px solid var(--gray-soft);
+}
+
+.stats-table td small {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+.stats-td-strong {
+  font-family: var(--font-title);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* --- Pie --- */
+
+.stats-contract-link {
+  align-self: flex-start;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0b6d77;
+  text-decoration: none;
+  min-height: 24px;
+}
+
+.stats-note {
+  background: var(--bg);
+}
+
+.stats-updated {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray);
+}
+
+.stats-contract-link:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-live::before {
+    animation: none;
+  }
+  .stats-bar-fill {
+    transition: none;
+  }
+}
+
+@media (min-width: 860px) {
+  .stats-tile {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  .stats-tile-value {
+    font-size: 2rem;
+  }
+
+  .trend-bars {
+    height: 200px;
+  }
+
+  .stats-table {
+    font-size: 0.92rem;
+  }
+}

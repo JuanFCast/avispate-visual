@@ -204,6 +204,9 @@ export default function PerfilPage() {
           )}
 
           <section className="profile-links">
+            <Link className="profile-link-row" href="/stats">
+              Estadísticas en vivo
+            </Link>
             <a
               className="profile-link-row"
               href="mailto:soporte@avispate.fun"

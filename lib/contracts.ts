@@ -71,6 +71,22 @@ export const AVISPATE_POT_ABI = [
     inputs: [{ name: "deck", type: "uint8" }],
     outputs: [{ name: "", type: "uint256" }],
   },
+  // Getters de las variables públicas: el panel /stats lee la economía REAL del
+  // contrato en vez de repetir aquí un 0.10 / 20% que podría quedar viejo.
+  {
+    type: "function",
+    name: "feeAmount",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "commissionBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint16" }],
+  },
   {
     type: "function",
     name: "settle",
