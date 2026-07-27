@@ -14,7 +14,8 @@ import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
 import { usePayToPlay, type PlayStage } from "@/lib/pay";
-import { useFreePlays } from "@/lib/round";
+import { refreshLeaderboard, useFreePlays } from "@/lib/round";
+import { BLOCKING_DELAYS, deliver, enqueue } from "@/lib/outbox";
 import { useActiveWallet } from "@/lib/wallet";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import { HowToPlay, useHowToPlay } from "./HowToPlay";
@@ -71,6 +72,18 @@ function describePayError(err: unknown): string {
     return "El juego aún no está disponible (contrato no configurado).";
   if (/no_wallet/.test(msg)) return "Conecta una wallet o entra con tu correo.";
   return "No se pudo registrar la jugada. Inténtalo de nuevo.";
+}
+
+/**
+ * La jugada se pagó pero el servidor no la confirmó. Lo importante que hay que
+ * decirle al jugador es que NO vuelva a pagar: su jugada quedó guardada en el
+ * teléfono y se registra sola en cuanto haya conexión.
+ */
+function describeRegisterError(result: "rejected" | "retry"): string {
+  if (result === "retry") {
+    return "Tu pago quedó confirmado, pero no pudimos avisarle al servidor. Quedó guardado en este dispositivo y se enviará solo: revisa tu conexión y vuelve a abrir la app. No vuelvas a pagar.";
+  }
+  return "El servidor no aceptó esta jugada. Escríbenos a soporte@avispate.fun con la hora y tu wallet y lo revisamos.";
 }
 
 export default function GameShell() {
@@ -198,6 +211,28 @@ export default function GameShell() {
       const { txHash, player } = await playForDeck(deck, setPayStage);
       txHashRef.current = txHash;
       playerRef.current = player;
+
+      // El cobro ya ocurrió y no se deshace. Lo PRIMERO es dejar el txHash
+      // escrito en el dispositivo, de forma síncrona: si Chrome se cierra en
+      // el instante siguiente, el registro sale solo al volver a abrir.
+      const receipt = enqueue(`play:${txHash}`, "/api/plays", {
+        txHash,
+        player,
+        deckSize: deck,
+        alias: alias || undefined,
+      });
+
+      // Y no se reparten cartas hasta que el servidor confirme que la jugada
+      // quedó registrada. Se borra de la bandeja al confirmarse, dentro de
+      // `deliver`.
+      setPayStage("registering");
+      const sent = await deliver(receipt, BLOCKING_DELAYS);
+      if (sent !== "ok") {
+        setPayError(describeRegisterError(sent));
+        setPayStage(null);
+        return;
+      }
+
       setPayStage("starting");
       setTimeout(() => {
         setPayStage(null);
@@ -239,37 +274,40 @@ export default function GameShell() {
   }
 
   /**
-   * Envía el resultado al ranking de la ronda. La identidad de TODA jugada es
-   * la wallet probada por el txHash de `play(deck)`; el servidor lee del
-   * evento si fue gratis o paga. Best-effort: el récord local ya quedó
-   * guardado. `clientGameId` lo hace idempotente en el servidor.
+   * Guarda la marca en la bandeja de salida y la envía al ranking de la ronda.
+   * La identidad de TODA jugada es la wallet probada por el txHash de
+   * `play(deck)`; el servidor lee del evento si fue gratis o paga.
+   *
+   * El guardado es lo primero y es síncrono: si el jugador cierra la app al
+   * ver su tiempo, la marca sale sola en la siguiente apertura. `clientGameId`
+   * se genera UNA vez y viaja con el envío guardado, así que reintentar (hoy o
+   * mañana) siempre es la misma partida para el servidor y nunca se duplica.
    */
-  async function submitScore(r: GameResult) {
-    if (!txHashRef.current || !playerRef.current) return;
-    try {
-      const res = await fetch("/api/scores", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          clientGameId: crypto.randomUUID(),
-          deckSize,
-          totalMs: r.totalMs,
-          averageMs: r.averageMs,
-          errors: r.errors,
-          accuracy: r.accuracy,
-          txHash: txHashRef.current,
-          player: playerRef.current,
-          alias: currentAlias || undefined,
-        }),
-      });
-      if (res.ok) {
-        // Refresca el ranking de la ronda y las jugadas gratis restantes.
-        queryClient.invalidateQueries({ queryKey: ["leaderboard", deckSize] });
-        refetchFreePlays();
-      }
-    } catch {
-      // Best-effort; el récord personal ya se guardó.
-    }
+  function queueScore(r: GameResult): (() => Promise<void>) | null {
+    if (!txHashRef.current || !playerRef.current) return null;
+    const clientGameId = crypto.randomUUID();
+    const item = enqueue(`score:${clientGameId}`, "/api/scores", {
+      clientGameId,
+      deckSize,
+      totalMs: r.totalMs,
+      averageMs: r.averageMs,
+      errors: r.errors,
+      accuracy: r.accuracy,
+      txHash: txHashRef.current,
+      player: playerRef.current,
+      alias: currentAlias || undefined,
+    });
+
+    return async () => {
+      const sent = await deliver(item, BLOCKING_DELAYS);
+      if (sent !== "ok") return;
+      // La marca ya está guardada: recarga el ranking de este mazo ANTES de
+      // que el jugador vuelva al lobby. Invalidar no basta — el top no está
+      // montado durante los resultados, así que quedaría marcado como viejo
+      // y el jugador volvería sin verse.
+      await refreshLeaderboard(queryClient, deckSize);
+      refetchFreePlays();
+    };
   }
 
   function finishGame(totalMs: number) {
@@ -289,7 +327,9 @@ export default function GameShell() {
     };
     // Persiste para el récord personal de este dispositivo (no es un ranking).
     saveResult(gameResult);
-    void submitScore(gameResult);
+    // La marca queda escrita en la bandeja ANTES de pintar nada; el envío se
+    // dispara después y ya puede tardar lo que quiera.
+    const sendScore = queueScore(gameResult);
     setResult(gameResult);
     setBestAverageMs(Math.min(previousBest, averageMs));
     setIsNewRecord(averageMs < previousBest);
@@ -299,6 +339,7 @@ export default function GameShell() {
       sound.finish();
     }
     setPhase("results");
+    void sendScore?.();
   }
 
   /** Rota roles: la base vieja sale y tu carta pasa a ser la nueva base. */

@@ -1,0 +1,135 @@
+"use client";
+
+import { postWithRetry, type SendResult } from "./submit";
+
+/**
+ * Bandeja de salida en el dispositivo.
+ *
+ * Lo que está en juego es dinero: cuando el contrato cobra la entrada (o gasta
+ * la jugada gratis del día), eso ya pasó y no se deshace. Si el envío al
+ * servidor viviera solo en memoria, cerrar Chrome en el momento equivocado lo
+ * borraría para siempre y el jugador se quedaría sin ranking y sin plata.
+ *
+ * Por eso todo envío crítico se ESCRIBE PRIMERO en `localStorage`, de forma
+ * síncrona, y solo se borra cuando el servidor confirma que lo recibió (o lo
+ * rechaza de manera definitiva). Lo que quede pendiente se reenvía al volver a
+ * abrir la app. Los dos endpoints son idempotentes, así que reenviar de más no
+ * duplica nada.
+ */
+
+const KEY = "avispateOutbox_v1";
+
+/**
+ * Pasado este tiempo un envío ya no sirve: el ranking es por ronda diaria y
+ * una marca de anteayer no entra en ninguna. Se descarta para no arrastrar
+ * basura en el dispositivo para siempre.
+ */
+const MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Envío que retiene al jugador (el recibo de la jugada recién pagada, antes
+ * del 3, 2, 1). Reintentos cortos y seguidos: ~30 s en total, suficiente para
+ * que el nodo del servidor se ponga al día sin dejarlo mirando el botón.
+ */
+export const BLOCKING_DELAYS = [1000, 2000, 4000, 8000, 15_000] as const;
+
+/** Reenvío de fondo (al abrir la app o al volver la conexión). Sin prisa. */
+export const BACKGROUND_DELAYS = [2000, 6000] as const;
+
+export interface OutboxItem {
+  /** Estable y único por envío: `play:<txHash>` o `score:<clientGameId>`. */
+  id: string;
+  url: string;
+  body: unknown;
+  createdAt: number;
+}
+
+function read(): OutboxItem[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const fresh = (parsed as OutboxItem[]).filter(
+      (it) => it && typeof it.id === "string" && Date.now() - it.createdAt < MAX_AGE_MS
+    );
+    return fresh;
+  } catch {
+    return [];
+  }
+}
+
+function write(items: OutboxItem[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(KEY, JSON.stringify(items));
+  } catch {
+    // localStorage lleno o bloqueado (modo privado). El envío en curso sigue
+    // funcionando; lo que se pierde es la red de seguridad ante un cierre.
+  }
+}
+
+/**
+ * Guarda un envío pendiente. SÍNCRONO a propósito: se llama antes de cualquier
+ * `await`, para que un cierre de pestaña en el instante siguiente ya lo
+ * encuentre escrito. Si el mismo `id` ya estaba, se conserva el original (los
+ * dos son el mismo envío y el servidor los trata igual).
+ */
+export function enqueue(id: string, url: string, body: unknown): OutboxItem {
+  const items = read();
+  const existing = items.find((it) => it.id === id);
+  if (existing) return existing;
+
+  const item: OutboxItem = { id, url, body, createdAt: Date.now() };
+  write(items.concat(item));
+  return item;
+}
+
+/** Saca un envío de la bandeja (entregado o rechazado sin remedio). */
+export function drop(id: string): void {
+  write(read().filter((it) => it.id !== id));
+}
+
+/** Envíos que siguen pendientes en este dispositivo. */
+export function pending(): OutboxItem[] {
+  return read();
+}
+
+/**
+ * Intenta entregar un envío. Solo lo borra de la bandeja cuando el servidor
+ * responde: si queda en "retry", se queda guardado para el próximo arranque.
+ */
+export async function deliver(
+  item: OutboxItem,
+  delays: readonly number[] = BACKGROUND_DELAYS
+): Promise<SendResult> {
+  const result = await postWithRetry(item.url, item.body, delays);
+  if (result !== "retry") drop(item.id);
+  return result;
+}
+
+/** Evita que dos disparos a la vez (montaje + evento `online`) se pisen. */
+let flushing = false;
+
+/**
+ * Reenvía todo lo pendiente. Devuelve cuántos envíos ACEPTÓ el servidor, para
+ * que quien llame decida si tiene que refrescar algo (el ranking, por ejemplo).
+ */
+export async function flushOutbox(
+  delays: readonly number[] = BACKGROUND_DELAYS
+): Promise<number> {
+  if (flushing) return 0;
+  flushing = true;
+  try {
+    let delivered = 0;
+    // En orden de llegada: el recibo de una jugada antes que su resultado.
+    for (const item of pending()) {
+      const result = await deliver(item, delays);
+      if (result === "ok") delivered++;
+    }
+    return delivered;
+  } finally {
+    flushing = false;
+  }
+}

@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { useReadContract, useReadContracts } from "wagmi";
 import { celo } from "viem/chains";
 import { DECK_OPTIONS } from "./game";
@@ -214,8 +214,20 @@ export function roundCopy(clock: RoundClock): RoundCopy {
   };
 }
 
-async function fetchLeaderboard(deck: number): Promise<LeaderboardEntry[]> {
-  const res = await fetch(`/api/leaderboard?deck=${deck}`);
+/**
+ * `fresh` es para el jugador que ACABA de terminar una partida: la respuesta
+ * del ranking se cachea en el CDN, así que una lectura normal puede devolver
+ * una copia anterior a su marca. El parámetro sobrante hace que esa petición
+ * sea otra URL para el CDN y llegue hasta la base de datos.
+ */
+async function fetchLeaderboard(
+  deck: number,
+  fresh = false
+): Promise<LeaderboardEntry[]> {
+  const bust = fresh ? `&fresh=${Date.now()}` : "";
+  const res = await fetch(`/api/leaderboard?deck=${deck}${bust}`, {
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("leaderboard_fetch_failed");
   const data = await res.json();
   return data.leaderboard ?? [];
@@ -228,6 +240,25 @@ export function useLeaderboard(deck: number) {
     queryFn: () => fetchLeaderboard(deck),
     staleTime: 60_000,
     gcTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Recarga el ranking de un mazo YA y deja el resultado en la caché.
+ *
+ * Se usa al terminar una partida: en ese momento el top del lobby ni siquiera
+ * está montado, así que invalidar solo lo marcaría como viejo y el jugador
+ * volvería al lobby sin verse. `fetchQuery` trae los datos aunque no haya
+ * nadie mirando, y salta la caché del CDN para que su marca ya venga incluida.
+ */
+export async function refreshLeaderboard(
+  queryClient: QueryClient,
+  deck: number
+): Promise<void> {
+  await queryClient.fetchQuery({
+    queryKey: ["leaderboard", deck],
+    queryFn: () => fetchLeaderboard(deck, true),
+    staleTime: 0,
   });
 }
 

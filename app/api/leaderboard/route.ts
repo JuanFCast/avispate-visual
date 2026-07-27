@@ -59,14 +59,16 @@ export async function GET(req: Request) {
       if (leaderboard.length >= TOP_N) break;
     }
 
-    // Cache de CDN: el ranking no necesita ser al milisegundo. 15s frescos +
-    // servir viejo mientras revalida hace que las cargas repetidas sean rápidas.
+    // Cache de CDN corta: el ranking cambia cada vez que alguien termina una
+    // partida y quien acaba de jugar tiene que verse. La ventana de "servir
+    // viejo mientras revalida" se queda en 30s (antes 300s: cinco minutos de
+    // partidas cabían dentro y la gente no encontraba su marca). Quien acaba
+    // de registrar una jugada además pide con `?fresh=` y no toca esta copia.
     return NextResponse.json(
       { deck, leaderboard },
       {
         headers: {
-          "Cache-Control":
-            "public, s-maxage=15, stale-while-revalidate=300",
+          "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30",
         },
       }
     );

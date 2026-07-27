@@ -11,6 +11,7 @@ import { wagmiConfig } from "./wagmi";
 import { useMiniPayAutoConnect } from "./minipay";
 import { ProfileProvider } from "./profile-context";
 import WelcomeGasBridge from "@/components/WelcomeGasBridge";
+import OutboxBridge from "@/components/OutboxBridge";
 
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 
@@ -124,6 +125,7 @@ export function Providers({ children }: { children: ReactNode }) {
             <PrivyEmbeddedBridge />
             <MiniPayBridge />
             <WelcomeGasBridge />
+            <OutboxBridge />
             <ProfileProvider>{children}</ProfileProvider>
           </RainbowKitProvider>
         </WagmiProvider>
