@@ -138,88 +138,96 @@ export default function PerfilPage() {
     <main className="app-shell profile-page">
       <ProfileHeader />
 
-      <ProfileStats
-        gamesPlayed={stats.gamesPlayed}
-        wins={stats.wins}
-        totalWonUsdt={totalWonUsdt}
-        loading={statsLoading}
-      />
+      {/* Dos columnas en pantallas anchas (juego a la izquierda, cartera y
+          ajustes a la derecha); en móvil se apila en el mismo orden. */}
+      <div className="page-grid">
+        <div className="page-col">
+          <ProfileStats
+            gamesPlayed={stats.gamesPlayed}
+            wins={stats.wins}
+            totalWonUsdt={totalWonUsdt}
+            loading={statsLoading}
+          />
 
-      <WonPrizes prizes={stats.prizes} loading={statsLoading} />
-
-      {address ? (
-        <>
-          <WalletCard address={address} />
-
-          <section className="token-grid" aria-label="Saldos">
-            <TokenBalanceCard
-              symbol="CELO"
-              tint="celo"
-              balance={celoValue}
-              loading={celoBal.isLoading}
-              error={celoBal.isError}
-              description="Se usa para pagar las tarifas de la red."
-              actions={
-                <button type="button" className="btn-ghost" disabled>
-                  Agregar CELO · próximamente
-                </button>
-              }
-            />
-            <TokenBalanceCard
-              symbol="USDT"
-              tint="usdt"
-              balance={usdtValue}
-              loading={usdtRead.isLoading}
-              error={usdtRead.isError}
-              description="Para entrar a partidas pagadas y recibir premios."
-              actions={
-                <>
-                  <button type="button" className="btn-ghost" disabled>
-                    Enviar · próximamente
-                  </button>
-                  <button type="button" className="btn-ghost" disabled>
-                    Agregar · próximamente
-                  </button>
-                </>
-              }
-            />
-            <TokenBalanceCard
-              symbol="COPm"
-              tint="copm"
-              balance={null}
-              loading={false}
-              description="Peso colombiano digital para jugar y ganar en Avíspate."
-              soon
-            />
-          </section>
-        </>
-      ) : (
-        <p className="empty-note">Creando tu wallet…</p>
-      )}
-
-      <section className="profile-links">
-        <a
-          className="profile-link-row"
-          href="mailto:soporte@avispate.fun"
-        >
-          Ayuda y soporte
-        </a>
-        <button
-          type="button"
-          className="profile-link-row profile-logout-link"
-          onClick={handleLogout}
-        >
-          Cerrar sesión
-        </button>
-        <p className="profile-links-hint">
-          Cierra sesión para cambiar de cuenta.
-        </p>
-        <div className="profile-legal">
-          <Link href="/terminos">Términos</Link>
-          <span aria-hidden="true">·</span>
-          <Link href="/privacidad">Privacidad</Link>
+          <WonPrizes prizes={stats.prizes} loading={statsLoading} />
         </div>
-      </section>
+
+        <div className="page-col">
+          {address ? (
+            <>
+              <WalletCard address={address} />
+
+              <section className="token-grid" aria-label="Saldos">
+                <TokenBalanceCard
+                  symbol="CELO"
+                  tint="celo"
+                  balance={celoValue}
+                  loading={celoBal.isLoading}
+                  error={celoBal.isError}
+                  description="Se usa para pagar las tarifas de la red."
+                  actions={
+                    <button type="button" className="btn-ghost" disabled>
+                      Agregar CELO · próximamente
+                    </button>
+                  }
+                />
+                <TokenBalanceCard
+                  symbol="USDT"
+                  tint="usdt"
+                  balance={usdtValue}
+                  loading={usdtRead.isLoading}
+                  error={usdtRead.isError}
+                  description="Para entrar a partidas pagadas y recibir premios."
+                  actions={
+                    <>
+                      <button type="button" className="btn-ghost" disabled>
+                        Enviar · próximamente
+                      </button>
+                      <button type="button" className="btn-ghost" disabled>
+                        Agregar · próximamente
+                      </button>
+                    </>
+                  }
+                />
+                <TokenBalanceCard
+                  symbol="COPm"
+                  tint="copm"
+                  balance={null}
+                  loading={false}
+                  description="Peso colombiano digital para jugar y ganar en Avíspate."
+                  soon
+                />
+              </section>
+            </>
+          ) : (
+            <p className="empty-note">Creando tu wallet…</p>
+          )}
+
+          <section className="profile-links">
+            <a
+              className="profile-link-row"
+              href="mailto:soporte@avispate.fun"
+            >
+              Ayuda y soporte
+            </a>
+            <button
+              type="button"
+              className="profile-link-row profile-logout-link"
+              onClick={handleLogout}
+            >
+              Cerrar sesión
+            </button>
+            <p className="profile-links-hint">
+              Cierra sesión para cambiar de cuenta.
+            </p>
+            <div className="profile-legal">
+              <Link href="/terminos">Términos</Link>
+              <span aria-hidden="true">·</span>
+              <Link href="/privacidad">Privacidad</Link>
+            </div>
+          </section>
+        </div>
+      </div>
 
       <ProfileBottomNav active="perfil" />
     </main>

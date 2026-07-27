@@ -22,11 +22,35 @@
   --font-title: var(--font-fredoka), "Comic Sans MS", system-ui, sans-serif;
   --font-body: var(--font-nunito), system-ui, sans-serif;
   --card-d: min(88vw, 40vh, 340px);
+  /*
+   * Escala de la app: TODAS las pantallas con barra inferior (Jugar,
+   * Historial, Perfil, Ranking) usan la misma columna de contenido y el mismo
+   * margen lateral. Si una pantalla se sale de aquí, se siente de otra app.
+   */
+  --app-w: 460px;
+  --app-pad: 16px;
+  /* Texto corrido (términos, privacidad): tope de lectura, no de app. */
+  --read-w: 640px;
 }
 
 @media (min-width: 760px), (orientation: landscape) {
   :root {
     --card-d: min(38vw, 56vh, 340px);
+  }
+}
+
+/* Tablet vertical: una columna más ancha y aireada. */
+@media (min-width: 600px) {
+  :root {
+    --app-w: 680px;
+  }
+}
+
+/* Escritorio/portátil: el ancho que ya usaba el lobby, ahora para las tres. */
+@media (min-width: 860px) {
+  :root {
+    --app-w: 920px;
+    --app-pad: 20px;
   }
 }
 
@@ -1015,15 +1039,21 @@ body {
 }
 
 /* ======================= Pantalla de Perfil / Ranking ======================= */
+/* Misma columna y mismo margen lateral que el lobby de Jugar (--app-w). */
 .app-shell.profile-page {
   width: 100%;
-  max-width: 520px;
+  max-width: calc(var(--app-w) + var(--app-pad) * 2);
   margin: 0 auto;
-  min-height: 100vh;
-  padding: 20px 16px calc(104px + env(safe-area-inset-bottom));
+  min-height: 100dvh;
+  padding: 20px var(--app-pad) calc(104px + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* Páginas de texto corrido: la app es ancha, la lectura no. */
+.app-shell.profile-page.page-narrow {
+  max-width: calc(var(--read-w) + var(--app-pad) * 2);
 }
 
 .page-title {
@@ -1031,6 +1061,23 @@ body {
   font-size: 1.5rem;
   font-weight: 600;
   text-align: center;
+}
+
+/*
+ * Dos columnas en pantallas anchas. En móvil se apila y es indistinguible de
+ * una sola columna, así que el JSX no necesita ramas por tamaño.
+ */
+.page-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
 .profile-guard {
@@ -1437,10 +1484,12 @@ body {
   pointer-events: none;
 }
 
+/* Se alinea con la columna de contenido: la barra no puede cambiar de ancho
+   al saltar entre Jugar, Historial y Perfil. */
 .bottom-nav-inner {
   pointer-events: auto;
-  width: calc(100% - 24px);
-  max-width: 496px;
+  width: calc(100% - var(--app-pad) * 2);
+  max-width: var(--app-w);
   margin: 0 auto;
   display: flex;
   background: var(--white);
@@ -2487,14 +2536,26 @@ body {
 
 /*
  * El lobby abandona la columna de 420 px: la topbar, la tarjeta y la barra
- * inferior comparten el mismo ancho máximo (hasta 920 px en escritorio).
+ * inferior comparten el mismo ancho máximo (--app-w), igual que /historial,
+ * /perfil y /ranking.
  */
 .shell.lobby {
-  max-width: 952px;
+  max-width: calc(var(--app-w) + var(--app-pad) * 2);
+  padding-left: var(--app-pad);
+  padding-right: var(--app-pad);
 }
 
 .shell.with-nav {
   padding-bottom: calc(96px + env(safe-area-inset-bottom));
+}
+
+/*
+ * Resultados: aquí la columna la manda el panel de 420 px, no la de la app.
+ * La barra inferior hereda `--app-w`, así que se alinea con el panel en vez
+ * de estirarse a lo ancho de la pantalla.
+ */
+.shell.with-nav:not(.lobby) {
+  --app-w: 420px;
 }
 
 /* Primera pintura: solo fondo de marca mientras se resuelve localStorage. */
@@ -2514,7 +2575,7 @@ body {
 
 .lobby-wrap {
   width: 100%;
-  max-width: 460px;
+  max-width: var(--app-w);
   margin: 14px auto 0;
 }
 
@@ -2868,10 +2929,6 @@ body {
 
 /* Tablet vertical: una columna más aireada; crecen filas, no el logo. */
 @media (min-width: 600px) {
-  .lobby-wrap {
-    max-width: 680px;
-  }
-
   .lobby-card {
     padding: 26px;
   }
@@ -2883,10 +2940,6 @@ body {
 
 /* Escritorio: la misma tarjeta se abre en dos columnas (acción | top 3). */
 @media (min-width: 860px) {
-  .lobby-wrap {
-    max-width: 920px;
-  }
-
   .lobby-card {
     flex-direction: row;
     align-items: stretch;
@@ -2904,10 +2957,6 @@ body {
     min-width: 0;
     border-left: 2px solid var(--gray-soft);
     padding-left: 26px;
-  }
-
-  .shell.lobby .bottom-nav-inner {
-    max-width: 920px;
   }
 }
 
@@ -3203,4 +3252,78 @@ body {
 .pot-retry:focus-visible {
   outline: 3px solid var(--ink);
   outline-offset: 2px;
+}
+
+/* ============ Escala compartida de Jugar / Historial / Perfil ============ */
+
+/*
+ * El panel del ranking nació como formulario de 420 px. Dentro de una página
+ * con barra inferior manda la columna de la app, no ese tope.
+ */
+.profile-page .panel {
+  max-width: none;
+  margin-top: 0;
+}
+
+/*
+ * Escritorio/portátil: las tres pantallas comparten ancho (--app-w), así que
+ * también comparten el aire y el tamaño de tipografía. Sin esto, Historial y
+ * Perfil quedarían anchos pero con elementos de teléfono dentro.
+ */
+@media (min-width: 860px) {
+  .page-grid {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .page-col {
+    flex: 1;
+  }
+
+  .page-title {
+    font-size: 1.9rem;
+  }
+
+  .page-lead {
+    font-size: 1rem;
+  }
+
+  /* Mismo relleno y radio que .lobby-card, la referencia de la app. */
+  .profile-section,
+  .hist-item,
+  .token-card,
+  .profile-page .panel {
+    padding: 22px;
+    border-radius: 24px;
+  }
+
+  .profile-avatar {
+    width: 104px;
+    height: 104px;
+  }
+
+  .profile-alias-big {
+    font-size: 2rem;
+  }
+
+  .section-title {
+    font-size: 1.25rem;
+  }
+
+  .stat-card {
+    padding: 18px;
+    border-radius: 22px;
+  }
+
+  /* Solo las del perfil: las de resultados ya tienen su propia regla. */
+  .stat-card .stat-value {
+    font-size: 2.1rem;
+  }
+
+  /* Historial: dos tarjetas por fila en vez de una columna estirada. */
+  .hist-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
 }

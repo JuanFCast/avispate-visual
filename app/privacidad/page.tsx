@@ -4,7 +4,7 @@ export const metadata = { title: "Privacidad · Avíspate" };
 
 export default function PrivacidadPage() {
   return (
-    <main className="app-shell profile-page">
+    <main className="app-shell profile-page page-narrow">
       <h1 className="page-title">Privacidad</h1>
       <section className="profile-section">
         <p className="section-note">
