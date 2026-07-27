@@ -1,5 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async redirects() {
+    return [
+      // El juego se mudó de /visual-rush a la raíz (avispate.fun). Permanente
+      // para que los enlaces ya compartidos —y los buscadores— apunten al
+      // nuevo sitio en vez de quedarse con la ruta vieja.
+      { source: "/visual-rush", destination: "/", permanent: true },
+    ];
+  },
+
   webpack: (config, { webpack }) => {
     // Dependencias opcionales de WalletConnect/wagmi que no se usan en el
     // navegador; externalizarlas evita warnings.

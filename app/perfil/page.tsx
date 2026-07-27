@@ -76,7 +76,7 @@ export default function PerfilPage() {
       if (isConnected) disconnect();
       if (authenticated) await logout();
     } finally {
-      router.push("/visual-rush");
+      router.push("/");
     }
   }
 
@@ -98,7 +98,7 @@ export default function PerfilPage() {
           <p className="empty-note">
             Inicia sesión con tu correo o conecta tu wallet para ver tu perfil.
           </p>
-          <Link href="/visual-rush" className="btn-primary">
+          <Link href="/" className="btn-primary">
             Ir al inicio
           </Link>
         </div>

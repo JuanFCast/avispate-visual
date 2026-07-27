@@ -17,7 +17,8 @@ npm install
 npm run dev
 ```
 
-Abrir <http://localhost:3000/visual-rush> (la raíz `/` redirige ahí).
+Abrir <http://localhost:3000>. El juego vive en la raíz; en producción es
+<https://avispate.fun>. La ruta vieja `/visual-rush` redirige a `/`.
 
 ## Reglas
 
@@ -39,7 +40,7 @@ Abrir <http://localhost:3000/visual-rush> (la raíz `/` redirige ahí).
 
 ## Estructura
 
-- `app/visual-rush/page.tsx` — ruta del juego.
+- `app/page.tsx` — el juego, en la raíz del sitio.
 - `components/` — `GameShell` (orquestador), `PlayerForm`, `CardView`,
   `SymbolButton`, `GameHUD`, `ResultsPanel`, `LocalLeaderboard`.
 - `lib/symbols.ts` — banco de 59 símbolos (emojis propios) con color y

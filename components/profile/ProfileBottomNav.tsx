@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 const ITEMS = [
-  { key: "inicio", label: "Jugar", emoji: "🐝", href: "/visual-rush" },
+  { key: "inicio", label: "Jugar", emoji: "🐝", href: "/" },
   { key: "historial", label: "Historial", emoji: "🏆", href: "/historial" },
   { key: "perfil", label: "Perfil", emoji: "👤", href: "/perfil" },
 ];
