@@ -28,10 +28,11 @@ const MAX_AGE_MS = 48 * 60 * 60 * 1000;
 
 /**
  * Envío que retiene al jugador (el recibo de la jugada recién pagada, antes
- * del 3, 2, 1). Reintentos cortos y seguidos: ~30 s en total, suficiente para
- * que el nodo del servidor se ponga al día sin dejarlo mirando el botón.
+ * del 3, 2, 1). ~15 s en total: en la práctica el servidor responde en menos
+ * de un segundo, así que este margen solo cubre un nodo que va detrás. Más
+ * espera no rescata nada y convierte el botón en una pantalla de carga.
  */
-export const BLOCKING_DELAYS = [1000, 2000, 4000, 8000, 15_000] as const;
+export const BLOCKING_DELAYS = [1000, 2000, 4000, 8000] as const;
 
 /** Reenvío de fondo (al abrir la app o al volver la conexión). Sin prisa. */
 export const BACKGROUND_DELAYS = [2000, 6000] as const;

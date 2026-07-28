@@ -61,6 +61,7 @@ export type PlayStage =
   | "switching"
   | "confirm"
   | "approving"
+  | "confirming"
   | "registering"
   | "starting";
 
@@ -68,9 +69,23 @@ export const PLAY_STAGE_LABEL: Record<PlayStage, string> = {
   switching: "Cambiando a Celo…",
   confirm: "Confirma en tu wallet…",
   approving: "Autorizando USDT…",
+  // Dos pasos distintos con dos textos distintos: esperar a que la cadena
+  // confirme no es lo mismo que avisarle al servidor, y cuando algo se cuelga
+  // hay que poder saber cuál de los dos fue.
+  confirming: "Confirmando en Celo…",
   registering: "Registrando jugada…",
   starting: "Preparando partida…",
 };
+
+/**
+ * Cuánto se espera a que la transacción aparezca confirmada en la cadena.
+ *
+ * El valor por defecto de viem son 180 s (tres minutos mirando un spinner).
+ * En Celo un bloque tarda ~1 s: si a los 20 s no se ve, no es que la
+ * transacción vaya a fallar, es que el sondeo se tropezó — típico dentro de
+ * MiniPay, cuya webview se suspende mientras muestra la hoja de firma.
+ */
+const RECEIPT_TIMEOUT_MS = 20_000;
 
 export interface PlayResult {
   /** Hash de la transacción `play(deck)` confirmada. */
@@ -164,8 +179,21 @@ export function usePayToPlay() {
         chainId: celo.id,
         ...feeCurrency,
       });
-      onStage("registering");
-      await publicClient.waitForTransactionReceipt({ hash: playHash });
+      // Con el hash en la mano, la wallet YA transmitió la transacción: el
+      // contrato consumió la jugada gratis o cobró la entrada, pase lo que
+      // pase de aquí en adelante. Por eso esta espera tiene tope y su fracaso
+      // NO cancela la jugada: tratarla como error le quitaría al jugador algo
+      // que la cadena ya le cobró. El servidor vuelve a verificar el hash de
+      // todos modos antes de aceptar nada.
+      onStage("confirming");
+      try {
+        await publicClient.waitForTransactionReceipt({
+          hash: playHash,
+          timeout: RECEIPT_TIMEOUT_MS,
+        });
+      } catch {
+        // Sigue adelante con el hash; el registro en el servidor decide.
+      }
 
       return { txHash: playHash, player: address.toLowerCase(), wasFree };
     },
