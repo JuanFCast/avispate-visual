@@ -12,3 +12,7 @@ docs/~$*
 *.local.sql
 # Archivo privado de pendientes
 docs/Pendientes de Avíspate.txt
+
+# Cableado local de las skills: son symlinks con ruta absoluta a este equipo.
+# La skill de verdad vive en .agents/ y se reinstala con skills-lock.json.
+.claude/
