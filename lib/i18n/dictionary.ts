@@ -326,7 +326,6 @@ export const en = {
   "round.winner": "Winner: {name}",
   "round.paid": "Prize paid",
   "round.pending": "Payment processing",
-  "round.calculating": "Working out the winner…",
   "round.closes_in": "Closes in {time}",
 
   /* -------------------------------- Historial ---------------------------- */
@@ -789,7 +788,6 @@ export const es: Record<MessageKey, string> = {
   "round.winner": "Ganador: {name}",
   "round.paid": "Premio pagado",
   "round.pending": "Pago procesándose",
-  "round.calculating": "Calculando ganador…",
   "round.closes_in": "Cierra en {time}",
 
   /* -------------------------------- Historial ---------------------------- */

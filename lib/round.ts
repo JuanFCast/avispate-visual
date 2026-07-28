@@ -35,7 +35,7 @@ export function fmtUsdt(units: bigint | undefined): string {
 
 /* ------------------------------ Reloj de ronda ----------------------------- */
 
-export type RoundStatus = "open" | "closing" | "settled";
+export type RoundStatus = "open" | "settled";
 
 export interface RoundWinner {
   alias: string | null;
@@ -203,12 +203,12 @@ export function roundCopy(clock: RoundClock, t: Translate): RoundCopy {
       retry: false,
     };
   }
-  if (clock.status === "closing" || clock.reachedCut) {
-    return {
-      primary: t("round.closed"),
-      secondary: t("round.calculating"),
-      retry: false,
-    };
+  // El corte ya pasó pero seguimos con la foto vieja: falta un segundo para
+  // que el servidor entregue la ronda nueva. Se muestra el neutral "Cierra
+  // en …" y NUNCA "ronda cerrada" — la ronda siguiente ya abrió y ya acepta
+  // jugadas, así que anunciar un cierre sería mentir durante ese segundo.
+  if (clock.reachedCut) {
+    return { primary: t("round.loading"), secondary: "", retry: false };
   }
   return {
     primary: t("round.closes_in", { time: clock.remaining }),

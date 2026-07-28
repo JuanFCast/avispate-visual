@@ -21,12 +21,11 @@ const SHOWCASE_MS =
   Math.max(0, Number(process.env.ROUND_RESULT_SHOWCASE_SECONDS ?? 90)) * 1000;
 
 /**
- * Techo del estado "closing". Si el robot de liquidación no responde, la
- * interfaz no puede quedarse en "calculando ganador…" para siempre: pasado
- * este tiempo se muestra la ronda nueva y el ganador aparecerá en /historial
- * cuando se liquide.
+ * Cuánto rato después del cierre seguimos preguntando por el ganador de la
+ * ronda que acaba de terminar. Pasado esto, el resultado ya solo vive en
+ * /historial: no vale la pena tocar la base en cada visita del resto del día.
  */
-const CLOSING_MAX_MS = 15 * 60_000;
+const RESULT_LOOKUP_MS = 15 * 60_000;
 
 interface SettlementRow {
   winner_wallet: string | null;
@@ -50,8 +49,13 @@ function shorten(address: string | null): string | null {
  *   roundId   ronda que la interfaz debe mostrar
  *   serverNow reloj del servidor, para corregir teléfonos desajustados
  *   closesAt  instante universal del cierre de `roundId` (pasado si ya cerró)
- *   status    open · closing · settled
+ *   status    open · settled
  *   winner    solo en `settled`: quién ganó ese mazo y cómo quedó el pago
+ *
+ * Por defecto se responde la ronda ABIERTA. La única excepción es el momento
+ * de celebración: los primeros `SHOWCASE_MS` después de que se liquida una
+ * ronda se muestra a su ganador. Una liquidación que se demora no cambia nada
+ * de lo que ve el jugador.
  *
  * Lectura pública, sin sesión. Sin caché: `serverNow` debe ser real.
  */
@@ -80,7 +84,7 @@ export async function GET(req: Request) {
 
   // Fuera de la ventana de liquidación no hay nada que consultar: el 99% de
   // las visitas se resuelve sin tocar la base.
-  if (now - closedAt >= CLOSING_MAX_MS) {
+  if (now - closedAt >= RESULT_LOOKUP_MS) {
     return NextResponse.json(openPayload, noStore);
   }
 
@@ -102,12 +106,13 @@ export async function GET(req: Request) {
       closesAt: new Date(closedAt).toISOString(),
     };
 
-    // Cerró pero todavía no hay fila: el robot está calculando.
+    // Cerró y el robot todavía no escribe la fila. Aquí NO se anuncia "ronda
+    // cerrada": a esta hora la ronda nueva lleva rato abierta y aceptando
+    // jugadas, y decirle al jugador que se está calculando un ganador lo deja
+    // mirando un cartel de cerrado con el juego funcionando. Que el robot se
+    // demore es problema nuestro, no suyo — el ganador saldrá en /historial.
     if (!row) {
-      return NextResponse.json(
-        { ...closedPayload, status: "closing" as const, winner: null },
-        noStore
-      );
+      return NextResponse.json(openPayload, noStore);
     }
 
     // Ya liquidada: se enseña un momento y luego manda la ronda nueva.
