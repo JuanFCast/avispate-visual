@@ -6,6 +6,7 @@ import { useBalance, useReadContracts } from "wagmi";
 import { ERC20_ABI } from "@/lib/contracts";
 import { useIsMiniPay } from "@/lib/minipay";
 import { TOKENS, formatBalance, type TokenInfo } from "@/lib/tokens";
+import { useI18n } from "@/lib/i18n/client";
 import TokenBalanceCard from "./TokenBalanceCard";
 import AddFundsModal from "../wallet/AddFundsModal";
 import SendModal from "../wallet/SendModal";
@@ -24,6 +25,7 @@ const REFRESH_MS = 20_000;
  * mostrar tokens fuera de su lista ni mandar al usuario a servicios externos.
  */
 export default function WalletTokens({ address }: Props) {
+  const { t, locale } = useI18n();
   const inMiniPay = useIsMiniPay();
   const [addFor, setAddFor] = useState<TokenInfo | null>(null);
   const [sendFor, setSendFor] = useState<TokenInfo | null>(null);
@@ -77,7 +79,7 @@ export default function WalletTokens({ address }: Props) {
 
   return (
     <>
-      <section className="token-grid" aria-label="Saldos">
+      <section className="token-grid" aria-label={t("tokens.aria")}>
         {visible.map((token) => {
           const { value, loading, error } = balanceOf(token);
           const canAdd = inMiniPay
@@ -96,11 +98,16 @@ export default function WalletTokens({ address }: Props) {
               balance={
                 value === undefined
                   ? null
-                  : formatBalance(value, token.decimals, token.displayDecimals)
+                  : formatBalance(
+                      value,
+                      token.decimals,
+                      token.displayDecimals,
+                      locale
+                    )
               }
               loading={loading}
               error={error}
-              description={token.description}
+              description={t(token.descriptionKey)}
               actions={
                 canAdd || canSend ? (
                   <>
@@ -110,7 +117,7 @@ export default function WalletTokens({ address }: Props) {
                         className="btn-ghost"
                         onClick={() => setAddFor(token)}
                       >
-                        Agregar
+                        {t("tokens.add")}
                       </button>
                     )}
                     {canSend && (
@@ -119,7 +126,7 @@ export default function WalletTokens({ address }: Props) {
                         className="btn-ghost"
                         onClick={() => setSendFor(token)}
                       >
-                        Enviar
+                        {t("tokens.send")}
                       </button>
                     )}
                   </>

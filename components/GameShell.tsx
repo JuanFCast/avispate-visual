@@ -18,6 +18,8 @@ import { refreshLeaderboard, useFreePlays } from "@/lib/round";
 import { BLOCKING_DELAYS, deliver, enqueue } from "@/lib/outbox";
 import { useActiveWallet } from "@/lib/wallet";
 import { useWalletAlias } from "@/lib/wallet-alias";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n";
 import { HowToPlay, useHowToPlay } from "./HowToPlay";
 import HomeLobby from "./lobby/HomeLobby";
 import StartAccessModal from "./lobby/StartAccessModal";
@@ -61,17 +63,19 @@ function vibrate(pattern: number | number[]) {
   }
 }
 
-/** Traduce un error del flujo de jugada a un mensaje corto para el jugador. */
-function describePayError(err: unknown): string {
+/**
+ * Clasifica un error del flujo de jugada. Devuelve la CLAVE del mensaje, no la
+ * frase: el idioma se resuelve al pintar, y así el lobby puede reconocer el
+ * caso de saldo insuficiente para ofrecer la recarga.
+ */
+function describePayError(err: unknown): MessageKey {
   const msg = err instanceof Error ? err.message : String(err);
-  if (/rejected|denied|User rejected/i.test(msg))
-    return "Cancelaste la firma de la jugada.";
+  if (/rejected|denied|User rejected/i.test(msg)) return "pay.error.rejected";
   if (/insufficient|exceeds balance|transfer amount/i.test(msg))
-    return "Saldo insuficiente de USDT (o gas) para esta jugada.";
-  if (/pot_not_configured/.test(msg))
-    return "El juego aún no está disponible (contrato no configurado).";
-  if (/no_wallet/.test(msg)) return "Conecta una wallet o entra con tu correo.";
-  return "No se pudo registrar la jugada. Inténtalo de nuevo.";
+    return "pay.error.insufficient";
+  if (/pot_not_configured/.test(msg)) return "pay.error.not_configured";
+  if (/no_wallet/.test(msg)) return "pay.error.no_wallet";
+  return "pay.error.generic";
 }
 
 /**
@@ -79,11 +83,8 @@ function describePayError(err: unknown): string {
  * decirle al jugador es que NO vuelva a pagar: su jugada quedó guardada en el
  * teléfono y se registra sola en cuanto haya conexión.
  */
-function describeRegisterError(result: "rejected" | "retry"): string {
-  if (result === "retry") {
-    return "Tu pago quedó confirmado, pero no pudimos avisarle al servidor. Quedó guardado en este dispositivo y se enviará solo: revisa tu conexión y vuelve a abrir la app. No vuelvas a pagar.";
-  }
-  return "El servidor no aceptó esta jugada. Escríbenos a soporte@avispate.fun con la hora y tu wallet y lo revisamos.";
+function describeRegisterError(result: "rejected" | "retry"): MessageKey {
+  return result === "retry" ? "pay.register.retry" : "pay.register.rejected";
 }
 
 export default function GameShell() {
@@ -101,13 +102,14 @@ export default function GameShell() {
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [bestAverageMs, setBestAverageMs] = useState(0);
   const [muted, setMutedState] = useState(false);
-  const [payError, setPayError] = useState<string | null>(null);
+  const [payError, setPayError] = useState<MessageKey | null>(null);
   // Paso de la jugada en curso (null = no hay ninguna). Vive aquí porque lo
   // pintan tanto el lobby como los resultados.
   const [payStage, setPayStage] = useState<PlayStage | null>(null);
   // Modal contextual de acceso (correo/wallet/alias) del lobby.
   const [accessOpen, setAccessOpen] = useState(false);
 
+  const t = useT();
   const profile = useProfile();
   const activeWallet = useActiveWallet();
   const queryClient = useQueryClient();
@@ -204,9 +206,7 @@ export default function GameShell() {
     const alias = currentAlias || playerName;
 
     if (!canPlay) {
-      setPayError(
-        "El juego aún no está disponible (contrato no configurado o wallet sin conectar)."
-      );
+      setPayError("pay.error.unavailable");
       return;
     }
     setDeckSize(deck);
@@ -457,7 +457,7 @@ export default function GameShell() {
             type="button"
             className="mute-btn"
             onClick={toggleMuted}
-            aria-label={muted ? "Activar sonido" : "Silenciar"}
+            aria-label={muted ? t("sound.unmute") : t("sound.mute")}
           >
             {muted ? "🔇" : "🔊"}
           </button>
@@ -527,12 +527,12 @@ export default function GameShell() {
                 <span className="sp-value">
                   {(elapsedMs / 1000).toFixed(1)}s
                 </span>
-                <span className="sp-label">tiempo</span>
+                <span className="sp-label">{t("game.stat.time")}</span>
               </div>
             </aside>
             <div className="chain-area">
-              <span className="slot-tag slot-tag-base">Base</span>
-              <span className="slot-tag slot-tag-mine">Tu carta</span>
+              <span className="slot-tag slot-tag-base">{t("game.slot.base")}</span>
+              <span className="slot-tag slot-tag-mine">{t("game.slot.mine")}</span>
               {cardsLeft > 1 && <div className="deck-stack" />}
               {errors > 0 && (
                 <span key={errors} className="penalty-float">
@@ -559,12 +559,12 @@ export default function GameShell() {
               <div className="stat-pill">
                 <span className="sp-emoji">🃏</span>
                 <span className="sp-value">{cardsLeft}</span>
-                <span className="sp-label">cartas</span>
+                <span className="sp-label">{t("game.stat.cards")}</span>
               </div>
               <div className="stat-pill">
                 <span className="sp-emoji">💥</span>
                 <span className="sp-value">{errors}</span>
-                <span className="sp-label">errores</span>
+                <span className="sp-label">{t("game.stat.errors")}</span>
               </div>
             </aside>
           </div>
@@ -581,7 +581,7 @@ export default function GameShell() {
             onPlayAgain={() => handleStart(deckSize)}
             onChangePlayer={() => setPhase("setup")}
           />
-          {payError && <p className="alias-error">{payError}</p>}
+          {payError && <p className="alias-error">{t(payError)}</p>}
           <ProfileBottomNav active="inicio" />
         </>
       )}

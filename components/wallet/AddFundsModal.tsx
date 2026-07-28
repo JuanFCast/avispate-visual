@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useIsMiniPay } from "@/lib/minipay";
 import { MINIPAY_ADD_CASH, type TokenInfo } from "@/lib/tokens";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   token: TokenInfo;
@@ -25,6 +26,7 @@ interface Props {
  * jugador o en un servicio de terceros que él controla.
  */
 export default function AddFundsModal({ token, address, onClose }: Props) {
+  const t = useT();
   const inMiniPay = useIsMiniPay();
   const [copied, setCopied] = useState(false);
 
@@ -60,41 +62,37 @@ export default function AddFundsModal({ token, address, onClose }: Props) {
           type="button"
           className="lobby-modal-close"
           onClick={onClose}
-          aria-label="Cerrar"
+          aria-label={t("common.close")}
         >
           ✕
         </button>
         <h2 className="lobby-modal-title" id="fund-title">
-          Agregar {token.symbol}
+          {t("fund.title", { symbol: token.symbol })}
         </h2>
 
         {inMiniPay && token.miniPayAddCash ? (
           <>
-            <p className="lobby-modal-text">
-              MiniPay recarga tu cartera con su propia pantalla, sin salir de
-              la aplicación.
-            </p>
+            <p className="lobby-modal-text">{t("fund.minipay.text")}</p>
             <a className="btn-primary fund-cta" href={MINIPAY_ADD_CASH}>
-              Agregar dinero en MiniPay
+              {t("fund.minipay.cta")}
             </a>
           </>
         ) : (
           <>
             <p className="lobby-modal-text">
-              Tres formas de conseguir {token.symbol} en la red Celo. Elige la
-              que te quede más cómoda.
+              {t("fund.intro", { symbol: token.symbol })}
             </p>
 
             <ol className="fund-options">
               <li className="fund-option">
                 <h3 className="fund-option-title">
-                  <span className="fund-option-num">1</span> Recibir en tu
-                  dirección
+                  <span className="fund-option-num">1</span>{" "}
+                  {t("fund.opt1.title")}
                 </h3>
                 <p className="fund-option-hint">
-                  Si ya tienes {token.symbol} en otro lado, envíalo aquí.{" "}
-                  <strong>Solo por la red Celo</strong>: mandarlo por otra red
-                  pierde el dinero.
+                  {t("fund.opt1.hint.a", { symbol: token.symbol })}{" "}
+                  <strong>{t("fund.opt1.hint.strong")}</strong>
+                  {t("fund.opt1.hint.b")}
                 </p>
                 <button
                   type="button"
@@ -102,7 +100,7 @@ export default function AddFundsModal({ token, address, onClose }: Props) {
                   onClick={copyAddress}
                 >
                   <span className="fund-copy-label">
-                    {copied ? "Dirección copiada ✓" : "Copiar mi dirección"}
+                    {copied ? t("wallet.copied") : t("fund.copy")}
                   </span>
                   <span className="fund-copy-addr">{address}</span>
                 </button>
@@ -111,12 +109,11 @@ export default function AddFundsModal({ token, address, onClose }: Props) {
               {token.bridgeUrl && (
                 <li className="fund-option">
                   <h3 className="fund-option-title">
-                    <span className="fund-option-num">2</span> Traer desde
-                    Ethereum
+                    <span className="fund-option-num">2</span>{" "}
+                    {t("fund.opt2.title")}
                   </h3>
                   <p className="fund-option-hint">
-                    Si tu {token.symbol} está en Ethereum, un puente lo pasa a
-                    Celo.
+                    {t("fund.opt2.hint", { symbol: token.symbol })}
                   </p>
                   <a
                     className="fund-link"
@@ -124,7 +121,7 @@ export default function AddFundsModal({ token, address, onClose }: Props) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Abrir el puente (Squid) ↗
+                    {t("fund.opt2.link")}
                   </a>
                 </li>
               )}
@@ -135,11 +132,10 @@ export default function AddFundsModal({ token, address, onClose }: Props) {
                     <span className="fund-option-num">
                       {token.bridgeUrl ? "3" : "2"}
                     </span>{" "}
-                    Cambiar dentro de Celo
+                    {t("fund.opt3.title")}
                   </h3>
                   <p className="fund-option-hint">
-                    Si ya tienes otro token en Celo, cámbialo por{" "}
-                    {token.symbol}.
+                    {t("fund.opt3.hint", { symbol: token.symbol })}
                   </p>
                   <a
                     className="fund-link"
@@ -147,16 +143,13 @@ export default function AddFundsModal({ token, address, onClose }: Props) {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Abrir el cambio (Uniswap) ↗
+                    {t("fund.opt3.link")}
                   </a>
                 </li>
               )}
             </ol>
 
-            <p className="fund-foot">
-              El puente y el cambio son servicios de terceros: Avíspate no toca
-              ese dinero ni cobra nada por ahí.
-            </p>
+            <p className="fund-foot">{t("fund.foot")}</p>
           </>
         )}
       </div>

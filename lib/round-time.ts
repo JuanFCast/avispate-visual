@@ -52,9 +52,34 @@ export function formatCountdown(ms: number): string {
   )}:${pad(total % 60)}`;
 }
 
+/**
+ * Las cuatro palabras que este módulo necesita traducidas. Van aquí y no en
+ * `lib/i18n` a propósito: `round-time.ts` lo importan las rutas `/api` y los
+ * scripts de `scripts/` con Node pelado, y tiene que seguir sin dependencias.
+ */
+type HintLang = "en" | "es";
+
+const HINT_COPY: Record<
+  HintLang,
+  { locale: string; today: string; tomorrow: string; yourZone: string }
+> = {
+  en: {
+    locale: "en-US",
+    today: "Today",
+    tomorrow: "Tomorrow",
+    yourZone: "your time",
+  },
+  es: {
+    locale: "es-CO",
+    today: "Hoy",
+    tomorrow: "Mañana",
+    yourZone: "en tu zona",
+  },
+};
+
 /** Hora de pared del instante `ms` en `timeZone` (la local si se omite). */
-function timeIn(ms: number, timeZone?: string): string {
-  return new Intl.DateTimeFormat("es-CO", {
+function timeIn(ms: number, locale: string, timeZone?: string): string {
+  return new Intl.DateTimeFormat(locale, {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
@@ -82,18 +107,22 @@ function dayIn(ms: number, timeZone: string): string {
 export function closeHintFor(
   closesAtMs: number,
   nowMs: number,
+  lang: HintLang = "en",
   localTz?: string
 ): string {
-  const colombia = timeIn(closesAtMs, ROUND_TZ);
+  const copy = HINT_COPY[lang] ?? HINT_COPY.en;
+  const colombia = timeIn(closesAtMs, copy.locale, ROUND_TZ);
   const when =
-    dayIn(closesAtMs, ROUND_TZ) === dayIn(nowMs, ROUND_TZ) ? "Hoy" : "Mañana";
+    dayIn(closesAtMs, ROUND_TZ) === dayIn(nowMs, ROUND_TZ)
+      ? copy.today
+      : copy.tomorrow;
   let local: string;
   try {
-    local = timeIn(closesAtMs, localTz);
+    local = timeIn(closesAtMs, copy.locale, localTz);
   } catch {
     return `${when}, ${colombia} (Colombia)`;
   }
   // Misma hora de pared que Colombia: no hay nada que traducir.
   if (local === colombia) return `${when}, ${colombia} (Colombia)`;
-  return `${colombia} Colombia · ${local} en tu zona`;
+  return `${colombia} Colombia · ${local} ${copy.yourZone}`;
 }

@@ -12,6 +12,8 @@ import { useReadContract, useReadContracts } from "wagmi";
 import { celo } from "viem/chains";
 import { DECK_OPTIONS } from "./game";
 import { closeHintFor, formatCountdown } from "./round-time";
+import { useI18n } from "./i18n/client";
+import type { Translate } from "./i18n";
 import {
   AVISPATE_POT_ADDRESS,
   AVISPATE_POT_ABI,
@@ -99,6 +101,7 @@ export interface RoundClock {
  * pregunta al servidor hasta que entregue la ronda siguiente.
  */
 export function useRoundClock(deck: number): RoundClock {
+  const { lang } = useI18n();
   const query = useQuery({
     queryKey: ["round", deck],
     queryFn: () => fetchRound(deck),
@@ -160,7 +163,7 @@ export function useRoundClock(deck: number): RoundClock {
     remainingMs,
     reachedCut: Boolean(snapshot) && remainingMs <= 0,
     winner: snapshot?.winner ?? null,
-    closeHint: snapshot ? closeHintFor(snapshot.closesAtMs, now) : "",
+    closeHint: snapshot ? closeHintFor(snapshot.closesAtMs, now, lang) : "",
     refetch: () => void query.refetch(),
   };
 }
@@ -173,42 +176,42 @@ export interface RoundCopy {
 }
 
 /** Copys del contador por estado, en un solo sitio para no divergir. */
-export function roundCopy(clock: RoundClock): RoundCopy {
+export function roundCopy(clock: RoundClock, t: Translate): RoundCopy {
   if (clock.status === "error") {
     return {
-      primary: "No pudimos actualizar la ronda",
-      secondary: "Reintentar",
+      primary: t("round.error"),
+      secondary: t("common.retry"),
       retry: true,
     };
   }
   if (clock.status === "loading") {
-    return { primary: "Cierra en …", secondary: "", retry: false };
+    return { primary: t("round.loading"), secondary: "", retry: false };
   }
   if (clock.status === "settled" && clock.winner) {
     const { alias, wallet, payout } = clock.winner;
     const name = alias || wallet;
     if (!name || payout === "rollover") {
       return {
-        primary: "Ronda cerrada",
-        secondary: "Sin ganador · premio acumulado",
+        primary: t("round.closed"),
+        secondary: t("round.no_winner"),
         retry: false,
       };
     }
     return {
-      primary: `Ganador: ${name}`,
-      secondary: payout === "paid" ? "Premio pagado" : "Pago procesándose",
+      primary: t("round.winner", { name }),
+      secondary: payout === "paid" ? t("round.paid") : t("round.pending"),
       retry: false,
     };
   }
   if (clock.status === "closing" || clock.reachedCut) {
     return {
-      primary: "Ronda cerrada",
-      secondary: "Calculando ganador…",
+      primary: t("round.closed"),
+      secondary: t("round.calculating"),
       retry: false,
     };
   }
   return {
-    primary: `Cierra en ${clock.remaining}`,
+    primary: t("round.closes_in", { time: clock.remaining }),
     secondary: clock.closeHint,
     retry: false,
   };

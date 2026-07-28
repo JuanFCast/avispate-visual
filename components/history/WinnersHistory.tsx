@@ -3,6 +3,8 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { USDT_DECIMALS } from "@/lib/contracts";
 import { formatMs } from "@/lib/game";
+import { useI18n } from "@/lib/i18n/client";
+import type { Lang, MessageKey } from "@/lib/i18n";
 
 const PAGE_SIZE = 15;
 
@@ -24,18 +26,20 @@ interface Page {
   hasMore: boolean;
 }
 
-const MONTHS = [
-  "ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
-  "JUL", "AGO", "SEP", "OCT", "NOV", "DIC",
-];
+const MONTHS: Record<Lang, string[]> = {
+  en: ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
+  es: ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
+       "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"],
+};
 
 /**
  * "25 JUL 2026" a partir del texto YYYY-MM-DD, sin pasar por `Date`: la fecha
  * de la ronda es la de Colombia y no debe correrse a la zona del visitante.
  */
-function fmtRoundDate(roundDate: string): string {
+function fmtRoundDate(roundDate: string, lang: Lang): string {
   const [year, month, day] = roundDate.split("-");
-  return `${Number(day)} ${MONTHS[Number(month) - 1] ?? ""} ${year}`;
+  return `${Number(day)} ${MONTHS[lang][Number(month) - 1] ?? ""} ${year}`;
 }
 
 function fmtPrize(units: string | null): string {
@@ -43,10 +47,10 @@ function fmtPrize(units: string | null): string {
   return `${(Number(units) / 10 ** USDT_DECIMALS).toFixed(2)} USDT`;
 }
 
-const PAYOUT_LABEL: Record<HistoryRound["payout"], string> = {
-  paid: "Premio pagado",
-  pending: "Pago procesándose",
-  rollover: "Premio acumulado",
+const PAYOUT_KEY: Record<HistoryRound["payout"], MessageKey> = {
+  paid: "hist.payout.paid",
+  pending: "hist.payout.pending",
+  rollover: "hist.payout.rollover",
 };
 
 async function fetchPage(offset: number): Promise<Page> {
@@ -62,6 +66,7 @@ async function fetchPage(offset: number): Promise<Page> {
  * dispositivo, así que recargar o cambiar de aparato no cambia nada.
  */
 export default function WinnersHistory() {
+  const { t, lang } = useI18n();
   const {
     data,
     status,
@@ -94,9 +99,9 @@ export default function WinnersHistory() {
   if (status === "error") {
     return (
       <div className="hist-state">
-        <p className="empty-note">No pudimos cargar los ganadores.</p>
+        <p className="empty-note">{t("hist.error")}</p>
         <button type="button" className="btn-ghost" onClick={() => refetch()}>
-          Reintentar
+          {t("common.retry")}
         </button>
       </div>
     );
@@ -107,9 +112,7 @@ export default function WinnersHistory() {
   if (rounds.length === 0) {
     return (
       <div className="hist-state">
-        <p className="empty-note">
-          Aún no hay ganadores. El primero aparecerá al cerrar una ronda.
-        </p>
+        <p className="empty-note">{t("hist.empty")}</p>
       </div>
     );
   }
@@ -126,11 +129,13 @@ export default function WinnersHistory() {
             >
               <div className="hist-head">
                 <span className="hist-date">
-                  {fmtRoundDate(round.roundDate)}
+                  {fmtRoundDate(round.roundDate, lang)}
                 </span>
-                <span className="hist-deck">Mazo {round.deck}</span>
+                <span className="hist-deck">
+                  {t("hist.deck", { deck: round.deck })}
+                </span>
                 <span className={`hist-badge hist-badge-${round.payout}`}>
-                  {PAYOUT_LABEL[round.payout]}
+                  {t(PAYOUT_KEY[round.payout])}
                 </span>
               </div>
 
@@ -138,15 +143,16 @@ export default function WinnersHistory() {
                 <span className="hist-prize">{fmtPrize(round.prizeUnits)}</span>
                 <span className="hist-winner">
                   <small className="hist-winner-label">
-                    {name ? "GANADOR" : "SIN GANADOR"}
+                    {name ? t("hist.winner") : t("hist.no_winner")}
                   </small>
                   <strong className="hist-winner-name">
-                    {name ?? "Nadie jugó esta ronda"}
+                    {name ?? t("hist.nobody")}
                   </strong>
                   {round.averageMs !== null && (
                     <small className="hist-result">
-                      Tiempo: {formatMs(round.averageMs)} por carta
-                      {round.errors !== null && ` · ${round.errors} err`}
+                      {t("hist.time", { time: formatMs(round.averageMs) })}
+                      {round.errors !== null &&
+                        ` · ${round.errors} ${t("hist.err")}`}
                     </small>
                   )}
                 </span>
@@ -159,7 +165,7 @@ export default function WinnersHistory() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  Ver el pago en Celoscan ↗
+                  {t("hist.tx")}
                 </a>
               )}
             </li>
@@ -174,7 +180,7 @@ export default function WinnersHistory() {
           onClick={() => fetchNextPage()}
           disabled={isFetchingNextPage}
         >
-          {isFetchingNextPage ? "Cargando…" : "Ver más"}
+          {isFetchingNextPage ? t("hist.loading") : t("hist.more")}
         </button>
       )}
     </>

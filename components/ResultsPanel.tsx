@@ -2,6 +2,7 @@
 
 import { formatMs, type GameResult } from "@/lib/game";
 import type { PlayStage } from "@/lib/pay";
+import { useT } from "@/lib/i18n/client";
 import PlayButton from "./PlayButton";
 
 interface Props {
@@ -22,43 +23,45 @@ export default function ResultsPanel({
   onPlayAgain,
   onChangePlayer,
 }: Props) {
+  const t = useT();
+
   return (
     <div className="panel">
       {isNewRecord && (
         <p className="rank-note">
-          🔥 ¡Nuevo récord personal, {result.playerName}!
+          {t("results.record", { name: result.playerName })}
         </p>
       )}
 
       <div className="stats-grid">
         <div className="stat highlight">
-          <span className="stat-label">Tiempo total</span>
+          <span className="stat-label">{t("results.total_time")}</span>
           <span className="stat-value">{formatMs(result.totalMs)}</span>
         </div>
         <div className="stat highlight">
-          <span className="stat-label">Prom. por carta</span>
+          <span className="stat-label">{t("results.avg_card")}</span>
           <span className="stat-value">{formatMs(result.averageMs)}</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Cartas</span>
+          <span className="stat-label">{t("results.cards")}</span>
           <span className="stat-value">{result.cards}</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Errores</span>
+          <span className="stat-label">{t("results.errors")}</span>
           <span className="stat-value">{result.errors}</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Precisión</span>
+          <span className="stat-label">{t("results.accuracy")}</span>
           <span className="stat-value">{result.accuracy}%</span>
         </div>
         <div className="stat">
-          <span className="stat-label">Mejor prom.</span>
+          <span className="stat-label">{t("results.best_avg")}</span>
           <span className="stat-value">{formatMs(bestAverageMs)}</span>
         </div>
       </div>
 
       <PlayButton
-        label="Jugar otra vez"
+        label={t("results.play_again")}
         stage={payStage}
         onClick={onPlayAgain}
       />
@@ -68,7 +71,7 @@ export default function ResultsPanel({
         disabled={payStage !== null}
         onClick={onChangePlayer}
       >
-        Volver al menú
+        {t("results.back")}
       </button>
     </div>
   );

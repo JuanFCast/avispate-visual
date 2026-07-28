@@ -1,6 +1,7 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
+import { useT } from "@/lib/i18n/client";
 import WalletConnect from "./WalletConnect";
 
 /**
@@ -11,6 +12,7 @@ import WalletConnect from "./WalletConnect";
  * identidad del ranking.
  */
 export default function AccessCard() {
+  const t = useT();
   const { login } = usePrivy();
 
   return (
@@ -20,11 +22,11 @@ export default function AccessCard() {
         className="access-btn access-btn-primary"
         onClick={() => login()}
       >
-        Continuar con correo
+        {t("access.email")}
       </button>
 
       <div className="access-sep">
-        <span>o</span>
+        <span>{t("access.or")}</span>
       </div>
 
       <WalletConnect />

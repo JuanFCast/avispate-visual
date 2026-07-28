@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { fmtUsdt, roundCopy, useDeckPot, useRoundClock } from "@/lib/round";
 import { useIsMiniPay } from "@/lib/minipay";
 import type { PlayStage } from "@/lib/pay";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n";
 import PlayButton from "../PlayButton";
 import DeckSelector from "./DeckSelector";
 
@@ -27,7 +29,7 @@ interface Props {
   cta: CtaState;
   /** Jugada en curso: el lobby sigue visible y solo el CTA cambia. */
   payStage: PlayStage | null;
-  payError: string | null;
+  payError: MessageKey | null;
   onPress: () => void;
   onShowHowTo: () => void;
   /** Vista previa del ranking: columna derecha en escritorio. */
@@ -50,25 +52,24 @@ export default function DailyChallengeCard({
   onShowHowTo,
   children,
 }: Props) {
+  const t = useT();
   const { potUnits, potEnabled } = useDeckPot(deckSize);
   const clock = useRoundClock(deckSize);
-  const clockCopy = roundCopy(clock);
+  const clockCopy = roundCopy(clock, t);
   const inMiniPay = useIsMiniPay();
 
   return (
-    <section className="lobby-card" aria-label="Reto de hoy">
+    <section className="lobby-card" aria-label={t("lobby.aria")}>
       <div className="lobby-action">
-        <span className="lobby-tag">RETO DE HOY</span>
-        <h2 className="lobby-title">Encuentra las parejas. Gasta tu mazo.</h2>
-        <p className="lobby-support">
-          El menor tiempo promedio por carta gana el premio de hoy.
-        </p>
+        <span className="lobby-tag">{t("lobby.tag")}</span>
+        <h2 className="lobby-title">{t("lobby.title")}</h2>
+        <p className="lobby-support">{t("lobby.support")}</p>
 
         {/* Altura reservada: el monto llega async y no debe saltar el layout. */}
         <div className="lobby-prize">
           {potEnabled ? (
             <>
-              <span className="lobby-prize-label">Premio de hoy</span>
+              <span className="lobby-prize-label">{t("lobby.prize.label")}</span>
               <span className="lobby-prize-amount">
                 {fmtUsdt(potUnits)} USDT
               </span>
@@ -90,7 +91,9 @@ export default function DailyChallengeCard({
               )}
             </>
           ) : (
-            <span className="lobby-prize-label">Premio en preparación</span>
+            <span className="lobby-prize-label">
+              {t("lobby.prize.preparing")}
+            </span>
           )}
         </div>
 
@@ -116,12 +119,12 @@ export default function DailyChallengeCard({
 
         {payError && (
           <p className="alias-error" aria-live="polite">
-            {payError}
-            {inMiniPay && /insuficiente/i.test(payError) && (
+            {t(payError)}
+            {inMiniPay && payError === "pay.error.insufficient" && (
               <>
                 {" "}
                 <a className="lobby-addcash" href={MINIPAY_ADD_CASH}>
-                  Recargar USDT
+                  {t("lobby.addcash")}
                 </a>
               </>
             )}
@@ -134,7 +137,7 @@ export default function DailyChallengeCard({
           data-howto-trigger
           onClick={onShowHowTo}
         >
-          Ver cómo se juega
+          {t("lobby.howto")}
         </button>
       </div>
 

@@ -2,6 +2,7 @@
 
 import type { PlacedSymbol } from "@/lib/game";
 import { SYMBOL_BY_ID } from "@/lib/symbols";
+import { useI18n } from "@/lib/i18n/client";
 
 interface Props {
   placed: PlacedSymbol;
@@ -11,6 +12,7 @@ interface Props {
 }
 
 export default function SymbolButton({ placed, flash, disabled, onTap }: Props) {
+  const { lang } = useI18n();
   const symbol = SYMBOL_BY_ID[placed.symbolId];
   const flashClass =
     flash === "good" ? " flash-good" : flash === "bad" ? " flash-bad" : "";
@@ -30,7 +32,7 @@ export default function SymbolButton({ placed, flash, disabled, onTap }: Props) 
         }
       }}
       tabIndex={disabled ? -1 : undefined}
-      aria-label={symbol.label}
+      aria-label={symbol.label[lang]}
     >
       <span
         className="symbol-emoji"

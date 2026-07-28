@@ -19,6 +19,7 @@ import {
   CIP64_FEE_ADAPTER,
 } from "./contracts";
 import { isMiniPay } from "./minipay";
+import type { MessageKey } from "./i18n";
 
 // Umbral de CELO por debajo del cual pagamos el gas en USDT (CIP-64). Las
 // wallets embebidas de Privy y MiniPay suelen tener 0 CELO.
@@ -65,16 +66,16 @@ export type PlayStage =
   | "registering"
   | "starting";
 
-export const PLAY_STAGE_LABEL: Record<PlayStage, string> = {
-  switching: "Cambiando a Celo…",
-  confirm: "Confirma en tu wallet…",
-  approving: "Autorizando USDT…",
+export const PLAY_STAGE_KEY: Record<PlayStage, MessageKey> = {
+  switching: "stage.switching",
+  confirm: "stage.confirm",
+  approving: "stage.approving",
   // Dos pasos distintos con dos textos distintos: esperar a que la cadena
   // confirme no es lo mismo que avisarle al servidor, y cuando algo se cuelga
   // hay que poder saber cuál de los dos fue.
-  confirming: "Confirmando en Celo…",
-  registering: "Registrando jugada…",
-  starting: "Preparando partida…",
+  confirming: "stage.confirming",
+  registering: "stage.registering",
+  starting: "stage.starting",
 };
 
 /**

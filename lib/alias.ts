@@ -9,20 +9,24 @@ export function normalizeAlias(raw: string): string {
   return (raw ?? "").trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Por qué falló la validación. Es un CÓDIGO y no una frase porque esta función
+ * corre también en el servidor, que no sabe (ni debe saber) en qué idioma está
+ * mirando el jugador: la pantalla lo traduce con `lib/i18n`.
+ */
+export type AliasError = "alias_too_short" | "alias_too_long" | "alias_charset";
+
 export interface AliasCheck {
   ok: boolean;
   value?: string;
-  error?: string;
+  error?: AliasError;
 }
 
 /** Valida un alias. Se usa igual en el cliente (UX) y en el servidor (seguridad). */
 export function validateAlias(raw: string): AliasCheck {
   const value = normalizeAlias(raw);
-  if (value.length < ALIAS_MIN)
-    return { ok: false, error: `El alias es muy corto (mínimo ${ALIAS_MIN}).` };
-  if (value.length > ALIAS_MAX)
-    return { ok: false, error: `El alias es muy largo (máximo ${ALIAS_MAX}).` };
-  if (!ALIAS_REGEX.test(value))
-    return { ok: false, error: "Solo letras, números, espacio, guion y guion bajo." };
+  if (value.length < ALIAS_MIN) return { ok: false, error: "alias_too_short" };
+  if (value.length > ALIAS_MAX) return { ok: false, error: "alias_too_long" };
+  if (!ALIAS_REGEX.test(value)) return { ok: false, error: "alias_charset" };
   return { ok: true, value };
 }

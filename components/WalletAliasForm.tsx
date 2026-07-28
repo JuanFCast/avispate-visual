@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { validateAlias, ALIAS_MAX } from "@/lib/alias";
+import { aliasErrorText } from "@/lib/alias-errors";
 import { useActiveWallet, shortAddress } from "@/lib/wallet";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   onSet: (alias: string) => void;
@@ -14,6 +16,7 @@ interface Props {
  * paga (el pago on-chain prueba que la wallet es suya).
  */
 export default function WalletAliasForm({ onSet }: Props) {
+  const t = useT();
   const { address } = useActiveWallet();
   const [value, setValue] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +27,7 @@ export default function WalletAliasForm({ onSet }: Props) {
     setError(null);
     const check = validateAlias(value);
     if (!check.ok || !check.value) {
-      setError(check.error ?? "Alias inválido.");
+      setError(aliasErrorText(t, check.error));
       return;
     }
     setChecking(true);
@@ -36,7 +39,7 @@ export default function WalletAliasForm({ onSet }: Props) {
       );
       const data = await res.json();
       if (!data.available) {
-        setError("Ese alias ya está tomado, elige otro.");
+        setError(t("alias.error.taken_pick"));
         setChecking(false);
         return;
       }
@@ -50,22 +53,21 @@ export default function WalletAliasForm({ onSet }: Props) {
   return (
     <form className="panel" onSubmit={submit}>
       <p className="hint">
-        Wallet conectada: <strong>{shortAddress(address)}</strong>. Elige tu
-        alias para el ranking. Tienes una jugada gratis al día por mazo; las
-        extras cuestan 0.10 USDT.
+        {t("alias.wallet_hint.a")} <strong>{shortAddress(address)}</strong>
+        {t("alias.wallet_hint.b")}
       </p>
       <div className="field">
-        <label>Tu alias</label>
+        <label>{t("alias.your")}</label>
         <input
           value={value}
           onChange={(e) => setValue(e.target.value)}
           maxLength={ALIAS_MAX}
           autoComplete="off"
-          aria-label="Alias"
+          aria-label={t("alias.field")}
         />
       </div>
       <button type="submit" className="btn-primary" disabled={checking || !value.trim()}>
-        {checking ? "Verificando…" : "Continuar"}
+        {checking ? t("alias.checking") : t("common.continue")}
       </button>
       {error && <p className="alias-error">{error}</p>}
     </form>

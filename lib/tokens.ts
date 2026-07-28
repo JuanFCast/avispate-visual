@@ -7,6 +7,7 @@
  */
 
 import { formatUnits } from "viem";
+import type { MessageKey } from "./i18n";
 import {
   COPM_CELO_ADDRESS,
   COPM_DECIMALS,
@@ -50,7 +51,8 @@ export interface TokenInfo {
   displayDecimals: number;
   /** Sufijo de la clase de color de la tarjeta. */
   tint: string;
-  description: string;
+  /** Clave del texto de la tarjeta: la traduce quien la pinta. */
+  descriptionKey: MessageKey;
   /** Enlace de puente desde Ethereum, si el token existe allá. */
   bridgeUrl?: string;
   /** Enlace de swap dentro de Celo. */
@@ -73,7 +75,7 @@ export const TOKENS: TokenInfo[] = [
     decimals: 18,
     displayDecimals: 4,
     tint: "celo",
-    description: "Se usa para pagar las tarifas de la red.",
+    descriptionKey: "token.celo.desc",
     bridgeUrl: squidUrl(
       "0x0000000000000000000000000000000000000000",
       CELO_ERC20
@@ -88,7 +90,7 @@ export const TOKENS: TokenInfo[] = [
     decimals: USDT_DECIMALS,
     displayDecimals: 2,
     tint: "usdt",
-    description: "Para entrar a partidas pagadas y recibir premios.",
+    descriptionKey: "token.usdt.desc",
     bridgeUrl: squidUrl(USDT_ETHEREUM, USDT_CELO_ADDRESS),
     swapUrl: uniswapUrl(CELO_ERC20, USDT_CELO_ADDRESS),
     miniPayAddCash: true,
@@ -100,8 +102,7 @@ export const TOKENS: TokenInfo[] = [
     decimals: COPM_DECIMALS,
     displayDecimals: 0,
     tint: "copm",
-    description:
-      "Peso colombiano digital en Celo. Todavía no se juega con él: las entradas se cobran en USDT.",
+    descriptionKey: "token.copm.desc",
     // Sin puente: COPm solo existe en Celo, no hay nada que traer de Ethereum.
     bridgeUrl: undefined,
     swapUrl: uniswapUrl(USDT_CELO_ADDRESS, COPM_CELO_ADDRESS),
@@ -114,22 +115,26 @@ export const TOKENS: TokenInfo[] = [
  * Saldo listo para leer. Un polvito de token (más de cero pero menos de lo que
  * se alcanza a mostrar) sale como "<0,01" y no como "0": que el saldo diga
  * cero cuando hay algo es peor que un número feo.
+ *
+ * El separador decimal sigue al idioma de la pantalla ("1,5" en español,
+ * "1.5" en inglés), así que el llamador pasa su locale.
  */
 export function formatBalance(
   balance: bigint,
   decimals: number,
-  display: number
+  display: number,
+  locale = "en-US"
 ): string {
   const human = Number(formatUnits(balance, decimals));
   const smallest = Math.pow(10, -display);
   if (balance > 0n && display > 0 && human < smallest) {
-    return `<${smallest.toLocaleString("es-CO", {
+    return `<${smallest.toLocaleString(locale, {
       minimumFractionDigits: display,
       maximumFractionDigits: display,
     })}`;
   }
   if (balance > 0n && display === 0 && human < 1) return "<1";
-  return human.toLocaleString("es-CO", {
+  return human.toLocaleString(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: display,
   });

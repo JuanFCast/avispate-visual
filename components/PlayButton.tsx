@@ -1,6 +1,7 @@
 "use client";
 
-import { PLAY_STAGE_LABEL, type PlayStage } from "@/lib/pay";
+import { PLAY_STAGE_KEY, type PlayStage } from "@/lib/pay";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   /** Texto en reposo; mientras se procesa manda el paso. */
@@ -24,6 +25,7 @@ export default function PlayButton({
   className,
   onClick,
 }: Props) {
+  const t = useT();
   const busy = stage !== null;
   return (
     <button
@@ -35,7 +37,7 @@ export default function PlayButton({
       onClick={onClick}
     >
       {busy && <span className="btn-spinner" aria-hidden="true" />}
-      {busy ? PLAY_STAGE_LABEL[stage] : label}
+      {busy ? t(PLAY_STAGE_KEY[stage]) : label}
     </button>
   );
 }

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { DECK_OPTIONS } from "@/lib/game";
 import GlobalLeaderboard from "@/components/GlobalLeaderboard";
 import ProfileBottomNav from "@/components/profile/ProfileBottomNav";
+import { useT } from "@/lib/i18n/client";
 
 /** El lobby enlaza con ?deck=10|15|20 para abrir la pestaña correcta. */
 function RankingContent() {
@@ -15,9 +16,11 @@ function RankingContent() {
 }
 
 export default function RankingPage() {
+  const t = useT();
+
   return (
     <main className="app-shell profile-page">
-      <h1 className="page-title">Ranking</h1>
+      <h1 className="page-title">{t("ranking.title")}</h1>
       <Suspense fallback={null}>
         <RankingContent />
       </Suspense>

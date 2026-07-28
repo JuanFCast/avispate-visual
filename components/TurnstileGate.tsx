@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useT } from "@/lib/i18n/client";
 
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 const SCRIPT_SRC =
@@ -30,6 +31,7 @@ export default function TurnstileGate({
 }: {
   onToken: (token: string) => void;
 }) {
+  const t = useT();
   const slotRef = useRef<HTMLDivElement>(null);
   const widgetRef = useRef<string | null>(null);
 
@@ -75,11 +77,14 @@ export default function TurnstileGate({
   if (!SITE_KEY) return null;
 
   return (
-    <div className="turnstile-backdrop" role="dialog" aria-modal="true" aria-label="Verificación de seguridad">
+    <div
+      className="turnstile-backdrop"
+      role="dialog"
+      aria-modal="true"
+      aria-label={t("turnstile.aria")}
+    >
       <div className="turnstile-panel">
-        <p className="turnstile-text">
-          Un segundo: confirma que eres humano para activar tu jugada gratis.
-        </p>
+        <p className="turnstile-text">{t("turnstile.text")}</p>
         <div ref={slotRef} />
       </div>
     </div>

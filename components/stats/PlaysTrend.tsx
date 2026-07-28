@@ -1,20 +1,24 @@
 "use client";
 
 import type { TrendPoint } from "@/lib/stats";
+import { useI18n } from "@/lib/i18n/client";
+import type { Lang } from "@/lib/i18n";
 
 interface Props {
   points: TrendPoint[];
 }
 
-const MONTHS = [
-  "ene", "feb", "mar", "abr", "may", "jun",
-  "jul", "ago", "sep", "oct", "nov", "dic",
-];
+const MONTHS: Record<Lang, string[]> = {
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+  es: ["ene", "feb", "mar", "abr", "may", "jun",
+       "jul", "ago", "sep", "oct", "nov", "dic"],
+};
 
 /** "26 jul" a partir de YYYY-MM-DD, sin pasar por Date (la ronda es UTC). */
-function shortDate(roundId: string): string {
+function shortDate(roundId: string, lang: Lang): string {
   const [, month, day] = roundId.split("-");
-  return `${Number(day)} ${MONTHS[Number(month) - 1] ?? ""}`;
+  return `${Number(day)} ${MONTHS[lang][Number(month) - 1] ?? ""}`;
 }
 
 /**
@@ -24,15 +28,12 @@ function shortDate(roundId: string): string {
  * La parte oscura de cada barra son las jugadas PAGAS; el resto, las gratis.
  */
 export default function PlaysTrend({ points }: Props) {
+  const { t, lang } = useI18n();
   const max = Math.max(...points.map((p) => p.plays), 0);
   const total = points.reduce((sum, p) => sum + p.plays, 0);
 
   if (max === 0) {
-    return (
-      <p className="empty-note">
-        Todavía no hay partidas en los últimos 30 días.
-      </p>
-    );
+    return <p className="empty-note">{t("stats.trend.empty")}</p>;
   }
 
   const first = points[0];
@@ -43,7 +44,7 @@ export default function PlaysTrend({ points }: Props) {
       <div
         className="trend-bars"
         role="img"
-        aria-label={`Partidas por día en los últimos 30 días: ${total} en total, con un máximo de ${max} en un día.`}
+        aria-label={t("stats.trend.aria", { total, max })}
       >
         {points.map((p) => {
           const height = (p.plays / max) * 100;
@@ -53,7 +54,12 @@ export default function PlaysTrend({ points }: Props) {
               <div
                 className="trend-bar"
                 style={{ height: `${height}%` }}
-                title={`${shortDate(p.roundId)} · ${p.plays} partidas (${p.paidPlays} pagas) · ${p.players} jugadores`}
+                title={t("stats.trend.bar", {
+                  date: shortDate(p.roundId, lang),
+                  plays: p.plays,
+                  paid: p.paidPlays,
+                  players: p.players,
+                })}
               >
                 <span
                   className="trend-bar-paid"
@@ -66,16 +72,20 @@ export default function PlaysTrend({ points }: Props) {
       </div>
 
       <div className="trend-axis">
-        <span>{shortDate(first.roundId)}</span>
-        <span>{shortDate(last.roundId)} (hoy)</span>
+        <span>{shortDate(first.roundId, lang)}</span>
+        <span>
+          {t("stats.trend.today", { date: shortDate(last.roundId, lang) })}
+        </span>
       </div>
 
       <div className="trend-legend">
         <span className="trend-key">
-          <span className="trend-swatch is-paid" aria-hidden="true" /> Pagas
+          <span className="trend-swatch is-paid" aria-hidden="true" />{" "}
+          {t("stats.trend.paid")}
         </span>
         <span className="trend-key">
-          <span className="trend-swatch is-free" aria-hidden="true" /> Gratis
+          <span className="trend-swatch is-free" aria-hidden="true" />{" "}
+          {t("stats.trend.free")}
         </span>
       </div>
     </div>

@@ -3,11 +3,12 @@
 import { useConnectModal, useAccountModal } from "@rainbow-me/rainbowkit";
 import { useAccount, useDisconnect } from "wagmi";
 import { shortAddress } from "@/lib/wallet";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   /** Clase del botón para adaptarlo a distintos sitios (acceso, perfil…). */
   className?: string;
-  /** Texto del botón cuando no hay wallet conectada. */
+  /** Texto del botón cuando no hay wallet conectada. Por defecto, "Conectar wallet". */
   label?: string;
   /**
    * Texto cuando SÍ hay wallet conectada. Si se omite, muestra la dirección
@@ -24,9 +25,10 @@ interface Props {
  */
 export default function WalletConnect({
   className = "access-btn access-btn-secondary",
-  label = "Conectar wallet",
+  label,
   connectedLabel,
 }: Props) {
+  const t = useT();
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
   const { address, isConnected } = useAccount();
@@ -38,7 +40,7 @@ export default function WalletConnect({
         type="button"
         className={className}
         onClick={() => (openAccountModal ? openAccountModal() : disconnect())}
-        title="Ver o cambiar wallet"
+        title={t("access.wallet_title")}
       >
         {connectedLabel ?? shortAddress(address)}
       </button>
@@ -52,7 +54,7 @@ export default function WalletConnect({
       onClick={() => openConnectModal?.()}
       disabled={!openConnectModal}
     >
-      {label}
+      {label ?? t("access.wallet_connect")}
     </button>
   );
 }

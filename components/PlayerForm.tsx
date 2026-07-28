@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { DEFAULT_DECK_SIZE, DECK_OPTIONS } from "@/lib/game";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   onStart: (deckSize: number) => void;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function PlayerForm({ onStart, freeByDeck = {}, payError }: Props) {
+  const t = useT();
   const [deckSize, setDeckSize] = useState(DEFAULT_DECK_SIZE);
 
   function handleSubmit(e: React.FormEvent) {
@@ -24,7 +26,7 @@ export default function PlayerForm({ onStart, freeByDeck = {}, payError }: Props
   return (
     <form className="panel" onSubmit={handleSubmit}>
       <div className="field">
-        <label>Cartas del mazo</label>
+        <label>{t("deck.label")}</label>
         <div className="rounds-options">
           {DECK_OPTIONS.map((option) => (
             <button
@@ -35,7 +37,7 @@ export default function PlayerForm({ onStart, freeByDeck = {}, payError }: Props
             >
               {option}
               <small className="deck-price">
-                {freeByDeck[option] ? "gratis" : "0.10 USDT"}
+                {freeByDeck[option] ? t("common.free") : "0.10 USDT"}
               </small>
             </button>
           ))}
@@ -43,16 +45,14 @@ export default function PlayerForm({ onStart, freeByDeck = {}, payError }: Props
       </div>
 
       <button type="submit" className="btn-primary">
-        {isFree ? "Jugar gratis" : "Pagar 0.10 USDT y jugar"}
+        {isFree ? t("cta.free.label") : t("form.pay_and_play")}
       </button>
 
       {payError && <p className="alias-error">{payError}</p>}
 
       <p className="hint">
-        {isFree
-          ? "Tu primera jugada del día en este mazo es gratis. ¡El #1 se lleva el pozo!"
-          : "Ya usaste tu jugada gratis de hoy en este mazo. El 80% de tu pago va al pozo."}{" "}
-        Cada error suma 1 segundo, ¡así que ojo avispa! 🐝
+        {isFree ? t("form.hint.free") : t("form.hint.paid")}{" "}
+        {t("form.hint.tail")}
       </p>
     </form>
   );

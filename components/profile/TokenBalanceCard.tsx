@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   symbol: string;
@@ -28,16 +29,23 @@ export default function TokenBalanceCard({
   actions,
   soon,
 }: Props) {
+  const t = useT();
+
   return (
     <div className={`token-card tint-${tint}${soon ? " token-soon" : ""}`}>
       <div className="token-head">
         <span className="token-symbol">{symbol}</span>
         {soon ? (
-          <span className="token-badge">Próximamente</span>
+          <span className="token-badge">{t("tokens.soon")}</span>
         ) : loading ? (
-          <span className="skeleton skeleton-balance" aria-label="Cargando saldo" />
+          <span
+            className="skeleton skeleton-balance"
+            aria-label={t("tokens.loading_aria")}
+          />
         ) : error ? (
-          <span className="token-balance token-balance-err">— error</span>
+          <span className="token-balance token-balance-err">
+            {t("tokens.error")}
+          </span>
         ) : (
           <span className="token-balance">{balance ?? "0"}</span>
         )}

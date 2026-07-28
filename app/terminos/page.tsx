@@ -1,20 +1,23 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { getServerT } from "@/lib/i18n/server";
 
-export const metadata = { title: "Términos · Avíspate" };
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getServerT();
+  return { title: t("meta.terms.title") };
+}
 
-export default function TerminosPage() {
+export default async function TerminosPage() {
+  const t = await getServerT();
+
   return (
     <main className="app-shell profile-page page-narrow">
-      <h1 className="page-title">Términos</h1>
+      <h1 className="page-title">{t("terms.title")}</h1>
       <section className="profile-section">
-        <p className="section-note">
-          Contenido de términos y condiciones en preparación. Avíspate es un juego
-          de agilidad visual; las partidas pagadas y los premios se procesan en la
-          red Celo.
-        </p>
+        <p className="section-note">{t("terms.body")}</p>
       </section>
       <Link href="/perfil" className="btn-ghost">
-        ← Volver al perfil
+        {t("common.back_to_profile")}
       </Link>
     </main>
   );

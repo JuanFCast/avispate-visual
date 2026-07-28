@@ -126,11 +126,13 @@ console.log("\nEquivalencia local (solo informativa)");
 const bogotaHint = closeHintFor(
   Date.parse(closesAt),
   Date.parse(serverNow),
+  'es',
   'America/Bogota'
 );
 const madridHint = closeHintFor(
   Date.parse(closesAt),
   Date.parse(serverNow),
+  'es',
   'Europe/Madrid'
 );
 console.log(`         Bogotá: "${bogotaHint}"`);

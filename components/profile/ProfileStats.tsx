@@ -1,5 +1,7 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
+
 interface Props {
   gamesPlayed: number;
   wins: number;
@@ -15,22 +17,24 @@ export default function ProfileStats({
   totalWonUsdt,
   loading,
 }: Props) {
+  const t = useT();
+
   return (
-    <section className="stats-grid" aria-label="Estadísticas">
+    <section className="stats-grid" aria-label={t("profile.stats.aria")}>
       <div className="stat-card tint-games">
         <span className="stat-value">
           {loading ? <span className="skeleton skeleton-num" /> : gamesPlayed}
         </span>
-        <span className="stat-label">Partidas</span>
+        <span className="stat-label">{t("profile.stats.games")}</span>
       </div>
       <div className="stat-card tint-wins">
         <span className="stat-value">
           {loading ? <span className="skeleton skeleton-num" /> : wins}
         </span>
-        <span className="stat-label">Victorias</span>
+        <span className="stat-label">{t("profile.stats.wins")}</span>
       </div>
       <div className="stat-card tint-won">
-        <span className="stat-label">Total ganado</span>
+        <span className="stat-label">{t("profile.stats.total_won")}</span>
         {loading ? (
           <span className="skeleton skeleton-line" />
         ) : (

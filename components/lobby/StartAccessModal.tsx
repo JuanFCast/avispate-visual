@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
+import { useT } from "@/lib/i18n/client";
 import AliasGate from "../AliasGate";
 import WalletAliasForm from "../WalletAliasForm";
 import WalletConnect from "../WalletConnect";
@@ -27,6 +28,7 @@ export default function StartAccessModal({
   onSetWalletAlias,
   onClose,
 }: Props) {
+  const t = useT();
   const { login } = usePrivy();
   const profile = useProfile();
   const wallet = useActiveWallet();
@@ -120,7 +122,7 @@ export default function StartAccessModal({
           type="button"
           className="lobby-modal-close"
           onClick={onClose}
-          aria-label="Cerrar"
+          aria-label={t("common.close")}
         >
           ✕
         </button>
@@ -128,49 +130,46 @@ export default function StartAccessModal({
         {needsEmailAlias ? (
           <>
             <h2 id="access-modal-title" className="lobby-modal-title">
-              Elige tu alias
+              {t("access.alias_title")}
             </h2>
             <AliasGate />
           </>
         ) : needsWalletAlias ? (
           <>
             <h2 id="access-modal-title" className="lobby-modal-title">
-              Elige tu alias
+              {t("access.alias_title")}
             </h2>
             <WalletAliasForm onSet={onSetWalletAlias} />
           </>
         ) : checkingWalletAlias || (profile.authenticated && profile.loading) ? (
           <>
             <h2 id="access-modal-title" className="lobby-modal-title">
-              Guarda tu marca y compite
+              {t("access.title")}
             </h2>
             <p className="lobby-modal-text" aria-live="polite">
-              Comprobando tu perfil…
+              {t("access.checking")}
             </p>
           </>
         ) : (
           <>
             <h2 id="access-modal-title" className="lobby-modal-title">
-              Guarda tu marca y compite
+              {t("access.title")}
             </h2>
-            <p className="lobby-modal-text">
-              Necesitas entrar con correo o wallet para guardar tu tiempo,
-              aparecer en el ranking y recibir premios.
-            </p>
+            <p className="lobby-modal-text">{t("access.text")}</p>
             <button
               type="button"
               className="access-btn access-btn-primary"
               onClick={() => login()}
             >
-              Continuar con correo
+              {t("access.email")}
             </button>
-            <WalletConnect label="Ya tengo una wallet" />
+            <WalletConnect label={t("access.wallet")} />
             <button
               type="button"
               className="lobby-modal-later"
               onClick={onClose}
             >
-              Cerrar
+              {t("common.close")}
             </button>
           </>
         )}

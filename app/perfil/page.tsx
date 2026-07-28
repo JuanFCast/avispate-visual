@@ -13,6 +13,8 @@ import WonPrizes, { type Prize } from "@/components/profile/WonPrizes";
 import WalletCard from "@/components/profile/WalletCard";
 import WalletTokens from "@/components/profile/WalletTokens";
 import ProfileBottomNav from "@/components/profile/ProfileBottomNav";
+import LanguageToggle from "@/components/profile/LanguageToggle";
+import { useT } from "@/lib/i18n/client";
 
 interface Stats {
   gamesPlayed: number;
@@ -29,6 +31,7 @@ const EMPTY_STATS: Stats = {
 };
 
 export default function PerfilPage() {
+  const t = useT();
   const router = useRouter();
   const { ready, authenticated, logout, getAccessToken } = usePrivy();
   const { address, isConnected } = useActiveWallet();
@@ -83,7 +86,7 @@ export default function PerfilPage() {
   if (!ready) {
     return (
       <main className="app-shell profile-page page-stack">
-        <p className="access-note">Cargando…</p>
+        <p className="access-note">{t("common.loading")}</p>
       </main>
     );
   }
@@ -94,12 +97,10 @@ export default function PerfilPage() {
         <div className="profile-guard">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-avispate.png" alt="" className="profile-avatar" />
-          <h1 className="profile-alias-big">Tu perfil</h1>
-          <p className="empty-note">
-            Inicia sesión con tu correo o conecta tu wallet para ver tu perfil.
-          </p>
+          <h1 className="profile-alias-big">{t("profile.title")}</h1>
+          <p className="empty-note">{t("profile.guard.text")}</p>
           <Link href="/" className="btn-primary">
-            Ir al inicio
+            {t("profile.guard.cta")}
           </Link>
         </div>
         <ProfileBottomNav active="perfil" />
@@ -133,33 +134,32 @@ export default function PerfilPage() {
               <WalletTokens address={address} />
             </>
           ) : (
-            <p className="empty-note">Creando tu wallet…</p>
+            <p className="empty-note">{t("profile.creating_wallet")}</p>
           )}
 
           <section className="profile-links">
             <Link className="profile-link-row" href="/stats">
-              Estadísticas en vivo
+              {t("common.live_stats")}
             </Link>
             <a
               className="profile-link-row"
               href="mailto:soporte@avispate.fun"
             >
-              Ayuda y soporte
+              {t("profile.link.support")}
             </a>
+            <LanguageToggle />
             <button
               type="button"
               className="profile-link-row profile-logout-link"
               onClick={handleLogout}
             >
-              Cerrar sesión
+              {t("profile.link.logout")}
             </button>
-            <p className="profile-links-hint">
-              Cierra sesión para cambiar de cuenta.
-            </p>
+            <p className="profile-links-hint">{t("profile.links.hint")}</p>
             <div className="profile-legal">
-              <Link href="/terminos">Términos</Link>
+              <Link href="/terminos">{t("profile.legal.terms")}</Link>
               <span aria-hidden="true">·</span>
-              <Link href="/privacidad">Privacidad</Link>
+              <Link href="/privacidad">{t("profile.legal.privacy")}</Link>
             </div>
           </section>
         </div>

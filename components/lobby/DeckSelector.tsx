@@ -1,6 +1,7 @@
 "use client";
 
 import { DECK_OPTIONS } from "@/lib/game";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   value: number;
@@ -21,9 +22,11 @@ export default function DeckSelector({
   freeByDeck,
   disabled,
 }: Props) {
+  const t = useT();
+
   return (
     <div className="field">
-      <label id="deck-selector-label">Cartas del mazo</label>
+      <label id="deck-selector-label">{t("deck.label")}</label>
       <div
         className="rounds-options"
         role="radiogroup"
@@ -41,7 +44,7 @@ export default function DeckSelector({
           >
             {option}
             <small className="deck-price">
-              {freeByDeck[option] ? "gratis" : "0.10 USDT"}
+              {freeByDeck[option] ? t("common.free") : "0.10 USDT"}
             </small>
           </button>
         ))}

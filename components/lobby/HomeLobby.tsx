@@ -3,6 +3,8 @@
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
 import type { PlayStage } from "@/lib/pay";
+import { useT } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n";
 import DailyChallengeCard, { type CtaState } from "./DailyChallengeCard";
 import LeaderboardPreview from "./LeaderboardPreview";
 
@@ -17,7 +19,7 @@ interface Props {
   walletAliasReady: boolean;
   /** Jugada en curso: el lobby no se va, solo cambia el CTA. */
   payStage: PlayStage | null;
-  payError: string | null;
+  payError: MessageKey | null;
   onStart: (deck: number) => void;
   onRequestAccess: () => void;
   onShowHowTo: () => void;
@@ -41,12 +43,13 @@ export default function HomeLobby({
   onRequestAccess,
   onShowHowTo,
 }: Props) {
+  const t = useT();
   const profile = useProfile();
   const wallet = useActiveWallet();
 
   const checking: CtaState = {
-    support: "Comprobando tu entrada…",
-    label: "Preparando…",
+    support: t("cta.checking.support"),
+    label: t("cta.checking.label"),
     disabled: true,
     action: "start",
   };
@@ -57,15 +60,15 @@ export default function HomeLobby({
     if (!entitlementReady) return checking;
     if (freeByDeck[deckSize]) {
       return {
-        support: "Tu partida gratis de hoy en este mazo está lista.",
-        label: "Jugar gratis",
+        support: t("cta.free.support"),
+        label: t("cta.free.label"),
         disabled: false,
         action: "start",
       };
     }
     return {
-      support: "Entrada 0.10 USDT · 80% va al premio.",
-      label: "Jugar por 0.10 USDT",
+      support: t("cta.paid.support"),
+      label: t("cta.paid.label"),
       disabled: false,
       action: "start",
     };
@@ -79,8 +82,8 @@ export default function HomeLobby({
     if (profile.authenticated) {
       if (!profile.alias) {
         return {
-          support: "Elige tu alias para guardar tu marca.",
-          label: "Continuar",
+          support: t("cta.alias.support"),
+          label: t("cta.alias.label"),
           disabled: false,
           action: "access",
         };
@@ -96,8 +99,8 @@ export default function HomeLobby({
       if (!walletAliasReady) return checking;
       if (!walletAlias) {
         return {
-          support: "Elige tu alias para guardar tu marca.",
-          label: "Continuar",
+          support: t("cta.alias.support"),
+          label: t("cta.alias.label"),
           disabled: false,
           action: "access",
         };
@@ -105,8 +108,8 @@ export default function HomeLobby({
       return playCta();
     }
     return {
-      support: "Inicia sesión para revisar tu jugada gratis.",
-      label: "Empezar",
+      support: t("cta.login.support"),
+      label: t("cta.login.label"),
       disabled: false,
       action: "access",
     };
@@ -118,8 +121,8 @@ export default function HomeLobby({
     return {
       ...base,
       support: freeByDeck[deckSize]
-        ? "Esta jugada es gratis. Solo debes confirmar en tu wallet."
-        : "Confirma el pago de 0,10 USDT en tu wallet.",
+        ? t("cta.paying.free")
+        : t("cta.paying.paid"),
     };
   }
 

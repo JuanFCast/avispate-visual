@@ -1517,6 +1517,17 @@ body {
   padding: 2px 4px;
 }
 
+/* Selector de idioma: mismas píldoras que el selector de mazo, pero en una
+   fila de ajustes, así que respira igual que las otras filas. */
+.lang-toggle {
+  margin: 2px 0;
+}
+
+.lang-toggle button {
+  min-height: 44px;
+  font-size: 0.95rem;
+}
+
 .profile-legal {
   display: flex;
   gap: 8px;

@@ -8,6 +8,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import type { ChainCard, PlacedSymbol } from "@/lib/game";
+import { useT } from "@/lib/i18n/client";
 import CardView from "./CardView";
 
 /* ---------------------------------------------------------------------- */
@@ -140,6 +141,7 @@ function noop() {}
 /* ---------------------------------------------------------------------- */
 
 export function HowToPlay({ onClose }: { onClose: () => void }) {
+  const t = useT();
   const [index, setIndex] = useState(0);
 
   // Paso 2: práctica.
@@ -233,12 +235,12 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
     setWrongId(null);
     setHintVisible(false);
     setMessage("");
-    const t = window.setTimeout(() => {
+    const timer = window.setTimeout(() => {
       setHintVisible(true);
-      setMessage((m) => m || "Busca la manzana de arriba también abajo.");
+      setMessage((m) => m || t("howto.s2.hint"));
     }, HINT_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [index]);
+    return () => clearTimeout(timer);
+  }, [index, t]);
 
   // Demo de movimiento: se reproduce una vez por entrada o repetición.
   useEffect(() => {
@@ -259,11 +261,11 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
       setMatched(true);
       setWrongId(null);
       setHintVisible(false);
-      setMessage("¡Eso! La manzana.");
+      setMessage(t("howto.s2.right"));
       later(() => setIndex(2), ADVANCE_DELAY_MS);
     } else {
       setWrongId(symbolId);
-      setMessage("Ese no. Busca el que también aparece en la Base.");
+      setMessage(t("howto.s2.wrong"));
       later(() => setWrongId((w) => (w === symbolId ? null : w)), SHAKE_MS);
     }
   }
@@ -274,13 +276,16 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
       className="howto-overlay"
       role="dialog"
       aria-modal="true"
-      aria-label="Cómo se juega"
+      aria-label={t("howto.aria")}
     >
       <div className="howto-inner">
         <header className="howto-top">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-avispate.png" alt="" className="howto-logo" />
-          <div className="howto-progress" aria-label={`Paso ${index + 1} de 4`}>
+          <div
+            className="howto-progress"
+            aria-label={t("howto.progress", { n: index + 1 })}
+          >
             {Array.from({ length: STEP_COUNT }, (_, i) => (
               <span
                 key={i}
@@ -294,23 +299,20 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
             className="howto-skip"
             onClick={onClose}
           >
-            Saltar
+            {t("howto.skip")}
           </button>
         </header>
 
         <div className="howto-body">
           {index === 0 && (
             <section className="howto-step" key="idea">
-              <span className="howto-kicker">PASO 1 DE 4</span>
-              <h2 className="howto-title">Dos cartas. Un símbolo igual.</h2>
-              <p className="howto-text">
-                La Base y Tu carta siempre comparten exactamente un símbolo.
-                Encuéntralo antes de que tus ojos se distraigan.
-              </p>
+              <span className="howto-kicker">{t("howto.kicker", { n: 1 })}</span>
+              <h2 className="howto-title">{t("howto.s1.title")}</h2>
+              <p className="howto-text">{t("howto.s1.text")}</p>
               <div
                 className="howto-minis"
                 role="img"
-                aria-label="Dos cartas de ejemplo que comparten la manzana"
+                aria-label={t("howto.s1.aria")}
               >
                 <div className="howto-mini">
                   <span style={{ left: "50%", top: "24%" }}>☀️</span>
@@ -340,16 +342,20 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
 
           {index === 1 && (
             <section className="howto-step" key="try">
-              <span className="howto-kicker">PASO 2 DE 4</span>
-              <h2 className="howto-title">Encuentra el símbolo común</h2>
-              <p className="howto-text">Mira la Base y tócalo en Tu carta.</p>
+              <span className="howto-kicker">{t("howto.kicker", { n: 2 })}</span>
+              <h2 className="howto-title">{t("howto.s2.title")}</h2>
+              <p className="howto-text">{t("howto.s2.text")}</p>
               <div className="chain-area">
-                <span className="slot-tag slot-tag-base">Base</span>
-                <span className="slot-tag slot-tag-mine">Tu carta</span>
+                <span className="slot-tag slot-tag-base">
+                  {t("game.slot.base")}
+                </span>
+                <span className="slot-tag slot-tag-mine">
+                  {t("game.slot.mine")}
+                </span>
                 <div
                   className="chain-card slot-base"
                   role="img"
-                  aria-label="Carta Base: es la referencia y no se toca"
+                  aria-label={t("howto.s2.base_aria")}
                 >
                   <CardView
                     symbols={CARD_A.symbols}
@@ -363,7 +369,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
                 <div
                   className="chain-card slot-incoming"
                   role="group"
-                  aria-label="Tu carta: toca el símbolo que también está en la Base"
+                  aria-label={t("howto.s2.mine_aria")}
                 >
                   {hintVisible && !matched && (
                     <span
@@ -390,20 +396,21 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
 
           {index === 2 && (
             <section className="howto-step" key="motion">
-              <span className="howto-kicker">PASO 3 DE 4</span>
-              <h2 className="howto-title">Tu carta se vuelve la Base</h2>
-              <p className="howto-text">
-                La anterior sale, la tuya sube y llega otra del mazo. Ahora
-                buscas un símbolo nuevo.
-              </p>
+              <span className="howto-kicker">{t("howto.kicker", { n: 3 })}</span>
+              <h2 className="howto-title">{t("howto.s3.title")}</h2>
+              <p className="howto-text">{t("howto.s3.text")}</p>
               <div
                 key={motionKey}
                 className="chain-area"
                 role="img"
-                aria-label="La Base sale, Tu carta pasa a ser la nueva Base y entra una carta del mazo"
+                aria-label={t("howto.s3.aria")}
               >
-                <span className="slot-tag slot-tag-base">Base</span>
-                <span className="slot-tag slot-tag-mine">Tu carta</span>
+                <span className="slot-tag slot-tag-base">
+                  {t("game.slot.base")}
+                </span>
+                <span className="slot-tag slot-tag-mine">
+                  {t("game.slot.mine")}
+                </span>
                 <div
                   className={`chain-card ${motionMoved ? "slot-exiting" : "slot-base"}`}
                 >
@@ -459,21 +466,15 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
 
           {index === 3 && (
             <section className="howto-step" key="ready">
-              <span className="howto-kicker">PASO 4 DE 4</span>
-              <h2 className="howto-title">Ahora sí, ¡avíspate!</h2>
-              <p className="howto-text">
-                Gasta todo el mazo en el menor tiempo. Cada error suma 1
-                segundo y el ranking compara tu tiempo promedio por carta.
-              </p>
+              <span className="howto-kicker">{t("howto.kicker", { n: 4 })}</span>
+              <h2 className="howto-title">{t("howto.s4.title")}</h2>
+              <p className="howto-text">{t("howto.s4.text")}</p>
               <div className="howto-chips">
-                <span className="howto-chip">🃏 10, 15 o 20 cartas</span>
-                <span className="howto-chip">👆 La Base no se toca</span>
-                <span className="howto-chip">⏱️ +1 s por error</span>
+                <span className="howto-chip">{t("howto.s4.chip1")}</span>
+                <span className="howto-chip">{t("howto.s4.chip2")}</span>
+                <span className="howto-chip">{t("howto.s4.chip3")}</span>
               </div>
-              <p className="howto-note">
-                Las condiciones de la jugada gratis y del premio están en el
-                inicio.
-              </p>
+              <p className="howto-note">{t("howto.s4.note")}</p>
             </section>
           )}
         </div>
@@ -485,7 +486,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
               className="btn-primary howto-btn"
               onClick={() => setIndex(1)}
             >
-              Muéstrame
+              {t("howto.show")}
             </button>
           )}
           {index === 1 && (
@@ -500,14 +501,14 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
                 className="btn-primary howto-btn"
                 onClick={() => setIndex(3)}
               >
-                Siguiente
+                {t("common.next")}
               </button>
               <button
                 type="button"
                 className="howto-again"
                 onClick={() => setMotionKey((k) => k + 1)}
               >
-                Ver otra vez
+                {t("howto.again")}
               </button>
             </>
           )}
@@ -517,7 +518,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
               className="btn-primary howto-btn"
               onClick={onClose}
             >
-              ¡A jugar!
+              {t("howto.play")}
             </button>
           )}
         </div>

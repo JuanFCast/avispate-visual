@@ -10,6 +10,8 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { wagmiConfig } from "./wagmi";
 import { useMiniPayAutoConnect } from "./minipay";
 import { ProfileProvider } from "./profile-context";
+import { I18nProvider } from "./i18n/client";
+import type { Lang } from "./i18n";
 import WelcomeGasBridge from "@/components/WelcomeGasBridge";
 import OutboxBridge from "@/components/OutboxBridge";
 
@@ -94,42 +96,54 @@ function MiniPayBridge() {
 
 /**
  * Árbol de providers de Avíspate. Orden (fuera → dentro):
- *   PrivyProvider → QueryClientProvider → WagmiProvider → RainbowKitProvider.
+ *   I18nProvider → PrivyProvider → QueryClientProvider → WagmiProvider →
+ *   RainbowKitProvider.
  * La identidad y el ranking siguen atados a Privy (correo); wagmi solo gestiona
  * la wallet ACTIVA (embebida o externa) para pagos, balances y premios.
+ *
+ * El idioma va por fuera de todo: lo decide el servidor y ningún otro provider
+ * depende de él, así que cambiarlo no vuelve a montar la wallet ni la sesión.
  */
-export function Providers({ children }: { children: ReactNode }) {
+export function Providers({
+  lang,
+  children,
+}: {
+  lang: Lang;
+  children: ReactNode;
+}) {
   return (
-    <PrivyProvider
-      appId={PRIVY_APP_ID}
-      config={{
-        loginMethods: ["email"],
-        // La wallet embebida se provisiona en Celo (red principal).
-        defaultChain: celo,
-        supportedChains: [celo],
-        embeddedWallets: {
-          // Sin UIs de Privy: gestionamos la wallet desde nuestra propia UI.
-          showWalletUIs: false,
-          ethereum: {
-            createOnLogin: "users-without-wallets",
+    <I18nProvider initialLang={lang}>
+      <PrivyProvider
+        appId={PRIVY_APP_ID}
+        config={{
+          loginMethods: ["email"],
+          // La wallet embebida se provisiona en Celo (red principal).
+          defaultChain: celo,
+          supportedChains: [celo],
+          embeddedWallets: {
+            // Sin UIs de Privy: gestionamos la wallet desde nuestra propia UI.
+            showWalletUIs: false,
+            ethereum: {
+              createOnLogin: "users-without-wallets",
+            },
+            solana: {
+              createOnLogin: "off",
+            },
           },
-          solana: {
-            createOnLogin: "off",
-          },
-        },
-      }}
-    >
-      <QueryClientProvider client={queryClient}>
-        <WagmiProvider config={wagmiConfig}>
-          <RainbowKitProvider modalSize="compact">
-            <PrivyEmbeddedBridge />
-            <MiniPayBridge />
-            <WelcomeGasBridge />
-            <OutboxBridge />
-            <ProfileProvider>{children}</ProfileProvider>
-          </RainbowKitProvider>
-        </WagmiProvider>
-      </QueryClientProvider>
-    </PrivyProvider>
+        }}
+      >
+        <QueryClientProvider client={queryClient}>
+          <WagmiProvider config={wagmiConfig}>
+            <RainbowKitProvider modalSize="compact">
+              <PrivyEmbeddedBridge />
+              <MiniPayBridge />
+              <WelcomeGasBridge />
+              <OutboxBridge />
+              <ProfileProvider>{children}</ProfileProvider>
+            </RainbowKitProvider>
+          </WagmiProvider>
+        </QueryClientProvider>
+      </PrivyProvider>
+    </I18nProvider>
   );
 }

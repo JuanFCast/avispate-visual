@@ -7,6 +7,8 @@ import { usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
 import { ERC20_ABI } from "@/lib/contracts";
 import { resolveFeeCurrency } from "@/lib/pay";
 import { formatBalance, type TokenInfo } from "@/lib/tokens";
+import { useI18n } from "@/lib/i18n/client";
+import type { MessageKey } from "@/lib/i18n";
 
 interface Props {
   token: TokenInfo;
@@ -27,16 +29,14 @@ type Phase = "form" | "sending" | "done";
  */
 const GAS_MARGIN_USDT = 20_000n; // 0.02 USDT
 
-/** Traduce un fallo de la wallet o de la red a algo que se pueda leer. */
-function describeSendError(err: unknown): string {
+/** Clasifica un fallo de la wallet o de la red. Devuelve la clave del mensaje. */
+function describeSendError(err: unknown): MessageKey {
   const msg = err instanceof Error ? err.message : String(err);
-  if (/rejected|denied|User rejected/i.test(msg))
-    return "Cancelaste la firma en tu wallet.";
+  if (/rejected|denied|User rejected/i.test(msg)) return "send.error.rejected";
   if (/insufficient|exceeds balance|transfer amount/i.test(msg))
-    return "Saldo insuficiente para ese monto más la tarifa de red.";
-  if (/chain|network/i.test(msg))
-    return "Tu wallet no está en la red Celo. Cámbiala e inténtalo de nuevo.";
-  return "No se pudo enviar. Revisa el monto y vuelve a intentar.";
+    return "send.error.insufficient";
+  if (/chain|network/i.test(msg)) return "send.error.chain";
+  return "send.error.generic";
 }
 
 /**
@@ -54,6 +54,7 @@ export default function SendModal({
   onClose,
   onSent,
 }: Props) {
+  const { t, locale } = useI18n();
   const publicClient = usePublicClient({ chainId: celo.id });
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
@@ -61,7 +62,7 @@ export default function SendModal({
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
   const [phase, setPhase] = useState<Phase>("form");
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<MessageKey | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
   /** El gas se cobrará en USDT (CIP-64), no en CELO. */
   const [gasInUsdt, setGasInUsdt] = useState(false);
@@ -156,7 +157,8 @@ export default function SendModal({
   const available = formatBalance(
     balance,
     token.decimals,
-    token.displayDecimals
+    token.displayDecimals,
+    locale
   );
 
   return (
@@ -176,21 +178,23 @@ export default function SendModal({
             type="button"
             className="lobby-modal-close"
             onClick={onClose}
-            aria-label="Cerrar"
+            aria-label={t("common.close")}
           >
             ✕
           </button>
         )}
         <h2 className="lobby-modal-title" id="send-title">
-          Enviar {token.symbol}
+          {t("send.title", { symbol: token.symbol })}
         </h2>
 
         {phase === "done" ? (
           <>
-            <p className="send-done">Enviado ✓</p>
+            <p className="send-done">{t("send.done")}</p>
             <p className="lobby-modal-text">
-              Tu {token.symbol} ya va en camino a {to.slice(0, 6)}…
-              {to.slice(-4)}.
+              {t("send.done_text", {
+                symbol: token.symbol,
+                to: `${to.slice(0, 6)}…${to.slice(-4)}`,
+              })}
             </p>
             {txHash && (
               <a
@@ -199,17 +203,19 @@ export default function SendModal({
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Ver la transacción en Celoscan ↗
+                {t("send.tx_link")}
               </a>
             )}
             <button type="button" className="btn-primary" onClick={onClose}>
-              Listo
+              {t("common.done")}
             </button>
           </>
         ) : (
           <>
             <div className="send-available">
-              <span className="send-available-label">Disponible</span>
+              <span className="send-available-label">
+                {t("send.available")}
+              </span>
               <span className="send-available-value">
                 {available} {token.symbol}
               </span>
@@ -217,7 +223,7 @@ export default function SendModal({
 
             <div className="send-field">
               <label className="send-label" htmlFor="send-to">
-                Dirección de destino
+                {t("send.to_label")}
               </label>
               <input
                 id="send-to"
@@ -232,20 +238,18 @@ export default function SendModal({
                 disabled={phase === "sending"}
               />
               {to !== "" && !validTo && (
-                <p className="send-warn">Esa dirección no es válida.</p>
+                <p className="send-warn">{t("send.invalid_addr")}</p>
               )}
-              {isSelf && (
-                <p className="send-warn">Esa es tu propia dirección.</p>
-              )}
+              {isSelf && <p className="send-warn">{t("send.self")}</p>}
               <p className="send-note">
-                <strong>Solo por la red Celo.</strong> Si esa dirección es de
-                otra red, el dinero se pierde y nadie lo puede devolver.
+                <strong>{t("send.network_note.strong")}</strong>{" "}
+                {t("send.network_note.rest")}
               </p>
             </div>
 
             <div className="send-field">
               <label className="send-label" htmlFor="send-amount">
-                Monto
+                {t("send.amount")}
               </label>
               <div className="send-amount-row">
                 <input
@@ -266,17 +270,12 @@ export default function SendModal({
                   }
                   disabled={phase === "sending"}
                 >
-                  Máximo
+                  {t("send.max")}
                 </button>
               </div>
-              {overBalance && (
-                <p className="send-warn">Es más de lo que tienes.</p>
-              )}
+              {overBalance && <p className="send-warn">{t("send.over")}</p>}
               {gasInUsdt && token.symbol === "USDT" && (
-                <p className="send-note">
-                  La tarifa de red se está pagando en USDT, así que “Máximo”
-                  deja un poco de saldo para cubrirla.
-                </p>
+                <p className="send-note">{t("send.gas_note")}</p>
               )}
             </div>
 
@@ -287,15 +286,13 @@ export default function SendModal({
               disabled={!canSend}
             >
               {phase === "sending"
-                ? "Enviando…"
-                : `Enviar ${token.symbol}`}
+                ? t("send.sending")
+                : t("send.cta", { symbol: token.symbol })}
             </button>
             {phase === "sending" && (
-              <p className="empty-note">
-                Confirma en tu wallet. No cierres esta ventana.
-              </p>
+              <p className="empty-note">{t("send.confirm_note")}</p>
             )}
-            {error && <p className="alias-error">{error}</p>}
+            {error && <p className="alias-error">{t(error)}</p>}
           </>
         )}
       </div>

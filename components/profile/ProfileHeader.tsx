@@ -5,6 +5,8 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useProfile } from "@/lib/profile-context";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import { validateAlias, ALIAS_MAX } from "@/lib/alias";
+import { aliasErrorText } from "@/lib/alias-errors";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Encabezado del perfil: avatar (avispa), "TU PERFIL", alias y editar alias.
@@ -12,6 +14,7 @@ import { validateAlias, ALIAS_MAX } from "@/lib/alias";
  * verificación de disponibilidad). Requiere sesión iniciada.
  */
 export default function ProfileHeader() {
+  const t = useT();
   const { authenticated } = usePrivy();
   const { alias: privyAlias, setAlias } = useProfile();
   const { walletAlias, setWalletAlias } = useWalletAlias();
@@ -34,7 +37,7 @@ export default function ProfileHeader() {
     setError(null);
     const check = validateAlias(value);
     if (!check.ok || !check.value) {
-      setError(check.error ?? "Alias inválido.");
+      setError(aliasErrorText(t, check.error));
       return;
     }
     setSaving(true);
@@ -44,8 +47,8 @@ export default function ProfileHeader() {
       if (!res.ok) {
         setError(
           res.error === "alias_taken"
-            ? "Ese alias ya está tomado."
-            : "No se pudo guardar."
+            ? t("alias.error.taken_pick")
+            : t("alias.error.save_failed_short")
         );
         return;
       }
@@ -56,7 +59,7 @@ export default function ProfileHeader() {
         );
         const d = await r.json();
         if (!d.available) {
-          setError("Ese alias ya está tomado, elige otro.");
+          setError(t("alias.error.taken_pick"));
           setSaving(false);
           return;
         }
@@ -73,16 +76,16 @@ export default function ProfileHeader() {
     <header className="profile-header">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/logo-avispate.png" alt="" className="profile-avatar" />
-      <p className="profile-eyebrow">Tu perfil</p>
+      <p className="profile-eyebrow">{t("profile.eyebrow")}</p>
 
       {!editing ? (
         <div className="profile-alias-line">
-          <h1 className="profile-alias-big">{alias ?? "Sin alias"}</h1>
+          <h1 className="profile-alias-big">{alias ?? t("profile.no_alias")}</h1>
           <button
             type="button"
             className="profile-alias-editbtn"
             onClick={startEdit}
-            aria-label="Editar alias"
+            aria-label={t("profile.edit_alias")}
           >
             ✏️
           </button>
@@ -96,13 +99,13 @@ export default function ProfileHeader() {
             maxLength={ALIAS_MAX}
             autoFocus
             autoComplete="off"
-            aria-label="Nuevo alias"
+            aria-label={t("profile.new_alias")}
           />
           <button
             type="submit"
             className="profile-alias-ok"
             disabled={saving || !value.trim()}
-            aria-label="Guardar alias"
+            aria-label={t("profile.save_alias")}
           >
             {saving ? "…" : "✓"}
           </button>
@@ -110,7 +113,7 @@ export default function ProfileHeader() {
             type="button"
             className="profile-alias-cancel"
             onClick={() => setEditing(false)}
-            aria-label="Cancelar"
+            aria-label={t("common.cancel")}
           >
             ✕
           </button>

@@ -12,6 +12,7 @@ import {
   useRoundClock,
   type LeaderboardEntry as Entry,
 } from "@/lib/round";
+import { useT } from "@/lib/i18n/client";
 
 interface Props {
   /** Mazo con el que abre; el usuario puede cambiar de pestaña. */
@@ -21,6 +22,7 @@ interface Props {
 const MEDALS = ["🥇", "🥈", "🥉"];
 
 export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
+  const t = useT();
   const [deck, setDeck] = useState(initialDeck);
   useEffect(() => {
     setDeck(initialDeck);
@@ -30,7 +32,7 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
   const { address } = useActiveWallet();
   const me = (address || "").toLowerCase();
   const clock = useRoundClock(deck);
-  const clockCopy = roundCopy(clock);
+  const clockCopy = roundCopy(clock, t);
 
   const { data: entries = [], status } = useLeaderboard(deck);
   const { potUnits, potEnabled } = useDeckPot(deck);
@@ -43,7 +45,11 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
 
   return (
     <div className="panel">
-      <div className="rounds-options lb-tabs" role="tablist" aria-label="Tamaño de mazo">
+      <div
+        className="rounds-options lb-tabs"
+        role="tablist"
+        aria-label={t("lb.tabs_aria")}
+      >
         {DECK_OPTIONS.map((option) => (
           <button
             key={option}
@@ -53,14 +59,14 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
             className={option === deck ? "selected" : ""}
             onClick={() => setDeck(option)}
           >
-            {option} cartas
+            {t("lb.cards", { n: option })}
           </button>
         ))}
       </div>
 
       {potEnabled && (
         <div className="pot-banner">
-          <span className="pot-label">🏆 Premio de hoy · el #1 se lo lleva todo</span>
+          <span className="pot-label">{t("lb.pot_label")}</span>
           <span className="pot-amount">{fmtUsdt(potUnits as bigint | undefined)} USDT</span>
           <span className="pot-timer">⏳ {clockCopy.primary}</span>
           {clockCopy.retry ? (
@@ -81,13 +87,13 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
         </div>
       )}
 
-      <h2 className="lb-title">Ranking de hoy · mazo {deck}</h2>
-      {status === "pending" && <p className="empty-note">Cargando ranking…</p>}
-      {status === "error" && (
-        <p className="empty-note">No se pudo cargar el ranking.</p>
+      <h2 className="lb-title">{t("lb.title", { deck })}</h2>
+      {status === "pending" && (
+        <p className="empty-note">{t("lb.loading")}</p>
       )}
+      {status === "error" && <p className="empty-note">{t("lb.error")}</p>}
       {status === "success" && entries.length === 0 && (
-        <p className="empty-note">Aún no hay marcas hoy. ¡Sé el primero y gana el pozo!</p>
+        <p className="empty-note">{t("lb.empty")}</p>
       )}
       {status === "success" && entries.length > 0 && (
         <ol className="lb-list">
@@ -101,18 +107,22 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
                 <span className="lb-name">
                   <span>
                     {entry.alias}
-                    {isMe(entry) && <span className="lb-you">TÚ</span>}
+                    {isMe(entry) && (
+                      <span className="lb-you">{t("top3.you")}</span>
+                    )}
                   </span>
                   <small>
                     {entry.walletAddress
                       ? shortAddress(entry.walletAddress)
-                      : "sin wallet"}{" "}
-                    · {entry.errors} err
+                      : t("lb.no_wallet")}{" "}
+                    · {entry.errors} {t("lb.err")}
                   </small>
                 </span>
                 <span className="lb-time">
                   {formatMs(entry.averageMs)}
-                  <small>{formatMs(entry.totalMs)} total</small>
+                  <small>
+                    {formatMs(entry.totalMs)} {t("lb.total")}
+                  </small>
                 </span>
               </li>
             );

@@ -5,6 +5,7 @@ import { formatMs } from "@/lib/game";
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
 import { useLeaderboard, type LeaderboardEntry } from "@/lib/round";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Top 3 del mazo elegido en el lobby. Sin tabs propios (sigue al selector
@@ -12,6 +13,7 @@ import { useLeaderboard, type LeaderboardEntry } from "@/lib/round";
  * El ranking completo queda en /ranking.
  */
 export default function LeaderboardPreview({ deck }: { deck: number }) {
+  const t = useT();
   const { status, data: entries = [] } = useLeaderboard(deck);
   const { alias } = useProfile();
   const { address } = useActiveWallet();
@@ -27,8 +29,8 @@ export default function LeaderboardPreview({ deck }: { deck: number }) {
   const mine = myIndex >= 3 ? entries[myIndex] : null;
 
   return (
-    <section className="lobby-top3" aria-label="Los más avispados de hoy">
-      <h2 className="lobby-top3-title">Los más avispados de hoy</h2>
+    <section className="lobby-top3" aria-label={t("top3.title")}>
+      <h2 className="lobby-top3-title">{t("top3.title")}</h2>
 
       {status === "pending" && (
         <ul className="lobby-rows" aria-hidden="true">
@@ -42,13 +44,13 @@ export default function LeaderboardPreview({ deck }: { deck: number }) {
 
       {status === "error" && (
         <p className="lobby-note">
-          No se pudo cargar el top de hoy.{" "}
-          <Link href={`/ranking?deck=${deck}`}>Ver ranking</Link>
+          {t("top3.error")}{" "}
+          <Link href={`/ranking?deck=${deck}`}>{t("common.view_ranking")}</Link>
         </p>
       )}
 
       {status === "success" && entries.length === 0 && (
-        <p className="lobby-note">Todavía no hay marcas. ¡Sé el primero!</p>
+        <p className="lobby-note">{t("top3.empty")}</p>
       )}
 
       {status === "success" && entries.length > 0 && (
@@ -64,15 +66,16 @@ export default function LeaderboardPreview({ deck }: { deck: number }) {
               <span className="lobby-row-name">
                 <span>
                   {entry.alias}
-                  {isMe(entry) && <span className="lb-you">TÚ</span>}
+                  {isMe(entry) && <span className="lb-you">{t("top3.you")}</span>}
                 </span>
                 <small>
-                  {entry.errors} err · {formatMs(entry.totalMs)} total
+                  {entry.errors} {t("top3.err")} · {formatMs(entry.totalMs)}{" "}
+                  {t("top3.total")}
                 </small>
               </span>
               <span className="lobby-row-time">
                 {formatMs(entry.averageMs)}
-                <small>promedio por carta</small>
+                <small>{t("top3.avg")}</small>
               </span>
             </li>
           ))}
@@ -82,14 +85,15 @@ export default function LeaderboardPreview({ deck }: { deck: number }) {
                 #{myIndex + 1}
               </span>
               <span className="lobby-row-name">
-                <span>Tu marca · #{myIndex + 1}</span>
+                <span>{t("top3.mine", { rank: myIndex + 1 })}</span>
                 <small>
-                  {mine.errors} err · {formatMs(mine.totalMs)} total
+                  {mine.errors} {t("top3.err")} · {formatMs(mine.totalMs)}{" "}
+                  {t("top3.total")}
                 </small>
               </span>
               <span className="lobby-row-time">
                 {formatMs(mine.averageMs)}
-                <small>promedio por carta</small>
+                <small>{t("top3.avg")}</small>
               </span>
             </li>
           )}
@@ -97,7 +101,7 @@ export default function LeaderboardPreview({ deck }: { deck: number }) {
       )}
 
       <Link className="lobby-ranking-link" href={`/ranking?deck=${deck}`}>
-        Ver ranking completo
+        {t("top3.full")}
       </Link>
     </section>
   );

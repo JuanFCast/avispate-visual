@@ -122,9 +122,15 @@ export interface PlayersSection {
   active30: number;
   everPaid: number;
   paidConversionPct: number;
-  /** Cuántos jugadores han jugado 1, 2-5, 6-20 o 21+ partidas. */
-  distribution: { label: string; players: number; pct: number }[];
+  /**
+   * Cuántos jugadores han jugado 1, 2-5, 6-20 o 21+ partidas. `bucket` es un
+   * código estable, no una etiqueta: el panel lo traduce al idioma de quien
+   * mira, y el servidor no tiene por qué saber cuál es.
+   */
+  distribution: { bucket: PlaysBucket; players: number; pct: number }[];
 }
+
+export type PlaysBucket = "1" | "2_5" | "6_20" | "21";
 
 export function buildPlayers(
   scores: StatsScoreRow[],
@@ -147,11 +153,11 @@ export function buildPlayers(
 
   const counts = [...playsByProfile.values()];
   const players = counts.length;
-  const buckets: { label: string; test: (n: number) => boolean }[] = [
-    { label: "1 partida", test: (n) => n === 1 },
-    { label: "2 a 5", test: (n) => n >= 2 && n <= 5 },
-    { label: "6 a 20", test: (n) => n >= 6 && n <= 20 },
-    { label: "21 o más", test: (n) => n >= 21 },
+  const buckets: { bucket: PlaysBucket; test: (n: number) => boolean }[] = [
+    { bucket: "1", test: (n) => n === 1 },
+    { bucket: "2_5", test: (n) => n >= 2 && n <= 5 },
+    { bucket: "6_20", test: (n) => n >= 6 && n <= 20 },
+    { bucket: "21", test: (n) => n >= 21 },
   ];
 
   return {
@@ -166,13 +172,16 @@ export function buildPlayers(
     paidConversionPct: pct(paidProfiles.size, players),
     distribution: buckets.map((b) => {
       const n = counts.filter(b.test).length;
-      return { label: b.label, players: n, pct: pct(n, players) };
+      return { bucket: b.bucket, players: n, pct: pct(n, players) };
     }),
   };
 }
 
+/** Ventana de retención. Código estable; el panel pone el texto. */
+export type RetentionWindow = "d1" | "d7" | "d30";
+
 export interface RetentionRow {
-  label: string;
+  window: RetentionWindow;
   /** Jugadores que ya tuvieron tiempo de volver en esa ventana. */
   eligible: number;
   returned: number;
@@ -203,13 +212,13 @@ export function buildRetention(
     return { id, first: sorted[0], days: sorted };
   });
 
-  const windows = [
-    { label: "Volvió al día siguiente", n: 1 },
-    { label: "Volvió en 7 días", n: 7 },
-    { label: "Volvió en 30 días", n: 30 },
+  const windows: { window: RetentionWindow; n: number }[] = [
+    { window: "d1", n: 1 },
+    { window: "d7", n: 7 },
+    { window: "d30", n: 30 },
   ];
 
-  return windows.map(({ label, n }) => {
+  return windows.map(({ window, n }) => {
     const eligible = players.filter((p) => roundsBetween(p.first, today) >= n);
     const returned = eligible.filter((p) =>
       p.days.some((d) => {
@@ -218,7 +227,7 @@ export function buildRetention(
       })
     );
     return {
-      label,
+      window,
       eligible: eligible.length,
       returned: returned.length,
       pct: pct(returned.length, eligible.length),

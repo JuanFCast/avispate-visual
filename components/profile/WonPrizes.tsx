@@ -1,6 +1,7 @@
 "use client";
 
 import { USDT_DECIMALS } from "@/lib/contracts";
+import { useT } from "@/lib/i18n/client";
 
 export interface Prize {
   roundDate: string;
@@ -23,12 +24,14 @@ function fmtUsdt(units: string): string {
  * nota de que el pago es automático (Avíspate no usa "reclamar").
  */
 export default function WonPrizes({ prizes, loading }: Props) {
+  const t = useT();
+
   return (
     <section className="profile-section">
-      <h2 className="section-title">Premios ganados</h2>
+      <h2 className="section-title">{t("prizes.title")}</h2>
       <p className="section-note">
-        🏆 En Avíspate los premios se pagan <strong>automáticamente</strong> a las
-        7pm (Col), directo a tu wallet. No tienes que reclamar nada.
+        {t("prizes.note.a")} <strong>{t("prizes.note.strong")}</strong>{" "}
+        {t("prizes.note.b")}
       </p>
 
       {loading ? (
@@ -37,9 +40,7 @@ export default function WonPrizes({ prizes, loading }: Props) {
           <span className="skeleton skeleton-row" />
         </div>
       ) : prizes.length === 0 ? (
-        <p className="empty-note">
-          Aún no has ganado. ¡Sigue jugando para ganar el pozo!
-        </p>
+        <p className="empty-note">{t("prizes.empty")}</p>
       ) : (
         <ul className="prize-list">
           {prizes.map((p, i) => (
@@ -50,7 +51,7 @@ export default function WonPrizes({ prizes, loading }: Props) {
               <span className="prize-info">
                 <span className="prize-amount">{fmtUsdt(p.amountUnits)} USDT</span>
                 <small>
-                  Mazo {p.deck} · {p.roundDate}
+                  {t("prizes.deck", { deck: p.deck })} · {p.roundDate}
                 </small>
               </span>
               {p.txHash ? (
@@ -59,12 +60,12 @@ export default function WonPrizes({ prizes, loading }: Props) {
                   href={`https://celoscan.io/tx/${p.txHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Ver transacción del premio"
+                  aria-label={t("prizes.view_aria")}
                 >
-                  ver ↗
+                  {t("prizes.view")}
                 </a>
               ) : (
-                <span className="prize-status">pagado</span>
+                <span className="prize-status">{t("prizes.paid")}</span>
               )}
             </li>
           ))}
