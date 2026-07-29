@@ -2829,11 +2829,39 @@ body {
   border: 2px solid var(--ink);
 }
 
+/* La fila del jugador va fuera del podio: se separa con un poco de aire y se
+   destaca con borde propio, pero mantiene la misma estructura que las demás. */
+.lobby-row-mine {
+  margin-top: 4px;
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+  box-shadow: 0 2px 0 var(--cyan);
+}
+
+/* La insignia crece a pastilla cuando la posición tiene dos o más cifras. */
 .lobby-row-mine .lobby-rank {
   width: auto;
   min-width: 30px;
-  padding: 0 8px;
+  padding: 0 6px;
   border-radius: 999px;
+  background: var(--cyan);
+  color: var(--white);
+}
+
+.lobby-row-alias {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.lobby-you-label {
+  margin-left: 6px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  opacity: 0.7;
 }
 
 .lobby-row-name {

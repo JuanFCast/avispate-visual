@@ -11,6 +11,10 @@ import { useT } from "@/lib/i18n/client";
  * Top 3 del mazo elegido en el lobby. Sin tabs propios (sigue al selector
  * principal) y sin premio ni contador: esos viven en la tarjeta del reto.
  * El ranking completo queda en /ranking.
+ *
+ * Si el jugador no entró al podio se añade una cuarta fila destacada con su
+ * posición real: mismo formato que las demás (insignia, alias, métricas y
+ * tiempo) y la posición solo en la insignia, nunca repetida en el texto.
  */
 export default function LeaderboardPreview({ deck }: { deck: number }) {
   const t = useT();
@@ -82,10 +86,13 @@ export default function LeaderboardPreview({ deck }: { deck: number }) {
           {mine && (
             <li className="lobby-row me lobby-row-mine">
               <span className="lobby-rank" aria-hidden="true">
-                #{myIndex + 1}
+                {myIndex + 1}
               </span>
               <span className="lobby-row-name">
-                <span>{t("top3.mine", { rank: myIndex + 1 })}</span>
+                <span className="lobby-row-alias">
+                  {mine.alias}
+                  <span className="lobby-you-label">{t("top3.you_label")}</span>
+                </span>
                 <small>
                   {mine.errors} {t("top3.err")} · {formatMs(mine.totalMs)}{" "}
                   {t("top3.total")}

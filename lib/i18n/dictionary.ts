@@ -117,7 +117,7 @@ export const en = {
   "top3.err": "err",
   "top3.total": "total",
   "top3.avg": "average per card",
-  "top3.mine": "Your score · #{rank}",
+  "top3.you_label": "· You",
   "top3.full": "See full ranking",
 
   /* ----------------------------- Modal de acceso ------------------------- */
@@ -579,7 +579,7 @@ export const es: Record<MessageKey, string> = {
   "top3.err": "err",
   "top3.total": "total",
   "top3.avg": "promedio por carta",
-  "top3.mine": "Tu marca · #{rank}",
+  "top3.you_label": "· Tú",
   "top3.full": "Ver ranking completo",
 
   /* ----------------------------- Modal de acceso ------------------------- */
