@@ -2644,10 +2644,18 @@ body {
   box-shadow: 0 10px 26px rgba(255, 194, 14, 0.45);
 }
 
+/*
+ * Los dos modos de juego, uno debajo del otro. En móvil el orden es el de la
+ * elección: primero el reto diario (que se juega hoy) y luego la Arena. En
+ * escritorio ancho se ponen lado a lado; eso se resuelve en el responsive.
+ */
 .lobby-wrap {
   width: 100%;
   max-width: var(--app-w);
   margin: 14px auto 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 /* Una sola tarjeta autosuficiente: reto, premio, mazo, entrada, CTA y top 3. */
@@ -3024,6 +3032,191 @@ body {
   outline-offset: 2px;
 }
 
+/* --- Arena multijugador (tarjeta del inicio y pantalla /arena) --- */
+
+/*
+ * Misma caja que .lobby-card, la referencia de la app: blanco, borde suave,
+ * radio 24 y la misma sombra. Es la hermana del reto diario, no otra cosa.
+ * No reutiliza la clase porque en escritorio .lobby-card se abre en columnas.
+ */
+.arena-card {
+  background: var(--white);
+  border: 2px solid var(--gray-soft);
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(13, 13, 15, 0.07);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.arena-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Mismo chip que el del reto, en amarillo: es el otro modo, no otro nivel. */
+.arena-tag {
+  align-self: flex-start;
+  font-family: var(--font-title);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+  border: 2px solid var(--yellow-deep);
+  background: var(--yellow-soft);
+  padding: 3px 12px;
+  border-radius: 999px;
+}
+
+.arena-title {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.arena-support {
+  font-weight: 600;
+  opacity: 0.75;
+  line-height: 1.45;
+}
+
+/* La ilustración crece con el hueco libre: en escritorio, al ir al lado del
+   reto, es lo que iguala el alto de las dos tarjetas. */
+.arena-art {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 132px;
+  padding: 10px 12px;
+  background: linear-gradient(160deg, var(--cyan-soft), var(--bg));
+  border: 2px solid var(--gray-soft);
+  border-radius: 18px;
+}
+
+.arena-illustration {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  height: auto;
+}
+
+.arena-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arena-entries-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.65;
+}
+
+/* Tres fichas que reparten el ancho por igual y nunca se salen del móvil. */
+.arena-entry-list {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+}
+
+.arena-entry {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 9px 6px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  background: var(--bg);
+  text-align: center;
+}
+
+.arena-entry-amount {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.arena-entry small {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  opacity: 0.6;
+}
+
+/* Botón del modo: la misma forma y la misma sombra dura que el de jugar, en
+   cyan para que se lea como la otra opción y no como el CTA de hoy. */
+.arena-cta {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--cyan);
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: 0 5px 0 #0b6d77;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
+}
+
+.arena-cta:active {
+  transform: translateY(4px);
+  box-shadow: 0 1px 0 #0b6d77;
+}
+
+/* Sobre cyan, el foco cyan no se vería. */
+.arena-cta:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* Pantalla /arena: la misma tarjeta, centrada y sin botón. */
+.arena-hero {
+  align-items: center;
+  text-align: center;
+}
+
+.arena-hero .arena-art {
+  width: 100%;
+}
+
+.arena-hero .arena-entries,
+.arena-hero .arena-entry-list {
+  width: 100%;
+}
+
+.arena-hero-title {
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.arena-hero-text {
+  font-weight: 600;
+  opacity: 0.75;
+  line-height: 1.5;
+  max-width: 34rem;
+}
+
 /* --- Responsive del lobby --- */
 
 /* Tablet vertical: una columna más aireada; crecen filas, no el logo. */
@@ -3056,6 +3249,36 @@ body {
     min-width: 0;
     border-left: 2px solid var(--gray-soft);
     padding-left: 26px;
+  }
+
+  .arena-card {
+    padding: 28px;
+  }
+}
+
+/*
+ * Escritorio ancho: los dos modos caben lado a lado, el reto a la izquierda
+ * (es el que se juega hoy) y la Arena a la derecha. Ahí el reto vuelve a una
+ * sola columna: en media tarjeta, partirlo en acción | top 3 lo apretaría, así
+ * que el top 3 pasa a estar debajo, separado por una línea en vez de al lado.
+ */
+@media (min-width: 1024px) {
+  .lobby-wrap {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 20px;
+  }
+
+  .lobby-card {
+    flex-direction: column;
+  }
+
+  .lobby-side {
+    border-left: none;
+    padding-left: 0;
+    border-top: 2px solid var(--gray-soft);
+    padding-top: 18px;
   }
 }
 

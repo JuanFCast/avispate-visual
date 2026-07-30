@@ -36,6 +36,9 @@ export const en = {
   "meta.history.title": "Winners history · Avíspate",
   "meta.history.description":
     "Who won each Avíspate round, how much they took home and how the payout went.",
+  "meta.arena.title": "Multiplayer arena · Avíspate",
+  "meta.arena.description":
+    "Play Avíspate live against other people and win the pot. Entries of 0.10, 0.50 and 1 USDT. Coming soon.",
   "meta.terms.title": "Terms · Avíspate",
   "meta.privacy.title": "Privacy · Avíspate",
 
@@ -86,10 +89,11 @@ export const en = {
   "stage.starting": "Setting up…",
 
   /* --------------------------------- Lobby ------------------------------- */
-  "lobby.aria": "Today's challenge",
-  "lobby.tag": "TODAY'S CHALLENGE",
-  "lobby.title": "Find the matches. Burn your deck.",
-  "lobby.support": "The fastest average time per card wins today's prize.",
+  "lobby.aria": "Daily challenge",
+  "lobby.tag": "PLAY SOLO",
+  "lobby.title": "Daily challenge",
+  "lobby.support":
+    "Find the matches and burn your deck. The fastest average time per card wins today's prize.",
   "lobby.prize.label": "Today's prize",
   "lobby.prize.preparing": "Prize on the way",
   "lobby.addcash": "Top up USDT",
@@ -108,6 +112,19 @@ export const en = {
   "cta.login.label": "Start",
   "cta.paying.free": "This game is free. Just confirm in your wallet.",
   "cta.paying.paid": "Confirm the 0.10 USDT payment in your wallet.",
+
+  /* --------------------------- Arena multijugador ------------------------ */
+  "arena.aria": "Multiplayer arena",
+  "arena.tag": "SOON",
+  "arena.title": "Multiplayer arena",
+  "arena.support": "Play live and win the pot",
+  "arena.entries.label": "Entries",
+  "arena.cta": "Enter Arena",
+  "arena.soon.title": "We're building the Arena",
+  "arena.soon.text":
+    "Soon you'll be able to sit at a table with 2 to 4 players, all racing through the same deck at the same time: the fastest one takes the pot. Nothing to pay here yet.",
+  "arena.soon.entries": "The entries we're preparing:",
+  "arena.soon.back": "← Back to the daily challenge",
 
   /* ------------------------------ Top 3 lobby ---------------------------- */
   "top3.title": "Today's sharpest",
@@ -498,6 +515,9 @@ export const es: Record<MessageKey, string> = {
   "meta.history.title": "Historial de ganadores · Avíspate",
   "meta.history.description":
     "Quién ganó cada ronda de Avíspate, cuánto se llevó y cómo quedó el pago.",
+  "meta.arena.title": "Arena multijugador · Avíspate",
+  "meta.arena.description":
+    "Juega Avíspate en tiempo real contra otras personas y gana el pozo. Entradas de 0.10, 0.50 y 1 USDT. Muy pronto.",
   "meta.terms.title": "Términos · Avíspate",
   "meta.privacy.title": "Privacidad · Avíspate",
 
@@ -548,10 +568,11 @@ export const es: Record<MessageKey, string> = {
   "stage.starting": "Preparando partida…",
 
   /* --------------------------------- Lobby ------------------------------- */
-  "lobby.aria": "Reto de hoy",
-  "lobby.tag": "RETO DE HOY",
-  "lobby.title": "Encuentra las parejas. Gasta tu mazo.",
-  "lobby.support": "El menor tiempo promedio por carta gana el premio de hoy.",
+  "lobby.aria": "Reto diario",
+  "lobby.tag": "JUEGA SOLO",
+  "lobby.title": "Reto diario",
+  "lobby.support":
+    "Encuentra las parejas y gasta tu mazo. El menor tiempo promedio por carta gana el premio de hoy.",
   "lobby.prize.label": "Premio de hoy",
   "lobby.prize.preparing": "Premio en preparación",
   "lobby.addcash": "Recargar USDT",
@@ -570,6 +591,19 @@ export const es: Record<MessageKey, string> = {
   "cta.login.label": "Empezar",
   "cta.paying.free": "Esta jugada es gratis. Solo debes confirmar en tu wallet.",
   "cta.paying.paid": "Confirma el pago de 0,10 USDT en tu wallet.",
+
+  /* --------------------------- Arena multijugador ------------------------ */
+  "arena.aria": "Arena multijugador",
+  "arena.tag": "PRONTO",
+  "arena.title": "Arena multijugador",
+  "arena.support": "Compite en tiempo real y gana el pozo",
+  "arena.entries.label": "Entradas",
+  "arena.cta": "Entrar a Arena",
+  "arena.soon.title": "Estamos armando la Arena",
+  "arena.soon.text":
+    "Pronto vas a poder sentarte en una mesa de 2 a 4 jugadores y correr el mismo mazo al mismo tiempo: el más rápido se lleva el pozo. Todavía no hay nada que pagar aquí.",
+  "arena.soon.entries": "Las entradas que estamos preparando:",
+  "arena.soon.back": "← Volver al reto diario",
 
   /* ------------------------------ Top 3 lobby ---------------------------- */
   "top3.title": "Los más avispados de hoy",

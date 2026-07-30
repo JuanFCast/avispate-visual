@@ -5,6 +5,7 @@ import { useActiveWallet } from "@/lib/wallet";
 import type { PlayStage } from "@/lib/pay";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
+import ArenaCard from "./ArenaCard";
 import DailyChallengeCard, { type CtaState } from "./DailyChallengeCard";
 import LeaderboardPreview from "./LeaderboardPreview";
 
@@ -26,9 +27,13 @@ interface Props {
 }
 
 /**
- * Lobby del setup: una sola tarjeta responde "¿qué tengo que hacer para jugar
- * este reto hoy?". La información pública (premio, cierre, top 3) no espera a
- * Privy; solo el chip de entrada y el CTA reflejan la sesión.
+ * Lobby del setup: dos tarjetas y una elección, "¿juego solo o compito contra
+ * otras personas?". Primero el reto diario, que se juega hoy y trae todo lo
+ * suyo (premio, cierre, mazo, entrada, CTA y top 3), y debajo la Arena, que
+ * todavía no existe como partida y solo enseña lo que viene.
+ *
+ * La información pública del reto no espera a Privy; solo el chip de entrada y
+ * el CTA reflejan la sesión.
  */
 export default function HomeLobby({
   deckSize,
@@ -145,6 +150,8 @@ export default function HomeLobby({
       >
         <LeaderboardPreview deck={deckSize} />
       </DailyChallengeCard>
+
+      <ArenaCard />
     </div>
   );
 }
