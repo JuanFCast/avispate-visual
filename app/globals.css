@@ -3875,6 +3875,272 @@ body {
   text-align: center;
 }
 
+/* ---------------------- La partida de dos de la Arena ---------------------- */
+
+/*
+ * El tablero NO se redefine aquí. `shell playing` y todo lo de `.chain-area`
+ * vienen del reto diario tal cual, que es justo lo que se pidió: la misma
+ * experiencia visual. Lo de abajo es solo lo que el individual no tiene —
+ * saber cómo va el otro— y un par de ajustes de encaje.
+ */
+.match-shell {
+  gap: 10px;
+}
+
+/* Los dos jugadores, frente a frente, arriba del todo. */
+.match-players {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+.match-vs {
+  align-self: center;
+  flex: none;
+  font-family: var(--font-title);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray);
+}
+
+.match-chip {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  background: var(--white);
+}
+
+/* El tuyo se distingue sin gritar: mismo tamaño, borde de marca. */
+.match-chip.is-you {
+  border-color: var(--ink);
+  background: var(--yellow-faint);
+}
+
+.match-chip.is-offline {
+  opacity: 0.55;
+}
+
+.match-chip-empty {
+  justify-content: center;
+  border-style: dashed;
+  color: var(--gray);
+}
+
+.match-chip-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.match-chip-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.match-chip-name {
+  font-weight: 700;
+  font-size: 0.86rem;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-chip-you {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+.match-chip-you::before {
+  content: " · ";
+}
+
+.match-chip-state {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--gray);
+  line-height: 1.2;
+}
+
+/* Las cartas que le quedan al otro: la cifra de la carrera, en grande. */
+.match-chip-cards {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.match-chip-cards strong {
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.match-chip-cards small {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+/* El mudo vive en la columna del reloj: durante la partida no hay barra. */
+.match-board .side-stats .mute-btn {
+  align-self: center;
+}
+
+.match-quit {
+  align-self: center;
+  margin-top: 2px;
+  padding: 6px 10px;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* --- Final de la partida --- */
+
+.match-over {
+  align-items: center;
+  text-align: center;
+  width: 100%;
+  max-width: 460px;
+  margin: auto;
+}
+
+.match-over-emoji {
+  font-size: 3rem;
+  line-height: 1;
+}
+
+.match-over-title {
+  font-family: var(--font-title);
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.match-over.won .match-over-title {
+  color: #12894f;
+}
+
+.match-over-lead {
+  font-weight: 600;
+  opacity: 0.75;
+  line-height: 1.45;
+}
+
+.match-over-time {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--yellow-faint);
+  border: 2px solid var(--yellow-line);
+  font-weight: 700;
+}
+
+.match-over-time strong {
+  font-family: var(--font-title);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+/* Las cifras de los dos, lado a lado: perder sin saber por qué es una pared. */
+.match-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+}
+
+.match-table th,
+.match-table td {
+  padding: 8px 6px;
+  border-bottom: 2px solid var(--gray-soft);
+  text-align: center;
+}
+
+.match-table thead th {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray);
+}
+
+.match-table tbody th {
+  text-align: left;
+  font-weight: 700;
+}
+
+.match-row-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  max-width: 9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.match-row-name em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+.match-row-name em::before {
+  content: "· ";
+}
+
+.match-row-win {
+  background: var(--yellow-faint);
+}
+
+.match-row-crown {
+  margin-left: 4px;
+}
+
+/* En horizontal el tablero ya usa todo el alto: la franja se aprieta. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .match-players {
+    max-width: 620px;
+  }
+
+  .match-chip-state {
+    display: none;
+  }
+}
+
 /* --- Responsive del lobby --- */
 
 /* Tablet vertical: una columna más aireada; crecen filas, no el logo. */

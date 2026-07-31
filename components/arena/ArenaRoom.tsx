@@ -34,11 +34,10 @@ export default function ArenaRoom({ code }: { code: string }) {
   const t = useT();
   const router = useRouter();
   const { ready, authenticated } = useProfile();
-  const { room, error, loading, busy, failures, join, setReady, leave } =
+  const { room, error, loading, busy, failures, join, setReady, leave, start } =
     useArenaRoom(code);
 
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
-  const [startNote, setStartNote] = useState(false);
 
   useEffect(() => {
     if (!copied) return;
@@ -46,10 +45,14 @@ export default function ArenaRoom({ code }: { code: string }) {
     return () => clearTimeout(id);
   }, [copied]);
 
-  // La sala dejó de estar completa: la promesa de "ya arranca" se retira.
+  /*
+   * El anfitrión repartió: a la mesa. Los dos llegan por aquí —el invitado
+   * nunca tocó nada, se enteró en su latido—, y `replace` en vez de `push`
+   * para que el "atrás" del teléfono no devuelva a una sala que ya empezó.
+   */
   useEffect(() => {
-    if (room && !roomCanStart(room)) setStartNote(false);
-  }, [room]);
+    if (room?.matchStarted) router.replace(`/arena/partida/${room.code}`);
+  }, [room?.matchStarted, room?.code, router]);
 
   const shareUrl =
     typeof window === "undefined" ? "" : `${window.location.origin}/arena/sala/${code}`;
@@ -211,19 +214,17 @@ export default function ArenaRoom({ code }: { code: string }) {
             <button
               type="button"
               className="btn-primary"
-              onClick={() => setStartNote(true)}
+              onClick={start}
               disabled={!canStart || busy}
             >
-              {t("room.start.cta")}
+              {busy ? t("room.start.dealing") : t("room.start.cta")}
             </button>
             <p className="arena-prize-note" aria-live="polite">
-              {startNote
-                ? t("room.start.next_phase")
-                : !full
-                  ? t("room.start.need_players")
-                  : !canStart
-                    ? t("room.start.need_ready")
-                    : t("room.start.ready")}
+              {!full
+                ? t("room.start.need_players")
+                : !canStart
+                  ? t("room.start.need_ready")
+                  : t("room.start.ready")}
             </p>
           </>
         ) : (

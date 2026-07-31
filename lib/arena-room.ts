@@ -52,6 +52,8 @@ export interface ArenaRoomApi extends ArenaRoomState {
   join: () => Promise<void>;
   setReady: (ready: boolean) => Promise<void>;
   leave: () => Promise<void>;
+  /** El anfitrión reparte. Los dos acaban en la partida por `matchStarted`. */
+  start: () => Promise<void>;
 }
 
 export function useArenaRoom(code: string): ArenaRoomApi {
@@ -191,6 +193,12 @@ export function useArenaRoom(code: string): ArenaRoomApi {
     await act(`/api/arena/rooms/${encodeURIComponent(code)}/leave`);
   }, [act, code]);
 
+  // El invitado no toca este botón: se entera de que la partida existe por el
+  // `matchStarted` del siguiente latido, o por el empujón del broadcast.
+  const start = useCallback(async () => {
+    await act("/api/arena/matches", { code });
+  }, [act, code]);
+
   // Primera carga y latido. Se espera a que Privy hidrate para que el primer
   // GET ya lleve token: si no, la sala se pintaría un instante sin "tú".
   useEffect(() => {
@@ -227,5 +235,5 @@ export function useArenaRoom(code: string): ArenaRoomApi {
     };
   }, [code]);
 
-  return { ...state, refresh, join, setReady, leave };
+  return { ...state, refresh, join, setReady, leave, start };
 }

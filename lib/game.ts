@@ -1,4 +1,4 @@
-import { SYMBOLS, SYMBOL_BY_ID, type Symbol } from "./symbols";
+import { SYMBOLS, SYMBOL_BY_ID, type Symbol } from "./symbols.ts";
 
 export const DEFAULT_DECK_SIZE = 10;
 export const DECK_OPTIONS = [10, 15, 20];
@@ -36,10 +36,16 @@ export interface GameResult {
   createdAt: string;
 }
 
-function shuffle<T>(items: T[]): T[] {
+/**
+ * Fuente de azar. El reto diario usa `Math.random`; la Arena pasa un generador
+ * con semilla para que los dos teléfonos dibujen la MISMA carta.
+ */
+export type Rnd = () => number;
+
+function shuffle<T>(items: T[], rnd: Rnd = Math.random): T[] {
   const arr = [...items];
   for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rnd() * (i + 1));
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
@@ -48,32 +54,39 @@ function shuffle<T>(items: T[]): T[] {
 /**
  * Distribuye 8 símbolos dentro de la carta circular: 1 cerca del centro y 7 en
  * anillo, con jitter, rotación y tamaño aleatorios. Coordenadas en %.
+ *
+ * Con `rnd` sembrado el resultado es reproducible, que es lo que permite que en
+ * la Arena una carta se vea igual en los dos dispositivos y siga viéndose igual
+ * cuando pasa de ser tu carta a ser la base compartida.
  */
-function placeSymbols(symbolIds: string[]): PlacedSymbol[] {
-  const ids = shuffle(symbolIds);
+export function placeSymbols(
+  symbolIds: string[],
+  rnd: Rnd = Math.random
+): PlacedSymbol[] {
+  const ids = shuffle(symbolIds, rnd);
   const placed: PlacedSymbol[] = [];
-  const angleOffset = Math.random() * 360;
+  const angleOffset = rnd() * 360;
   const ringCount = ids.length - 1;
 
   // Símbolo central
   placed.push({
     symbolId: ids[0],
-    x: 50 + (Math.random() * 8 - 4),
-    y: 50 + (Math.random() * 8 - 4),
-    rotation: Math.random() * 70 - 35,
-    scale: 0.85 + Math.random() * 0.45,
+    x: 50 + (rnd() * 8 - 4),
+    y: 50 + (rnd() * 8 - 4),
+    rotation: rnd() * 70 - 35,
+    scale: 0.85 + rnd() * 0.45,
   });
 
   // Anillo exterior
   for (let i = 0; i < ringCount; i++) {
     const angle = ((angleOffset + (360 / ringCount) * i) * Math.PI) / 180;
-    const radius = 31 + Math.random() * 5; // % del diámetro
+    const radius = 31 + rnd() * 5; // % del diámetro
     placed.push({
       symbolId: ids[i + 1],
       x: 50 + Math.cos(angle) * radius,
       y: 50 + Math.sin(angle) * radius,
-      rotation: Math.random() * 70 - 35,
-      scale: 0.85 + Math.random() * 0.45,
+      rotation: rnd() * 70 - 35,
+      scale: 0.85 + rnd() * 0.45,
     });
   }
   return placed;

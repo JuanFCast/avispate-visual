@@ -83,6 +83,11 @@ export interface RoomView {
   players: RoomPlayerView[];
   /** Null cuando quien mira todavía no se sentó (llegó por el enlace). */
   you: RoomPlayerView | null;
+  /**
+   * El anfitrión ya repartió. Es lo que arrastra a los DOS a la partida: el
+   * invitado nunca tocó "iniciar", así que su pantalla se entera por aquí.
+   */
+  matchStarted: boolean;
 }
 
 /**

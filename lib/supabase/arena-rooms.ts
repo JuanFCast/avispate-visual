@@ -337,6 +337,15 @@ export async function readRoom(params: {
   const after = await getRoomByCode(params.code);
   const live = after ? roomIsLive(after) : false;
 
+  // La consulta va aquí suelta y no llamando a `lib/supabase/arena-matches`
+  // para no cerrar un círculo de imports: la partida ya depende de la sala.
+  const db = getSupabaseAdmin();
+  const { count, error: matchError } = await db
+    .from("arena_matches")
+    .select("id", { count: "exact", head: true })
+    .eq("room_id", room.id);
+  if (matchError) throw matchError;
+
   const views = players.map((p) => toPlayerView(p, viewerId));
   return {
     ok: true,
@@ -347,6 +356,7 @@ export async function readRoom(params: {
       maxPlayers: room.max_players,
       players: views,
       you: views.find((p) => p.isYou) ?? null,
+      matchStarted: (count ?? 0) > 0,
     },
   };
 }
