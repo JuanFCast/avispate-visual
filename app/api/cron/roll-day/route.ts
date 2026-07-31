@@ -101,8 +101,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // Sondeo de salud: confirma que la URL responde y que el secreto coincide,
+  // sin liquidar, sin pagar y sin escribir una sola fila. Existe porque la
+  // alternativa —probar con ?date= de una fecha cualquiera— NO es inocua: una
+  // ronda sin partidas no tiene ganador, pero el endpoint igual registra la
+  // transición, así que cada prueba dejaba tres filas basura en
+  // round_settlements. El robot de Supabase usa esto para verificarse.
+  const params = new URL(req.url).searchParams;
+  if (params.get("probe") === "1") {
+    return NextResponse.json({ ok: true, probe: true, now: new Date().toISOString() });
+  }
+
   const started = Date.now();
-  const explicitDate = new URL(req.url).searchParams.get("date");
+  const explicitDate = params.get("date");
   // Con ?date= explícito (rescate manual) no hay nada que esperar.
   const waitedMs = explicitDate ? 0 : await waitForRoundClose();
   const round = explicitDate ?? defaultRound();

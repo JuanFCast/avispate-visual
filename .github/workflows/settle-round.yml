@@ -1,22 +1,26 @@
-# Despertador confiable del pago diario de premios (7:00 p. m. Colombia).
+# Último recurso y ALARMA del pago diario de premios (7:00 p. m. Colombia).
 #
-# El reloj puntual es el pg_cron de Supabase (00:00 UTC = 7:00 p. m. COL).
-# Este workflow es la red de seguridad: llama /api/cron/roll-day varias veces
-# seguidas a partir de las 00:00 UTC. El endpoint es idempotente por
-# (ronda, mazo): el primer intento que llegue paga y los demás no hacen nada.
-# El cron de Vercel (00:05) queda como respaldo adicional.
+# El reloj puntual es el pg_cron de Supabase (00:00 UTC = 7:00 p. m. COL), con
+# reintento a las 00:03 y el cron de Vercel a las 00:05. Este workflow NO es un
+# reloj: GitHub entrega los `schedule` con dos y tres horas de retraso (medido:
+# un `0 0 * * *` corriendo a las 02:08 y a las 03:30 UTC). Sirve para dos cosas:
 #
-# Requiere el secret CRON_SECRET en el repo (Settings → Secrets → Actions).
+#   1. reintentar la liquidación si todas las capas puntuales fallaron, y
+#   2. AVISAR. Si al llegar aquí la ronda de ayer sigue sin liquidar, este
+#      workflow falla y GitHub manda el correo. Un correo de "settle-round
+#      failed" significa que el pago no salió — y solo eso.
+#
+# Requiere el secret CRON_SECRET en el repo (Settings → Secrets → Actions), con
+# EXACTAMENTE el mismo valor que la variable CRON_SECRET de producción en
+# Vercel. Si no coinciden, el endpoint responde 401 y el paso 1 lo dice claro.
 name: settle-round
 
 on:
   schedule:
-    # 00:00, 00:04, 00:08 y 00:15 UTC — GitHub puede demorar unos minutos un
-    # schedule; cuatro intentos escalonados cubren esa varianza.
-    - cron: "0 0 * * *"
-    - cron: "4 0 * * *"
-    - cron: "8 0 * * *"
-    - cron: "15 0 * * *"
+    # Dos intentos. Las horas nominales son de mentira — GitHub los entrega
+    # cuando puede; más triggers solo multiplican los correos, no la puntualidad.
+    - cron: "20 0 * * *"
+    - cron: "50 0 * * *"
   # Disparo manual desde la pestaña Actions por si algún día hace falta.
   workflow_dispatch:
 
@@ -25,10 +29,41 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Liquidar la ronda
+      # No falla el job: a esta hora lo normal es que la ronda YA esté pagada y
+      # el endpoint conteste "already_settled". Quien decide si hay problema es
+      # el paso de verificación.
+      - name: Reintentar la liquidación
+        id: settle
         run: |
-          curl -fsS --max-time 120 --retry 3 --retry-delay 10 \
+          code=$(curl -sS --max-time 120 --retry 3 --retry-delay 10 \
+            -o /tmp/settle.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" \
-            "https://avispate.fun/api/cron/roll-day"
+            "https://avispate.fun/api/cron/roll-day" || echo 000)
+          echo "HTTP $code"
+          cat /tmp/settle.json || true
+          echo "code=$code" >> "$GITHUB_OUTPUT"
         env:
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      # La única pregunta que importa: ¿el ganador de ayer tiene su plata?
+      # Se lee del historial público, sin credenciales. Una ronda sin jugadores
+      # también cuenta como liquidada (deja fila con payout "rollover").
+      - name: Verificar que la ronda de ayer quedó liquidada
+        run: |
+          round=$(date -u -d yesterday +%F)
+          curl -sS --max-time 30 "https://avispate.fun/api/history?limit=50" > /tmp/history.json
+          decks=$(jq --arg r "$round" '[.history[] | select(.roundDate == $r)] | length' /tmp/history.json)
+          echo "Ronda $round · mazos liquidados: $decks/3"
+          jq --arg r "$round" -c '.history[] | select(.roundDate == $r)' /tmp/history.json
+
+          if [ "${{ steps.settle.outputs.code }}" = "401" ]; then
+            echo "::error::El endpoint respondió 401: el secret CRON_SECRET del repo no coincide con el CRON_SECRET de producción en Vercel. Ninguna capa de respaldo puede pagar así."
+            exit 1
+          fi
+
+          if [ "$decks" -lt 3 ]; then
+            echo "::error::La ronda $round NO quedó liquidada ($decks/3 mazos). Revisa cron.job / net._http_response en Supabase y los logs de /api/cron/roll-day en Vercel."
+            exit 1
+          fi
+
+          echo "Ronda $round liquidada."
