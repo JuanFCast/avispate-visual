@@ -39,6 +39,8 @@ export const en = {
   "meta.arena.title": "Multiplayer arena · Avíspate",
   "meta.arena.description":
     "Play Avíspate live against other people and win the pot. Entries of 0.10, 0.50 and 1 USDT. Coming soon.",
+  "meta.arena.quick.title": "Quick match · Avíspate",
+  "meta.arena.private.title": "Private room · Avíspate",
   "meta.terms.title": "Terms · Avíspate",
   "meta.privacy.title": "Privacy · Avíspate",
 
@@ -125,6 +127,43 @@ export const en = {
     "Soon you'll be able to sit at a table with 2 to 4 players, all racing through the same deck at the same time: the fastest one takes the pot. Nothing to pay here yet.",
   "arena.soon.entries": "The entries we're preparing:",
   "arena.soon.back": "← Back to the daily challenge",
+  "arena.lead": "Compete, empty your deck and take the prize",
+  "arena.mode.aria": "How you want to get in",
+  "arena.mode.quick.title": "Quick match",
+  "arena.mode.quick.text":
+    "We look for players who are up for it and you start as soon as the table fills.",
+  "arena.mode.quick.cta": "Find players",
+  "arena.mode.private.title": "Private room",
+  "arena.mode.private.text":
+    "Create a match and share the code, or join with a friend's code.",
+  "arena.mode.private.cta": "Create or join a room",
+  "arena.setup.aria": "Table setup",
+  "arena.entry.label": "Entry per player",
+  "arena.players.label": "Players at the table",
+  "arena.players.unit": "players",
+  "arena.prize.pot": "Total pot",
+  "arena.prize.fee": "Fee (20%)",
+  "arena.prize.winner": "The winner takes",
+  "arena.prize.note":
+    "Estimate for the table you picked. Nothing is charged here yet.",
+  "arena.howto.open": "How it's played",
+  "arena.howto.title": "How the Arena is played",
+  "arena.howto.s1.title": "Everyone starts at the same time",
+  "arena.howto.s1.text":
+    "The table opens when it's full and all of you get the same number of cards.",
+  "arena.howto.s2.title": "Find the symbol that repeats",
+  "arena.howto.s2.text":
+    "Your card and the one in the middle always share exactly one symbol. Tap it and you drop a card.",
+  "arena.howto.s3.title": "First one with no cards wins",
+  "arena.howto.s3.text":
+    "Whoever empties their deck first takes the pot, minus the 20% fee. It lands in their wallet.",
+  "arena.howto.note":
+    "It's the same game as the daily challenge — here you're racing other people instead of the clock.",
+  "arena.soon.quick":
+    "Matchmaking isn't connected yet, so there's no table to sit at for now. This is the setup you picked.",
+  "arena.soon.private":
+    "Rooms and codes aren't connected yet, so there's nothing to create or join for now. This is the setup you picked.",
+  "arena.soon.back_lobby": "← Back to the Arena",
 
   /* ------------------------------ Top 3 lobby ---------------------------- */
   "top3.title": "Today's sharpest",
@@ -511,6 +550,8 @@ export const es: Record<MessageKey, string> = {
   "meta.arena.title": "Arena multijugador · Avíspate",
   "meta.arena.description":
     "Juega Avíspate en tiempo real contra otras personas y gana el pozo. Entradas de 0.10, 0.50 y 1 USDT. Muy pronto.",
+  "meta.arena.quick.title": "Partida rápida · Avíspate",
+  "meta.arena.private.title": "Sala privada · Avíspate",
   "meta.terms.title": "Términos · Avíspate",
   "meta.privacy.title": "Privacidad · Avíspate",
 
@@ -597,6 +638,43 @@ export const es: Record<MessageKey, string> = {
     "Pronto vas a poder sentarte en una mesa de 2 a 4 jugadores y correr el mismo mazo al mismo tiempo: el más rápido se lleva el pozo. Todavía no hay nada que pagar aquí.",
   "arena.soon.entries": "Las entradas que estamos preparando:",
   "arena.soon.back": "← Volver al reto diario",
+  "arena.lead": "Compite, vacía tu mazo y llévate el premio",
+  "arena.mode.aria": "Cómo quieres entrar",
+  "arena.mode.quick.title": "Partida rápida",
+  "arena.mode.quick.text":
+    "Buscamos jugadores disponibles y empiezas apenas se llene la mesa.",
+  "arena.mode.quick.cta": "Buscar jugadores",
+  "arena.mode.private.title": "Sala privada",
+  "arena.mode.private.text":
+    "Crea una partida y comparte el código, o entra con el código de un amigo.",
+  "arena.mode.private.cta": "Crear o entrar a una sala",
+  "arena.setup.aria": "Configuración de la mesa",
+  "arena.entry.label": "Entrada por jugador",
+  "arena.players.label": "Jugadores en la mesa",
+  "arena.players.unit": "jugadores",
+  "arena.prize.pot": "Pozo total",
+  "arena.prize.fee": "Comisión (20%)",
+  "arena.prize.winner": "Se lleva el ganador",
+  "arena.prize.note":
+    "Estimado para la mesa que elegiste. Todavía no se cobra nada aquí.",
+  "arena.howto.open": "Cómo se juega",
+  "arena.howto.title": "Cómo se juega en la Arena",
+  "arena.howto.s1.title": "Todos empiezan a la vez",
+  "arena.howto.s1.text":
+    "La mesa arranca cuando se llena y todos reciben el mismo número de cartas.",
+  "arena.howto.s2.title": "Encuentra el símbolo repetido",
+  "arena.howto.s2.text":
+    "Tu carta y la del centro siempre comparten un símbolo, uno solo. Tócalo y sueltas una carta.",
+  "arena.howto.s3.title": "Gana quien se quede sin cartas",
+  "arena.howto.s3.text":
+    "El primero que vacía su mazo se lleva el pozo menos la comisión del 20%, directo a su wallet.",
+  "arena.howto.note":
+    "Es el mismo juego del reto diario: aquí compites contra otras personas en vez de contra el reloj.",
+  "arena.soon.quick":
+    "Todavía no está conectado el emparejamiento, así que por ahora no hay mesa a la que sentarse. Esta es la configuración que elegiste.",
+  "arena.soon.private":
+    "Todavía no están conectadas las salas ni los códigos, así que por ahora no hay nada que crear ni a qué entrar. Esta es la configuración que elegiste.",
+  "arena.soon.back_lobby": "← Volver a la Arena",
 
   /* ------------------------------ Top 3 lobby ---------------------------- */
   "top3.title": "Los más avispados de hoy",

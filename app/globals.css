@@ -3292,6 +3292,244 @@ body {
   outline-offset: 3px;
 }
 
+/* --- Lobby de /arena: elegir cómo entrar, con cuánto y contra cuántos --- */
+
+/*
+ * Encabezado: chip, título, frase y el enlace del tutorial, todo centrado y
+ * junto. El chip va arriba porque la Arena todavía no se puede jugar y eso se
+ * dice antes de que el jugador empiece a configurar una mesa.
+ */
+.arena-lobby-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.arena-lobby-head .arena-tag {
+  align-self: center;
+}
+
+/* La ilustración aquí es un rótulo, no el cuerpo de una tarjeta: se queda
+   baja para que las dos opciones entren en pantalla sin bajar el dedo. */
+.arena-lobby-art {
+  flex: none;
+  min-height: 0;
+  padding: 8px 12px;
+}
+
+.arena-lobby-art .arena-illustration {
+  max-width: 260px;
+}
+
+.arena-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Tarjeta-opción: grande, de una línea de toque, con el mismo relieve del
+   resto de la app. Seleccionada se comporta como la ficha del mazo —borde
+   tinta, fondo amarillo y sombra dura— para que la elección se lea de un ojo. */
+.arena-mode {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 88px;
+  padding: 16px;
+  text-align: left;
+  background: var(--white);
+  border: 2px solid var(--gray-soft);
+  border-radius: 22px;
+  box-shadow: 0 3px 0 var(--gray-soft);
+  font-family: var(--font-body);
+  color: var(--ink);
+  cursor: pointer;
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.arena-mode.selected {
+  border-color: var(--ink);
+  background: var(--yellow-soft);
+  box-shadow: 0 4px 0 var(--yellow-press);
+}
+
+.arena-mode:active {
+  transform: translateY(2px);
+  box-shadow: 0 1px 0 var(--gray-soft);
+}
+
+.arena-mode.selected:active {
+  box-shadow: 0 1px 0 var(--yellow-press);
+}
+
+.arena-mode:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.arena-mode-emoji {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 16px;
+  border: 2px solid var(--ink);
+  background: var(--white);
+  font-size: 1.35rem;
+}
+
+.arena-mode-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.arena-mode-title {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.15;
+}
+
+.arena-mode-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.35;
+  opacity: 0.7;
+}
+
+/* El check solo existe cuando la opción está elegida; el hueco se reserva
+   siempre para que el texto no se mueva al cambiar de tarjeta. */
+.arena-mode-check {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-soft);
+  background: var(--white);
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: transparent;
+}
+
+.arena-mode.selected .arena-mode-check {
+  border-color: var(--ink);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+/* Configuración: los dos selectores, el cálculo y el botón, en una tarjeta. */
+.arena-setup {
+  gap: 16px;
+}
+
+/*
+ * El reparto del pozo. Es la cifra que decide si el jugador entra o no, así
+ * que va en amarillo de marca y con el total del ganador destacado en verde,
+ * el mismo del "Total ganado" del perfil.
+ */
+.arena-prize {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: var(--yellow-faint);
+  border: 2px solid var(--yellow-line);
+}
+
+.arena-prize-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.arena-prize-row strong {
+  font-family: var(--font-title);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.arena-prize-fee {
+  opacity: 0.6;
+}
+
+/* La línea que importa: separada del resto y con el peso de un resultado. */
+.arena-prize-win {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 2px solid var(--yellow-line);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.arena-prize-win strong {
+  font-size: 1.35rem;
+  color: #12894f;
+}
+
+.arena-prize-note {
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--gray);
+  text-align: center;
+}
+
+/* Resumen de la mesa elegida en las pantallas temporales de cada modo. */
+.arena-recap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arena-recap-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--bg);
+  border: 2px solid var(--gray-soft);
+  text-align: left;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.arena-recap-item dd {
+  font-family: var(--font-title);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.arena-recap-win {
+  background: var(--yellow-faint);
+  border-color: var(--yellow-line);
+}
+
+.arena-recap-win dd {
+  font-size: 1.15rem;
+  color: #12894f;
+}
+
 /* Pantalla /arena: la misma tarjeta, centrada y sin botón. */
 .arena-hero {
   align-items: center;
