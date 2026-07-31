@@ -338,11 +338,6 @@ export const en = {
   /* ------------------------------ Reloj de ronda ------------------------- */
   "round.error": "We couldn't refresh the round",
   "round.loading": "Closes in …",
-  "round.closed": "Round closed",
-  "round.no_winner": "No winner · prize rolled over",
-  "round.winner": "Winner: {name}",
-  "round.paid": "Prize paid",
-  "round.pending": "Payment processing",
   "round.closes_in": "Closes in {time}",
 
   /* -------------------------------- Historial ---------------------------- */
@@ -817,11 +812,6 @@ export const es: Record<MessageKey, string> = {
   /* ------------------------------ Reloj de ronda ------------------------- */
   "round.error": "No pudimos actualizar la ronda",
   "round.loading": "Cierra en …",
-  "round.closed": "Ronda cerrada",
-  "round.no_winner": "Sin ganador · premio acumulado",
-  "round.winner": "Ganador: {name}",
-  "round.paid": "Premio pagado",
-  "round.pending": "Pago procesándose",
   "round.closes_in": "Cierra en {time}",
 
   /* -------------------------------- Historial ---------------------------- */

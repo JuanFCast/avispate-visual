@@ -35,16 +35,12 @@ export function fmtUsdt(units: bigint | undefined): string {
 
 /* ------------------------------ Reloj de ronda ----------------------------- */
 
-export type RoundStatus = "open" | "settled";
-
-export interface RoundWinner {
-  alias: string | null;
-  /** Dirección ya abreviada por el servidor; nunca llega completa. */
-  wallet: string | null;
-  amountUnits: string | null;
-  txHash: string | null;
-  payout: "paid" | "pending" | "rollover";
-}
+/**
+ * El servidor solo entrega rondas abiertas: a la hora del cierre la siguiente
+ * ya empezó. El ganador de la ronda anterior no cabe en el contador — se lee
+ * en /historial.
+ */
+export type RoundStatus = "open";
 
 /** Respuesta de `/api/round`: la verdad sobre la ronda vive en el servidor. */
 export interface RoundInfo {
@@ -53,7 +49,6 @@ export interface RoundInfo {
   serverNow: string;
   closesAt: string;
   status: RoundStatus;
-  winner: RoundWinner | null;
 }
 
 interface RoundSnapshot extends RoundInfo {
@@ -85,7 +80,6 @@ export interface RoundClock {
   remainingMs: number;
   /** El corte ya pasó según el reloj del servidor. */
   reachedCut: boolean;
-  winner: RoundWinner | null;
   closeHint: string;
   refetch: () => void;
 }
@@ -112,9 +106,9 @@ export function useRoundClock(deck: number): RoundClock {
     refetchInterval: (q) => {
       const snap = q.state.data;
       if (!snap) return 30_000;
-      // Transición de ronda en curso: preguntar seguido hasta que se resuelva.
-      if (snap.status !== "open") return 10_000;
       const left = snap.closesAtMs - (Date.now() + snap.offsetMs);
+      // Pasado el corte seguimos con la foto vieja: preguntar seguido hasta
+      // que el servidor entregue la ronda del día siguiente.
       if (left <= 0) return 5_000;
       return Math.min(60_000, Math.max(5_000, left));
     },
@@ -138,7 +132,16 @@ export function useRoundClock(deck: number): RoundClock {
     };
   }, []);
 
-  // Cambio de ronda: el ranking del día que quedaba en caché ya no vale.
+  // Cambio de ronda: TODO lo del día anterior que quedaba en caché ya no vale.
+  //
+  //   ["leaderboard"]  el ranking vuelve a empezar vacío
+  //   ["readContract"] el pozo se pagó y se resembró, y la jugada gratis del
+  //                    día se renovó — ambos se leen del contrato
+  //
+  // Sin esto el jugador se queda hasta un minuto viendo el premio de ayer
+  // después de que el robot ya lo pagó, que es justo el momento en que más
+  // mira la pantalla. Invalidar el grupo entero de lecturas on-chain es
+  // deliberado: al cruzar la medianoche UTC no hay ninguna que siga válida.
   const queryClient = useQueryClient();
   const snapshot = query.data;
   const roundId = snapshot?.roundId ?? null;
@@ -147,6 +150,7 @@ export function useRoundClock(deck: number): RoundClock {
     if (!roundId) return;
     if (lastRound.current && lastRound.current !== roundId) {
       queryClient.invalidateQueries({ queryKey: ["leaderboard"] });
+      queryClient.invalidateQueries({ queryKey: ["readContract"] });
     }
     lastRound.current = roundId;
   }, [roundId, queryClient]);
@@ -162,7 +166,6 @@ export function useRoundClock(deck: number): RoundClock {
     remaining: formatCountdown(remainingMs),
     remainingMs,
     reachedCut: Boolean(snapshot) && remainingMs <= 0,
-    winner: snapshot?.winner ?? null,
     closeHint: snapshot ? closeHintFor(snapshot.closesAtMs, now, lang) : "",
     refetch: () => void query.refetch(),
   };
@@ -187,26 +190,11 @@ export function roundCopy(clock: RoundClock, t: Translate): RoundCopy {
   if (clock.status === "loading") {
     return { primary: t("round.loading"), secondary: "", retry: false };
   }
-  if (clock.status === "settled" && clock.winner) {
-    const { alias, wallet, payout } = clock.winner;
-    const name = alias || wallet;
-    if (!name || payout === "rollover") {
-      return {
-        primary: t("round.closed"),
-        secondary: t("round.no_winner"),
-        retry: false,
-      };
-    }
-    return {
-      primary: t("round.winner", { name }),
-      secondary: payout === "paid" ? t("round.paid") : t("round.pending"),
-      retry: false,
-    };
-  }
   // El corte ya pasó pero seguimos con la foto vieja: falta un segundo para
   // que el servidor entregue la ronda nueva. Se muestra el neutral "Cierra
-  // en …" y NUNCA "ronda cerrada" — la ronda siguiente ya abrió y ya acepta
-  // jugadas, así que anunciar un cierre sería mentir durante ese segundo.
+  // en …" y NUNCA "ronda cerrada" ni el ganador de ayer — la ronda siguiente
+  // ya abrió y ya acepta jugadas, así que cualquier otra cosa sería mentir
+  // durante ese segundo.
   if (clock.reachedCut) {
     return { primary: t("round.loading"), secondary: "", retry: false };
   }
