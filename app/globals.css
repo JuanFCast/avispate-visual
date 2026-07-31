@@ -1120,6 +1120,24 @@ body {
   padding-bottom: calc(124px + env(safe-area-inset-bottom));
 }
 
+/*
+ * /perfil: UN solo contenedor para todo —avatar, alias y tarjetas—, así que
+ * comparten ancho y eje vertical por construcción y no por coincidencia. El
+ * ancho lo fija el propio contenedor (nada de relleno lateral, márgenes de un
+ * lado, desplazamientos ni columnas), y `margin-inline: auto` lo centra sobre
+ * el ancho útil, ya descontada la barra de desplazamiento.
+ *
+ * Los 32 px son los 16 de margen a cada lado del móvil: por debajo de 592 px
+ * de ancho útil la cuenta da lo mismo que daba el relleno de antes, así que el
+ * teléfono se ve igual que siempre.
+ */
+.app-shell.profile-page.page-profile {
+  width: min(100% - 32px, 560px);
+  max-width: none;
+  margin-inline: auto;
+  padding-inline: 0;
+}
+
 .page-title {
   font-family: var(--font-title);
   font-size: 1.5rem;
@@ -3679,6 +3697,13 @@ body {
  * Perfil quedarían anchos pero con elementos de teléfono dentro.
  */
 @media (min-width: 860px) {
+  /*
+   * Dos columnas de verdad, solo en /stats. Ninguna página apilada usa ya esta
+   * rejilla: darle la vuelta a `flex-direction` sin devolver `align-items` a
+   * `stretch` dejaba las columnas encogidas y pegadas a la izquierda, que es
+   * como el perfil acabó descentrado. Si alguna vuelve a necesitar rejilla,
+   * que la pida entera y no a medias.
+   */
   .page-grid {
     flex-direction: row;
     align-items: flex-start;
@@ -3686,11 +3711,6 @@ body {
 
   .page-col {
     flex: 1;
-  }
-
-  /* …salvo en las páginas apiladas, que siguen en una sola columna. */
-  .page-stack .page-grid {
-    flex-direction: column;
   }
 
   .page-title {

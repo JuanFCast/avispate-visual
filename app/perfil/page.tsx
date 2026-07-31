@@ -85,7 +85,7 @@ export default function PerfilPage() {
 
   if (!ready) {
     return (
-      <main className="app-shell profile-page page-stack">
+      <main className="app-shell profile-page page-stack page-profile">
         <p className="access-note">{t("common.loading")}</p>
       </main>
     );
@@ -93,7 +93,7 @@ export default function PerfilPage() {
 
   if (!loggedIn) {
     return (
-      <main className="app-shell profile-page page-stack">
+      <main className="app-shell profile-page page-stack page-profile">
         <div className="profile-guard">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo-avispate.png" alt="" className="profile-avatar" />
@@ -109,61 +109,53 @@ export default function PerfilPage() {
   }
 
   return (
-    <main className="app-shell profile-page page-stack">
+    <main className="app-shell profile-page page-stack page-profile">
       <ProfileHeader />
 
-      {/* Una sola columna en todos los tamaños: juego arriba, cartera y
-          ajustes debajo, en el mismo orden en móvil y en escritorio. */}
-      <div className="page-grid">
-        <div className="page-col">
-          <ProfileStats
-            gamesPlayed={stats.gamesPlayed}
-            wins={stats.wins}
-            totalWonUsdt={totalWonUsdt}
-            loading={statsLoading}
-          />
+      {/* Sin rejilla ni columnas: encabezado y tarjetas son hermanos del mismo
+          contenedor, así que comparten ancho y eje vertical en cualquier
+          pantalla. El orden es el mismo en móvil y en escritorio. */}
+      <ProfileStats
+        gamesPlayed={stats.gamesPlayed}
+        wins={stats.wins}
+        totalWonUsdt={totalWonUsdt}
+        loading={statsLoading}
+      />
 
-          <WonPrizes prizes={stats.prizes} loading={statsLoading} />
+      <WonPrizes prizes={stats.prizes} loading={statsLoading} />
+
+      {address ? (
+        <>
+          <WalletCard address={address} />
+
+          <WalletTokens address={address} />
+        </>
+      ) : (
+        <p className="empty-note">{t("profile.creating_wallet")}</p>
+      )}
+
+      <section className="profile-links">
+        <Link className="profile-link-row" href="/stats">
+          {t("common.live_stats")}
+        </Link>
+        <a className="profile-link-row" href="mailto:soporte@avispate.fun">
+          {t("profile.link.support")}
+        </a>
+        <LanguageToggle />
+        <button
+          type="button"
+          className="profile-link-row profile-logout-link"
+          onClick={handleLogout}
+        >
+          {t("profile.link.logout")}
+        </button>
+        <p className="profile-links-hint">{t("profile.links.hint")}</p>
+        <div className="profile-legal">
+          <Link href="/terminos">{t("profile.legal.terms")}</Link>
+          <span aria-hidden="true">·</span>
+          <Link href="/privacidad">{t("profile.legal.privacy")}</Link>
         </div>
-
-        <div className="page-col">
-          {address ? (
-            <>
-              <WalletCard address={address} />
-
-              <WalletTokens address={address} />
-            </>
-          ) : (
-            <p className="empty-note">{t("profile.creating_wallet")}</p>
-          )}
-
-          <section className="profile-links">
-            <Link className="profile-link-row" href="/stats">
-              {t("common.live_stats")}
-            </Link>
-            <a
-              className="profile-link-row"
-              href="mailto:soporte@avispate.fun"
-            >
-              {t("profile.link.support")}
-            </a>
-            <LanguageToggle />
-            <button
-              type="button"
-              className="profile-link-row profile-logout-link"
-              onClick={handleLogout}
-            >
-              {t("profile.link.logout")}
-            </button>
-            <p className="profile-links-hint">{t("profile.links.hint")}</p>
-            <div className="profile-legal">
-              <Link href="/terminos">{t("profile.legal.terms")}</Link>
-              <span aria-hidden="true">·</span>
-              <Link href="/privacidad">{t("profile.legal.privacy")}</Link>
-            </div>
-          </section>
-        </div>
-      </div>
+      </section>
 
       <ProfileBottomNav active="perfil" />
     </main>
