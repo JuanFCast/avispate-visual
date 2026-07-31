@@ -3559,6 +3559,322 @@ body {
   max-width: 34rem;
 }
 
+/* ------------------------- Salas privadas de la Arena ---------------------- */
+
+/*
+ * La sala reutiliza TODO lo que ya existe —.arena-card, .arena-mode,
+ * .arena-recap, .btn-primary— y solo agrega lo que no tenía nombre: el código,
+ * las sillas y los avisos. Si algo de aquí abajo se parece a un componente
+ * nuevo, es que faltaba de verdad.
+ */
+
+/* Volver a la sala que quedó abierta. Va arriba de todo y en cyan, porque es
+   una salida del flujo, no una opción más del flujo. */
+.room-resume {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-color: var(--cyan);
+  background: var(--cyan-soft);
+}
+
+.room-resume-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.room-resume-body strong {
+  font-family: var(--font-title);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.room-resume-body small {
+  font-size: 0.82rem;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.room-resume-cta {
+  flex: none;
+  padding: 10px 16px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.room-login {
+  align-items: center;
+  text-align: center;
+}
+
+/* El código, escrito por el jugador. Espaciado como se dicta: cifra a cifra. */
+.room-code-input {
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  letter-spacing: 0.12em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/*
+ * El código de la sala. Es lo que se viene a buscar aquí, así que ocupa una
+ * tarjeta entera y se lee desde el otro lado de la mesa. Va sobre amarillo de
+ * marca, el mismo del pozo: son las dos cifras que importan de una sala.
+ */
+.room-code-card {
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  background: var(--yellow-faint);
+  border-color: var(--yellow-line);
+}
+
+.room-code-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.room-code-value {
+  font-family: var(--font-title);
+  /* Se encoge en pantallas angostas antes que partirse en dos líneas. */
+  font-size: clamp(2rem, 11vw, 2.8rem);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  line-height: 1.05;
+  /* Para dictarlo por teléfono hay que poder seleccionarlo con el dedo. */
+  user-select: all;
+}
+
+.room-code-actions {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 340px;
+}
+
+.room-code-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 3px 0 var(--yellow-press);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease;
+}
+
+.room-code-btn:active {
+  transform: translateY(3px);
+  box-shadow: 0 0 0 var(--yellow-press);
+}
+
+.room-code-hint {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray);
+}
+
+/* --- La mesa: quién está sentado y quién falta --- */
+
+.room-players-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.room-players-title {
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+.room-players-count {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--gray);
+}
+
+.room-seats {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.room-seat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  background: var(--bg);
+}
+
+/* La silla vacía se ve vacía: línea punteada y nada de peso visual. */
+.room-seat-empty {
+  border-style: dashed;
+  background: transparent;
+  color: var(--gray);
+}
+
+/* Desconectado no es lo mismo que ausente: sigue en la mesa, apagado. */
+.room-seat-offline {
+  opacity: 0.55;
+}
+
+.room-seat-avatar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  font-family: var(--font-title);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.room-seat-avatar-empty {
+  border-style: dashed;
+  border-color: var(--gray);
+  background: transparent;
+  color: var(--gray);
+}
+
+.room-seat-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.room-seat-name {
+  font-weight: 700;
+  font-size: 0.98rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-seat-you {
+  font-style: normal;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gray);
+}
+
+.room-seat-you::before {
+  content: " · ";
+}
+
+.room-seat-host {
+  align-self: flex-start;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--yellow-soft);
+  border: 2px solid var(--yellow-deep);
+  border-radius: 999px;
+  padding: 1px 8px;
+}
+
+.room-seat-state {
+  flex: none;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-align: right;
+}
+
+.room-seat-state.ready {
+  color: #12894f;
+}
+
+/* --- Botonera de la sala --- */
+
+.room-actions {
+  gap: 12px;
+}
+
+/* Ya dijo que sí: el botón deja de invitar y pasa a confirmar. */
+.room-ready-on {
+  background: var(--good);
+  box-shadow: 0 5px 0 #218c52;
+}
+
+.room-ready-on:active {
+  box-shadow: 0 1px 0 #218c52;
+}
+
+.room-leave {
+  align-self: center;
+  padding: 6px 4px;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.room-error,
+.room-warn {
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.room-error {
+  color: var(--bad);
+}
+
+/* Aviso, no error: informa de algo que se está resolviendo solo. */
+.room-warn {
+  color: var(--ink);
+  opacity: 0.72;
+}
+
+/* Cargando o sala imposible: una tarjeta centrada y nada más. */
+.room-state {
+  align-items: center;
+  text-align: center;
+}
+
 /* --- Responsive del lobby --- */
 
 /* Tablet vertical: una columna más aireada; crecen filas, no el logo. */

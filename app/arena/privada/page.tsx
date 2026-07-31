@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import ArenaSoon from "@/components/arena/ArenaSoon";
+import ArenaPrivate from "@/components/arena/ArenaPrivate";
 import ProfileBottomNav from "@/components/profile/ProfileBottomNav";
 import { parseEntry, parsePlayers } from "@/lib/arena";
 import { getServerT } from "@/lib/i18n/server";
@@ -14,18 +14,19 @@ interface Props {
 }
 
 /**
- * /arena/privada — pantalla temporal de la sala privada. Aquí vivirán crear la
- * sala y entrar con código: por ahora solo confirma la mesa elegida en el lobby.
+ * /arena/privada — crear una sala o entrar con el código de un amigo.
+ *
+ * La mesa (entrada y jugadores) llega del lobby por la URL y se vuelve a
+ * validar aquí: quien manipule el enlace se lleva la configuración por defecto,
+ * no una mesa inventada. Sigue sin haber cobro, contrato ni partida.
  */
 export default async function ArenaPrivatePage({ searchParams }: Props) {
   const { entry, players } = await searchParams;
 
   return (
     <main className="app-shell profile-page page-stack">
-      <ArenaSoon
-        titleKey="arena.mode.private.title"
-        textKey="arena.soon.private"
-        entryUnits={parseEntry(entry)}
+      <ArenaPrivate
+        entry={parseEntry(entry).toString()}
         players={parsePlayers(players)}
       />
 

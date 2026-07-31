@@ -27,3 +27,19 @@ export async function requireIdentity(
     return { response: NextResponse.json({ error: "invalid_token" }, { status: 401 }) };
   }
 }
+
+/**
+ * La identidad si viene y es válida; `null` si no. Para rutas que responden
+ * igual a un desconocido y a un jugador, solo que con más detalle al segundo:
+ * el estado de una sala privada se puede mirar con el código en la mano, y
+ * pedir sesión para eso rompería el enlace que se comparte por chat.
+ */
+export async function optionalIdentity(req: Request): Promise<PrivyIdentity | null> {
+  const token = bearerToken(req);
+  if (!token) return null;
+  try {
+    return await verifyPrivyToken(token);
+  } catch {
+    return null;
+  }
+}
