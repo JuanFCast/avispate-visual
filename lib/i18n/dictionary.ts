@@ -238,16 +238,14 @@ export const en = {
   "profile.stats.total_won": "Total won",
 
   /* --------------------------------- Premios ----------------------------- */
-  "prizes.title": "Prizes won",
-  "prizes.note.a": "🏆 In Avíspate prizes are paid",
-  "prizes.note.strong": "automatically",
-  "prizes.note.b":
-    "at 7pm (Colombia), straight to your wallet. You don't have to claim anything.",
+  "prizes.title": "Your prizes",
+  "prizes.note":
+    "Prizes are sent automatically to your wallet every day at 7:00 p.m. (Colombia).",
   "prizes.empty": "No wins yet. Keep playing to take the pot!",
   "prizes.deck": "Deck {deck}",
-  "prizes.view": "view ↗",
   "prizes.view_aria": "View the prize transaction",
-  "prizes.paid": "paid",
+  "prizes.paid": "Paid",
+  "prizes.more": "See full history",
 
   /* -------------------------------- Cartera ------------------------------ */
   "wallet.title": "Wallet",
@@ -712,16 +710,14 @@ export const es: Record<MessageKey, string> = {
   "profile.stats.total_won": "Total ganado",
 
   /* --------------------------------- Premios ----------------------------- */
-  "prizes.title": "Premios ganados",
-  "prizes.note.a": "🏆 En Avíspate los premios se pagan",
-  "prizes.note.strong": "automáticamente",
-  "prizes.note.b":
-    "a las 7pm (Col), directo a tu wallet. No tienes que reclamar nada.",
+  "prizes.title": "Tus premios",
+  "prizes.note":
+    "Los premios se envían automáticamente a tu wallet todos los días a las 7:00 p. m. (Colombia).",
   "prizes.empty": "Aún no has ganado. ¡Sigue jugando para ganar el pozo!",
   "prizes.deck": "Mazo {deck}",
-  "prizes.view": "ver ↗",
   "prizes.view_aria": "Ver transacción del premio",
-  "prizes.paid": "pagado",
+  "prizes.paid": "Pagado",
+  "prizes.more": "Ver historial completo",
 
   /* -------------------------------- Cartera ------------------------------ */
   "wallet.title": "Cartera",

@@ -10,6 +10,10 @@
   --yellow-deep: #fbbd02;
   --yellow-press: #d9a300; /* base de la sombra dura de los botones */
   --yellow-soft: #fff3cd;
+  /* Amarillo de fondo y de línea: identidad visible sin gritar, para listados
+     tranquilos donde el amarillo pleno cansaría la vista. */
+  --yellow-faint: #fffaeb;
+  --yellow-line: #ffe6a8;
   --ink: #0d0d0f;
   --white: #ffffff;
   --cyan: #00c7d6;
@@ -1307,50 +1311,132 @@ body {
   line-height: 1.4;
 }
 
-/* --- Premios --- */
+/* --- Premios ---
+   Tarjeta blanca de borde amarillo suave: el amarillo sigue siendo la
+   identidad, pero como contorno y fondo tenue, no como bloque. Dentro, filas
+   compactas de línea fina; el trofeo abre y la etiqueta de pago cierra. */
+.prizes-card {
+  border-color: var(--yellow-line);
+  gap: 8px;
+}
+
+.prizes-note {
+  font-size: 0.8rem;
+  color: var(--gray);
+  line-height: 1.45;
+}
+
 .prize-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  list-style: none;
 }
 
-.prize-item {
+.prize-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
   border-radius: 14px;
-  background: var(--yellow-soft);
-  border: 2px solid var(--yellow);
+  background: var(--yellow-faint);
+  border: 1px solid var(--yellow-line);
 }
 
-.prize-emoji {
-  font-size: 1.2rem;
+.prize-skeleton {
+  width: 100%;
+  height: 56px;
+  border-radius: 14px;
+}
+
+.prize-trophy {
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 .prize-info {
   display: flex;
   flex-direction: column;
+  gap: 2px;
   flex: 1;
   min-width: 0;
 }
 
 .prize-amount {
   font-family: var(--font-title);
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
 }
 
-.prize-info small {
+.prize-meta {
+  font-size: 0.72rem;
   color: var(--gray);
-  font-size: 0.75rem;
 }
 
-.prize-link,
-.prize-status {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--ink);
+.prize-end {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Verde de "cobrado": el mismo tono del total ganado, para que el jugador lea
+   la etiqueta y la cifra de arriba como la misma cosa. */
+.prize-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #12894f;
+  background: #e6f7ee;
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+
+.prize-tx {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--gray);
   text-decoration: none;
+}
+
+.prize-tx:hover {
+  color: var(--ink);
+  background: rgba(13, 13, 15, 0.05);
+}
+
+/* Última fila, discreta: lleva al Historial, no compite con los premios. */
+.prize-more-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+  padding-top: 10px;
+  border-top: 1px solid var(--gray-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-decoration: none;
+}
+
+.prize-more-row:hover {
+  color: var(--ink);
+}
+
+.prize-more-arrow {
+  font-size: 1rem;
+}
+
+.prize-tx:focus-visible,
+.prize-more-row:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
 }
 
 /* --- Cartera --- */

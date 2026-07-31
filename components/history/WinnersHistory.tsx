@@ -4,7 +4,8 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { USDT_DECIMALS } from "@/lib/contracts";
 import { formatMs } from "@/lib/game";
 import { useI18n } from "@/lib/i18n/client";
-import type { Lang, MessageKey } from "@/lib/i18n";
+import { fmtRoundDate } from "@/lib/i18n/date";
+import type { MessageKey } from "@/lib/i18n";
 
 const PAGE_SIZE = 15;
 
@@ -24,22 +25,6 @@ export interface HistoryRound {
 interface Page {
   history: HistoryRound[];
   hasMore: boolean;
-}
-
-const MONTHS: Record<Lang, string[]> = {
-  en: ["JAN", "FEB", "MAR", "APR", "MAY", "JUN",
-       "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"],
-  es: ["ENE", "FEB", "MAR", "ABR", "MAY", "JUN",
-       "JUL", "AGO", "SEP", "OCT", "NOV", "DIC"],
-};
-
-/**
- * "25 JUL 2026" a partir del texto YYYY-MM-DD, sin pasar por `Date`: la fecha
- * de la ronda es la de Colombia y no debe correrse a la zona del visitante.
- */
-function fmtRoundDate(roundDate: string, lang: Lang): string {
-  const [year, month, day] = roundDate.split("-");
-  return `${Number(day)} ${MONTHS[lang][Number(month) - 1] ?? ""} ${year}`;
 }
 
 function fmtPrize(units: string | null): string {
