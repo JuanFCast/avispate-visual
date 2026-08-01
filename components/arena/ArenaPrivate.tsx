@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import {
   ARENA_ENTRY_UNITS,
   ARENA_PLAYER_OPTIONS,
+  DEFAULT_PLAYERS,
   arenaPrize,
   fmtEntry,
   fmtUsdt,
+  isPlayableTable,
 } from "@/lib/arena";
 import {
   DECK_MODES,
@@ -67,7 +69,11 @@ export default function ArenaPrivate({ entry, players }: Props) {
   // Lo que trae el lobby es el punto de partida de la mesa que vas a proponer,
   // no una decisión cerrada.
   const [entryUnits, setEntryUnits] = useState<bigint>(BigInt(entry));
-  const [maxPlayers, setMaxPlayers] = useState<number>(players);
+  // El enlace puede traer una mesa de 4 —el lobby las ofrecía— y llegar con ella
+  // ya elegida sería empezar en una casilla desde la que no se puede jugar.
+  const [maxPlayers, setMaxPlayers] = useState<number>(
+    isPlayableTable(players) ? players : DEFAULT_PLAYERS
+  );
   const [deckMode, setDeckMode] = useState<DeckMode>(DEFAULT_DECK_MODE);
 
   const [code, setCode] = useState("");
@@ -313,6 +319,11 @@ export default function ArenaPrivate({ entry, players }: Props) {
             </div>
           </div>
 
+          {/*
+            Las mesas de 3 y 4 se enseñan apagadas, no escondidas. El reparto ya
+            funciona para ellas y llegarán; esconderlas haría creer que la Arena
+            es de a dos y ya. Apagadas dicen la verdad: vienen, hoy no.
+          */}
           <div className="field">
             <label id="room-players-label">{t("room.config.max")}</label>
             <div
@@ -320,20 +331,25 @@ export default function ArenaPrivate({ entry, players }: Props) {
               role="radiogroup"
               aria-labelledby="room-players-label"
             >
-              {ARENA_PLAYER_OPTIONS.map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  role="radio"
-                  aria-checked={n === maxPlayers}
-                  className={n === maxPlayers ? "selected" : ""}
-                  onClick={() => setMaxPlayers(n)}
-                  disabled={busy}
-                >
-                  {n}
-                  <small className="deck-price">{t("arena.players.unit")}</small>
-                </button>
-              ))}
+              {ARENA_PLAYER_OPTIONS.map((n) => {
+                const playable = isPlayableTable(n);
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    role="radio"
+                    aria-checked={n === maxPlayers}
+                    className={n === maxPlayers ? "selected" : ""}
+                    onClick={() => setMaxPlayers(n)}
+                    disabled={busy || !playable}
+                  >
+                    {n}
+                    <small className="deck-price">
+                      {playable ? t("arena.players.unit") : t("tokens.soon")}
+                    </small>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireIdentity } from "@/lib/http";
 import { getRoomByCode } from "@/lib/supabase/arena-rooms";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
+import { isPlayableTable } from "@/lib/arena";
 import { startMatch } from "@/lib/supabase/arena-matches";
 import { ensureProfile } from "@/lib/supabase/profiles";
 
@@ -13,20 +14,6 @@ const STATUS: Record<string, number> = {
   room_not_ready: 409,
   table_too_big: 409,
 };
-
-/**
- * Tamaños de mesa que hoy se pueden JUGAR de verdad.
- *
- * El motor reparte bien para 2, 3 y 4 —está probado— pero la partida en
- * pantalla todavía está pensada para un rival y no para tres: el tablero, el
- * final y el abandono se diseñaron de a dos. Abrir el botón antes de terminar
- * eso sería repartir cartas para una partida que nadie puede terminar.
- *
- * El freno vive aquí, en el borde, y no dentro de `startMatch`: la regla es de
- * producto, no del motor, y así las pruebas pueden ejercitar 3 y 4 sin tener
- * que fingir que son 2.
- */
-const PLAYABLE_TABLE_SIZES = [2];
 
 /**
  * POST /api/arena/matches — el anfitrión reparte.
@@ -50,8 +37,10 @@ export async function POST(req: Request) {
   try {
     const profile = await ensureProfile(auth.identity);
 
+    // La pantalla ya no deja armar mesas de 3 ni de 4, pero el botón es del
+    // navegador y las salas viejas siguen existiendo: el freno de verdad va aquí.
     const room = await getRoomByCode(code);
-    if (room && !PLAYABLE_TABLE_SIZES.includes(room.max_players)) {
+    if (room && !isPlayableTable(room.max_players)) {
       return NextResponse.json({ error: "table_too_big" }, { status: 409 });
     }
 

@@ -21,6 +21,25 @@ export const ARENA_PLAYER_OPTIONS = [2, 3, 4] as const;
 /** Dos: la mesa que antes se llena y la partida que antes empieza. */
 export const DEFAULT_PLAYERS = 2;
 
+/**
+ * De las mesas que caben, cuáles se pueden JUGAR hoy.
+ *
+ * El motor reparte bien para 2, 3 y 4 —está probado— pero la partida en
+ * pantalla se diseñó para un rival y no para tres: el tablero, el final y el
+ * abandono son de a dos. Mientras eso no cambie, una mesa de 3 o 4 se puede
+ * llenar pero no empezar, que es la peor forma de decir que no.
+ *
+ * Vive aquí, no en el motor, porque es una decisión de producto: así el
+ * servidor puede frenarla en el borde y las pruebas pueden ejercitar los
+ * tamaños reales sin fingir que todas las mesas son de dos.
+ */
+export const ARENA_PLAYABLE_PLAYERS = [2] as const;
+
+/** ¿Esta mesa se puede terminar, no solo llenar? */
+export function isPlayableTable(players: number): boolean {
+  return (ARENA_PLAYABLE_PLAYERS as readonly number[]).includes(players);
+}
+
 /** Comisión de la casa sobre el pozo, en puntos básicos (20%). */
 export const ARENA_COMMISSION_BPS = 2000n;
 
