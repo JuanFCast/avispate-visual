@@ -16,7 +16,14 @@ function getPrivy(): PrivyClient {
 export interface PrivyIdentity {
   /** DID de Privy (did:privy:...): identidad estable del jugador. */
   privyId: string;
-  /** Wallet embebida EVM en minúsculas, o null si aún no está creada. */
+  /**
+   * Wallet EVM del jugador, en minúsculas, o null si no tiene ninguna.
+   *
+   * Es la embebida cuando entró por correo, y la externa cuando entró firmando
+   * con su wallet (SIWE): ese jugador no tiene embebida, y quedarnos en null
+   * lo dejaría sin dirección para premios y sin forma de reencontrarse con el
+   * perfil que ya tenía.
+   */
   walletAddress: string | null;
 }
 
@@ -37,14 +44,15 @@ export async function verifyPrivyToken(token: string): Promise<PrivyIdentity> {
   const claims = await privy.verifyAuthToken(token);
   const user = await privy.getUserById(claims.userId);
   const linked = (user.linkedAccounts ?? []) as LinkedAccountLike[];
-  const embedded = linked.find(
-    (a) =>
-      a.type === "wallet" &&
-      a.walletClientType === "privy" &&
-      a.chainType === "ethereum"
-  );
+  const evm = linked.filter((a) => a.type === "wallet" && a.chainType === "ethereum");
+  // La embebida manda cuando existe: es la que ya usan el ranking y los premios
+  // de quien entró por correo, y cambiarla por una externa recién enlazada le
+  // movería la identidad bajo los pies. Si no hay embebida, el jugador entró
+  // firmando y su wallet externa ES su identidad.
+  const wallet =
+    evm.find((a) => a.walletClientType === "privy") ?? evm[0] ?? null;
   return {
     privyId: claims.userId,
-    walletAddress: embedded?.address ? embedded.address.toLowerCase() : null,
+    walletAddress: wallet?.address ? wallet.address.toLowerCase() : null,
   };
 }

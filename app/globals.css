@@ -2055,6 +2055,43 @@ body {
   box-shadow: 0 2px 0 var(--cyan-soft);
 }
 
+.access-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/*
+ * La dirección, en pequeño y bajo el botón. Va aquí y no dentro del botón a
+ * propósito: enseñarla en grande fue justo lo que hacía creer que la wallet ya
+ * estaba lista cuando todavía faltaba firmar.
+ */
+.access-wallet-hint {
+  margin-top: -4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--gray);
+  text-align: center;
+}
+
+.access-switch {
+  align-self: center;
+  padding: 2px 6px;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--gray);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.access-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .access-sep {
   display: flex;
   align-items: center;

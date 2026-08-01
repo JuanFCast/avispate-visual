@@ -116,7 +116,17 @@ export function Providers({
       <PrivyProvider
         appId={PRIVY_APP_ID}
         config={{
-          loginMethods: ["email"],
+          /*
+           * Correo Y wallet. El correo va primero porque sigue siendo el
+           * camino por defecto, pero la wallet ahora es una IDENTIDAD y no
+           * solo un medio de pago: sin esto, `loginWithSiwe` no está permitido
+           * para la app y firmar no sirve de nada.
+           *
+           * Ojo: esto es la mitad del interruptor. La otra mitad está en el
+           * panel de Privy (Login methods → Wallet); si allí está apagado, la
+           * firma se hace pero el login se rechaza.
+           */
+          loginMethods: ["email", "wallet"],
           // La wallet embebida se provisiona en Celo (red principal).
           defaultChain: celo,
           supportedChains: [celo],

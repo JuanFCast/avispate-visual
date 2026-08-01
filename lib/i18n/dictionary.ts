@@ -186,9 +186,9 @@ export const en = {
   "room.resume.title": "You still have a room open",
   "room.resume.text": "You're sitting at table {code}.",
   "room.resume.cta": "Back to my room",
-  "room.login.title": "Sign in to open a room",
+  "room.login.title": "Get in to open a room",
   "room.login.text":
-    "A private room needs to know who's who: your friends see your alias, and the table remembers your seat if you reload.",
+    "With your wallet or with email — either works. A private room needs to know who's who: your friends see your alias, and the table remembers your seat if you reload.",
 
   /* ----------------------- Dentro de la sala privada --------------------- */
   "room.title": "Your room",
@@ -292,6 +292,16 @@ export const en = {
   "access.email": "Continue with email",
   "access.wallet": "I already have a wallet",
   "access.wallet_connect": "Connect wallet",
+  "access.wallet_continue": "Continue with this wallet",
+  "access.wallet_signing": "Sign in your wallet…",
+  "access.wallet_verifying": "Checking the signature…",
+  "access.wallet_will_sign":
+    "You'll sign a message with {address}. It's free and moves nothing.",
+  "access.wallet_other": "Use a different wallet",
+  "access.error.rejected": "You cancelled the signature. Nothing happened.",
+  "access.error.not_enabled":
+    "Wallet sign-in isn't enabled for this app yet. Use email for now.",
+  "access.error.failed": "We couldn't sign you in with that wallet. Try again.",
   "access.wallet_title": "View or change wallet",
   "access.or": "or",
   "access.alias_title": "Pick your alias",
@@ -806,9 +816,9 @@ export const es: Record<MessageKey, string> = {
   "room.resume.title": "Todavía tienes una sala abierta",
   "room.resume.text": "Estás sentado en la mesa {code}.",
   "room.resume.cta": "Volver a mi sala",
-  "room.login.title": "Inicia sesión para abrir una sala",
+  "room.login.title": "Entra para abrir una sala",
   "room.login.text":
-    "Una sala privada necesita saber quién es quién: tus amigos ven tu alias, y la mesa se acuerda de tu silla si recargas.",
+    "Con tu wallet o con correo, como prefieras. Una sala privada necesita saber quién es quién: tus amigos ven tu alias, y la mesa se acuerda de tu silla si recargas.",
 
   /* ----------------------- Dentro de la sala privada --------------------- */
   "room.title": "Tu sala",
@@ -913,6 +923,16 @@ export const es: Record<MessageKey, string> = {
   "access.email": "Continuar con correo",
   "access.wallet": "Ya tengo una wallet",
   "access.wallet_connect": "Conectar wallet",
+  "access.wallet_continue": "Continuar con esta wallet",
+  "access.wallet_signing": "Firma en tu wallet…",
+  "access.wallet_verifying": "Comprobando la firma…",
+  "access.wallet_will_sign":
+    "Vas a firmar un mensaje con {address}. Es gratis y no mueve nada.",
+  "access.wallet_other": "Usar otra wallet",
+  "access.error.rejected": "Cancelaste la firma. No pasó nada.",
+  "access.error.not_enabled":
+    "El ingreso con wallet todavía no está habilitado en esta app. Usa el correo por ahora.",
+  "access.error.failed": "No pudimos entrar con esa wallet. Inténtalo otra vez.",
   "access.wallet_title": "Ver o cambiar wallet",
   "access.or": "o",
   "access.alias_title": "Elige tu alias",

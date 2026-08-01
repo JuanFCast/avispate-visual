@@ -10,6 +10,7 @@ import { roomCanStart, roomIsFull, type RoomPlayerView } from "@/lib/arena-rooms
 import { useProfile } from "@/lib/profile-context";
 import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n";
+import AccessCard from "../AccessCard";
 
 /** Cuánto se queda "Copiado ✓" antes de volver a ser un botón normal. */
 const COPIED_MS = 1600;
@@ -198,7 +199,13 @@ export default function ArenaRoom({ code }: { code: string }) {
           full ? (
             <p className="room-warn">{t("room.error.full")}</p>
           ) : ready && !authenticated ? (
-            <p className="room-warn">{t("room.join_this.login")}</p>
+            /* Llegó por el enlace de un amigo y no tiene sesión. Aquí mismo se
+               resuelve —wallet o correo— en vez de mandarlo a otra pantalla y
+               que vuelva a buscar el código. */
+            <>
+              <p className="room-warn">{t("room.join_this.login")}</p>
+              <AccessCard />
+            </>
           ) : (
             <button
               type="button"
