@@ -31,11 +31,75 @@ const ORDER = 7;
 /** 57 = 7² + 7 + 1. Ni una más cabe con 8 símbolos por carta. */
 export const PLANE_CARDS = ORDER * ORDER + ORDER + 1;
 
-/** Cartas que reparte una partida a cada jugador. */
-export const CARDS_PER_PLAYER = 27;
+/**
+ * Cuántas cartas se reparten.
+ *
+ * OJO con el nombre: esto NO es el modo de entrar a la Arena (partida rápida vs
+ * sala privada). Es cuánto dura la partida. En pantalla se llaman "Rápida" y
+ * "Completa"; aquí `sprint` y `full` para que nadie confunda las dos cosas al
+ * leer el código.
+ */
+export type DeckMode = "sprint" | "full";
 
-/** 1 base compartida + 27 + 27. */
-export const MATCH_CARDS = 1 + CARDS_PER_PLAYER * 2;
+export const DECK_MODES = ["sprint", "full"] as const;
+
+/** La partida larga es la que había hasta ahora. */
+export const DEFAULT_DECK_MODE: DeckMode = "full";
+
+/** "Rápida": diez cartas, sin importar cuánta gente haya. */
+export const SPRINT_CARDS_PER_PLAYER = 10;
+
+/**
+ * "Completa": lo máximo que se puede repartir en partes iguales sin pasarse del
+ * tope. Con 2 son 27, con 3 son 18 y con 4 son 13 — y siempre le toca lo mismo
+ * a todo el mundo, que es lo que hace justa la carrera.
+ */
+const FULL_CARDS_BY_PLAYERS: Readonly<Record<number, number>> = {
+  2: 27,
+  3: 18,
+  4: 13,
+};
+
+/**
+ * Tope de cartas repartidas, contando la base compartida.
+ *
+ * Son 55 y no 57 porque las que sobran no son un descarte: son la RESERVA de
+ * castigos, y empezar sin ninguna obligaría a reciclar descartes desde el
+ * primer error. Reciclar es seguro —el plano entero conserva la propiedad— pero
+ * es mejor que sea el plan B y no el plan A.
+ */
+export const MAX_DEALT_CARDS = 55;
+
+/** Cuántas cartas recibe cada jugador. Todos la misma cantidad, siempre. */
+export function cardsPerPlayer(mode: DeckMode, players: number): number {
+  return mode === "sprint"
+    ? SPRINT_CARDS_PER_PLAYER
+    : (FULL_CARDS_BY_PLAYERS[players] ?? 0);
+}
+
+/** Cartas que salen del mazo al repartir: la base más las manos. */
+export function dealtCards(mode: DeckMode, players: number): number {
+  return 1 + cardsPerPlayer(mode, players) * players;
+}
+
+/**
+ * ¿Este reparto cabe? Se comprueba en el servidor antes de crear la sala y otra
+ * vez antes de repartir, porque una combinación inventada desde la URL o desde
+ * la API sacaría cartas que el plano no tiene.
+ */
+export function isDealValid(mode: DeckMode, players: number): boolean {
+  const per = cardsPerPlayer(mode, players);
+  if (per <= 0) return false;
+  const dealt = dealtCards(mode, players);
+  return dealt <= MAX_DEALT_CARDS && dealt <= PLANE_CARDS;
+}
+
+/** El modo del cliente, si es uno de los nuestros. Estricto: nada de suponer. */
+export function parseDeckMode(value: unknown): DeckMode | null {
+  return (DECK_MODES as readonly string[]).includes(value as string)
+    ? (value as DeckMode)
+    : null;
+}
 
 /**
  * Semilla de texto → entero de 32 bits (xmur3). Existe para que dos semillas

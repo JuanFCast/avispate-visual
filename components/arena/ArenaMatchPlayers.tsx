@@ -14,10 +14,10 @@ import type { Translate } from "@/lib/i18n";
  */
 export default function ArenaMatchPlayers({
   you,
-  rival,
+  rivals,
 }: {
   you: MatchPlayerView | null;
-  rival: MatchPlayerView | null;
+  rivals: MatchPlayerView[];
 }) {
   const t = useT();
 
@@ -27,7 +27,13 @@ export default function ArenaMatchPlayers({
       <span className="match-vs" aria-hidden="true">
         VS
       </span>
-      <PlayerChip player={rival} t={t} youLabel={null} />
+      {rivals.length === 0 ? (
+        <PlayerChip player={null} t={t} youLabel={null} />
+      ) : (
+        rivals.map((r) => (
+          <PlayerChip key={r.profileId} player={r} t={t} youLabel={null} />
+        ))
+      )}
     </div>
   );
 }

@@ -56,6 +56,8 @@ export type RoomError =
   | "not_in_room"
   | "not_host"
   | "unauthorized"
+  /** Entrada, jugadores o cartas que no son una combinación real. */
+  | "invalid_setup"
   | "server_error";
 
 export interface RoomPlayerView {
@@ -79,6 +81,14 @@ export interface RoomView {
   /** Unidades de USDT como texto: el JSON no sabe de `bigint`. */
   entryUnits: string;
   maxPlayers: number;
+  /** "sprint" (Rápida) o "full" (Completa). Lo eligió el anfitrión. */
+  deckMode: string;
+  /**
+   * Cuántas cartas le tocarán a cada uno. Se manda calculada y no se deja
+   * deducir en la pantalla: con "Completa" depende del tamaño de la mesa, y el
+   * invitado tiene que poder LEER la cifra antes de aceptar, no inferirla.
+   */
+  cardsPerPlayer: number;
   /** Ordenados por silla, incluidas las vacías (que simplemente no aparecen). */
   players: RoomPlayerView[];
   /** Null cuando quien mira todavía no se sentó (llegó por el enlace). */

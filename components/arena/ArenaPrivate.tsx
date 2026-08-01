@@ -11,6 +11,12 @@ import {
   fmtUsdt,
 } from "@/lib/arena";
 import {
+  DECK_MODES,
+  DEFAULT_DECK_MODE,
+  cardsPerPlayer,
+  type DeckMode,
+} from "@/lib/arena-deck";
+import {
   ROOM_CODE_DIGITS,
   formatRoomCodeInput,
   normalizeRoomCode,
@@ -62,6 +68,7 @@ export default function ArenaPrivate({ entry, players }: Props) {
   // no una decisión cerrada.
   const [entryUnits, setEntryUnits] = useState<bigint>(BigInt(entry));
   const [maxPlayers, setMaxPlayers] = useState<number>(players);
+  const [deckMode, setDeckMode] = useState<DeckMode>(DEFAULT_DECK_MODE);
 
   const [code, setCode] = useState("");
   /** La sala que se está mirando antes de decidir. Null = todavía en el código. */
@@ -190,6 +197,7 @@ export default function ArenaPrivate({ entry, players }: Props) {
         body: JSON.stringify({
           entry: entryUnits.toString(),
           players: maxPlayers,
+          cards: deckMode,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -329,6 +337,44 @@ export default function ArenaPrivate({ entry, players }: Props) {
             </div>
           </div>
 
+          {/*
+            Cuántas cartas dura. "Completa" no es una cifra fija: con más gente
+            en la mesa toca menos a cada uno para que el reparto siga cabiendo y
+            siga siendo igual para todos. Por eso el número vive en la etiqueta
+            y se mueve solo al cambiar de tamaño de mesa.
+          */}
+          <div className="field">
+            <label id="room-cards-label">{t("room.config.cards")}</label>
+            <div
+              className="rounds-options"
+              role="radiogroup"
+              aria-labelledby="room-cards-label"
+            >
+              {DECK_MODES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  role="radio"
+                  aria-checked={m === deckMode}
+                  className={m === deckMode ? "selected" : ""}
+                  onClick={() => setDeckMode(m)}
+                  disabled={busy}
+                >
+                  {t(m === "sprint" ? "room.cards.sprint" : "room.cards.full")}
+                  <small className="deck-price">
+                    {t("room.cards.each", { n: cardsPerPlayer(m, maxPlayers) })}
+                  </small>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="arena-prize-note" aria-live="polite">
+            {t("room.cards.note", {
+              cards: cardsPerPlayer(deckMode, maxPlayers),
+            })}
+          </p>
+
           <div className="arena-prize" aria-live="polite">
             <div className="arena-prize-row">
               <span>{t("arena.prize.pot")}</span>
@@ -464,6 +510,19 @@ function RoomPreview({
           <dt>{t("room.config.max")}</dt>
           <dd>
             {room.maxPlayers} {t("arena.players.unit")}
+          </dd>
+        </div>
+        {/* La cifra que el invitado tiene que poder LEER antes de aceptar: con
+            "Completa" cambia según la mesa, así que suponerla no sirve. */}
+        <div className="arena-recap-item">
+          <dt>{t("room.config.cards")}</dt>
+          <dd>
+            {t("room.cards.value", {
+              n: room.cardsPerPlayer,
+              mode: t(
+                room.deckMode === "sprint" ? "room.cards.sprint" : "room.cards.full"
+              ),
+            })}
           </dd>
         </div>
         <div className="arena-recap-item">

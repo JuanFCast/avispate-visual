@@ -16,6 +16,8 @@ const TEXTS: Record<string, MessageKey> = {
   not_in_room: "room.error.not_in_room",
   not_host: "room.error.not_host",
   unauthorized: "room.error.unauthorized",
+  invalid_setup: "room.error.invalid_setup",
+  table_too_big: "room.error.table_too_big",
 };
 
 export function roomErrorText(

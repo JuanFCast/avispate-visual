@@ -212,6 +212,13 @@ export const en = {
   "room.code.link_copied": "Link copied ✓",
   "room.code.hint": "Anyone with this code can sit at the table.",
   "room.config.max": "Max players",
+  "room.config.cards": "How long it runs",
+  "room.cards.sprint": "Quick",
+  "room.cards.full": "Full",
+  "room.cards.each": "{n} each",
+  "room.cards.value": "{n} each · {mode}",
+  "room.cards.note":
+    "Everyone gets {cards} cards, plus one shared base. The rest of the deck is held back for penalty cards.",
   "room.players.aria": "Players in the room",
   "room.players.title": "Players",
   "room.players.host": "Host",
@@ -243,6 +250,9 @@ export const en = {
   "room.error.not_in_room": "You're not sitting at this table anymore.",
   "room.error.not_host": "Only the host can do that.",
   "room.error.unauthorized": "Sign in again to keep your seat.",
+  "room.error.invalid_setup": "That table setup doesn't exist. Pick one of the options.",
+  "room.error.table_too_big":
+    "For now only 2-player tables can actually be played. Tables of 3 and 4 deal correctly but the match screen isn't ready for them yet.",
   "room.error.generic": "That didn't go through. Try again.",
   "room.error.you_offline":
     "We lost the connection. What you see may be out of date — reconnecting…",
@@ -853,6 +863,13 @@ export const es: Record<MessageKey, string> = {
   "room.code.link_copied": "Enlace copiado ✓",
   "room.code.hint": "Cualquiera con este código puede sentarse en la mesa.",
   "room.config.max": "Jugadores máximo",
+  "room.config.cards": "Cuánto dura",
+  "room.cards.sprint": "Rápida",
+  "room.cards.full": "Completa",
+  "room.cards.each": "{n} c/u",
+  "room.cards.value": "{n} c/u · {mode}",
+  "room.cards.note":
+    "A cada uno le tocan {cards} cartas, más una base compartida. El resto del mazo queda de reserva para los castigos.",
   "room.players.aria": "Jugadores en la sala",
   "room.players.title": "Jugadores",
   "room.players.host": "Anfitrión",
@@ -884,6 +901,9 @@ export const es: Record<MessageKey, string> = {
   "room.error.not_in_room": "Ya no estás sentado en esta mesa.",
   "room.error.not_host": "Eso solo lo puede hacer el anfitrión.",
   "room.error.unauthorized": "Vuelve a iniciar sesión para conservar tu silla.",
+  "room.error.invalid_setup": "Esa configuración de mesa no existe. Elige una de las opciones.",
+  "room.error.table_too_big":
+    "Por ahora solo se pueden jugar mesas de 2. Las de 3 y 4 reparten bien, pero la pantalla de partida todavía no está lista para ellas.",
   "room.error.generic": "No se pudo. Inténtalo otra vez.",
   "room.error.you_offline":
     "Se perdió la conexión. Lo que ves puede estar desactualizado; reconectando…",

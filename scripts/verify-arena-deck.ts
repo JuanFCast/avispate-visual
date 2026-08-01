@@ -7,12 +7,17 @@
 //
 // Sin dependencias: Node 22+ ejecuta TypeScript quitando los tipos.
 import {
-  CARDS_PER_PLAYER,
-  MATCH_CARDS,
+  DECK_MODES,
+  MAX_DEALT_CARDS,
   PLANE_CARDS,
   buildMatchDeck,
+  cardsPerPlayer,
+  dealtCards,
+  isDealValid,
+  parseDeckMode,
   placeMatchCard,
   sharedSymbol,
+  type DeckMode,
 } from "../lib/arena-deck.ts";
 import { SYMBOLS } from "../lib/symbols.ts";
 
@@ -44,7 +49,6 @@ console.log("\nForma del mazo");
 const deck = buildMatchDeck("semilla-de-prueba");
 {
   check("son 57 cartas", deck.length, PLANE_CARDS);
-  check("55 se reparten (1 + 27 + 27)", MATCH_CARDS, 55);
   ok("todas tienen 8 símbolos", deck.every((c) => c.length === 8));
   ok(
     "ninguna repite símbolo dentro de sí misma",
@@ -87,25 +91,125 @@ console.log("\nLa propiedad que sostiene la base compartida");
   );
 }
 
-console.log("\nLo que se reparte de verdad");
+console.log("\nCuántas cartas toca a cada uno");
 {
-  const base = deck[0];
-  const mine = deck.slice(1, 1 + CARDS_PER_PLAYER);
-  const theirs = deck.slice(1 + CARDS_PER_PLAYER, MATCH_CARDS);
-  check("mi mazo son 27", mine.length, CARDS_PER_PLAYER);
-  check("el del rival son 27", theirs.length, CARDS_PER_PLAYER);
+  // La tabla completa de la que depende que la mesa sea justa.
+  const want: [DeckMode, number, number][] = [
+    ["sprint", 2, 10],
+    ["sprint", 3, 10],
+    ["sprint", 4, 10],
+    ["full", 2, 27],
+    ["full", 3, 18],
+    ["full", 4, 13],
+  ];
+  for (const [mode, players, per] of want) {
+    check(`${mode} con ${players} → ${per} por jugador`, cardsPerPlayer(mode, players), per);
+  }
+
+  for (const [mode, players] of want) {
+    const dealt = dealtCards(mode, players);
+    ok(
+      `${mode} con ${players}: reparte ${dealt} y no pasa de ${MAX_DEALT_CARDS}`,
+      dealt <= MAX_DEALT_CARDS,
+      `reparte ${dealt}`
+    );
+    ok(`${mode} con ${players}: cabe en el plano`, dealt <= PLANE_CARDS);
+    ok(`${mode} con ${players}: queda reserva de castigos`, PLANE_CARDS - dealt > 0,
+      `${PLANE_CARDS - dealt}`);
+    ok(`${mode} con ${players}: el reparto es válido`, isDealValid(mode, players));
+  }
+
+  check("completa con 2 reparte 55 justos", dealtCards("full", 2), 55);
+  check("completa con 3 también 55", dealtCards("full", 3), 55);
+  check("completa con 4 reparte 53", dealtCards("full", 4), 53);
+
+  // Lo que hace justa la carrera: nadie empieza con más cartas que otro.
+  for (const mode of DECK_MODES) {
+    for (const players of [2, 3, 4]) {
+      const per = cardsPerPlayer(mode, players);
+      ok(
+        `${mode} con ${players}: todos reciben lo mismo`,
+        dealtCards(mode, players) === 1 + per * players
+      );
+    }
+  }
+
+  ok("un modo inventado no se acepta", parseDeckMode("gigante") === null);
+  ok("ni un número donde va el modo", parseDeckMode(27) === null);
+  ok("los dos reales sí", parseDeckMode("sprint") === "sprint" && parseDeckMode("full") === "full");
+  ok("una mesa de 5 no tiene reparto", !isDealValid("full", 5));
+  ok("ni una de 1", !isDealValid("full", 1));
+}
+
+console.log("\nLo que se reparte de verdad, mesa por mesa");
+{
+  for (const mode of DECK_MODES) {
+    for (const players of [2, 3, 4]) {
+      const per = cardsPerPlayer(mode, players);
+      const base = deck[0];
+      const hands: string[][][] = [];
+      for (let i = 0; i < players; i++) {
+        hands.push(deck.slice(1 + i * per, 1 + (i + 1) * per));
+      }
+
+      ok(
+        `${mode}/${players}: cada mano tiene ${per} cartas`,
+        hands.every((h) => h.length === per)
+      );
+      // Cortes consecutivos: si dos jugadores compartieran una carta, uno
+      // podría jugar la que el otro tiene en la mano.
+      const all = hands.flat();
+      ok(
+        `${mode}/${players}: ninguna carta se reparte dos veces`,
+        new Set(all.map((c) => c.join(","))).size === all.length
+      );
+      ok(
+        `${mode}/${players}: la base no está en ninguna mano`,
+        !all.some((c) => c.join(",") === base.join(","))
+      );
+      ok(
+        `${mode}/${players}: toda carta encaja con la base`,
+        all.every((c) => sharedSymbol(c, base) !== null)
+      );
+      // La de verdad: cualquier carta de cualquiera puede volverse base.
+      ok(
+        `${mode}/${players}: toda carta encaja con la de cualquier otro`,
+        hands.every((h, i) =>
+          h.every((c) =>
+            hands.every((other, j) =>
+              i === j ? true : other.every((o) => sharedSymbol(c, o) !== null)
+            )
+          )
+        )
+      );
+
+      // La reserva: lo que no se repartió, y que sigue siendo jugable.
+      const reserve = deck.slice(dealtCards(mode, players));
+      ok(
+        `${mode}/${players}: la reserva son ${PLANE_CARDS - dealtCards(mode, players)}`,
+        reserve.length === PLANE_CARDS - dealtCards(mode, players)
+      );
+      ok(
+        `${mode}/${players}: toda carta de reserva encaja con todo el mazo`,
+        reserve.every((r) =>
+          deck.every((c) => c === r || sharedSymbol(r, c) !== null)
+        )
+      );
+    }
+  }
+}
+
+console.log("\nReciclar descartes cuando la reserva se acaba");
+{
+  // El caso apretado: completa con 3, solo 2 cartas de reserva. A partir del
+  // tercer castigo hay que reutilizar cartas ya jugadas.
+  const dealt = dealtCards("full", 3);
+  ok("completa con 3 deja solo 2 de reserva", PLANE_CARDS - dealt === 2);
   ok(
-    "cada carta mía encaja con la base inicial",
-    mine.every((c) => sharedSymbol(c, base) !== null)
-  );
-  ok(
-    "y con cualquier carta del rival, que es la que puede volverse base",
-    mine.every((c) => theirs.every((o) => sharedSymbol(c, o) !== null))
-  );
-  ok("sobran 2 cartas para el montón de castigo", deck.length - MATCH_CARDS === 2);
-  ok(
-    "una carta de castigo reciclada también encaja con todo",
-    deck.every((c) => c === deck[56] || sharedSymbol(deck[56], c) !== null)
+    "y aun así CUALQUIER carta del mazo sirve de castigo contra cualquier base",
+    deck.every((candidate) =>
+      deck.every((base) => candidate === base || sharedSymbol(candidate, base) !== null)
+    )
   );
 }
 

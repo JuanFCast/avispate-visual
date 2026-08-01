@@ -21,6 +21,7 @@ import {
   type RoomStatus,
   type RoomView,
 } from "../arena-rooms";
+import { cardsPerPlayer, isDealValid, type DeckMode } from "../arena-deck";
 import { getSupabaseAdmin } from "./server";
 
 export interface RoomRow {
@@ -31,6 +32,7 @@ export interface RoomRow {
   max_players: number;
   status: RoomStatus;
   created_at: string;
+  deck_mode: DeckMode;
 }
 
 interface PlayerRow {
@@ -43,7 +45,7 @@ interface PlayerRow {
 }
 
 const ROOM_COLUMNS =
-  "id, code, host_profile_id, entry_units, max_players, status, created_at";
+  "id, code, host_profile_id, entry_units, max_players, status, created_at, deck_mode";
 
 const PLAYER_COLUMNS =
   "profile_id, seat, is_host, is_ready, last_seen_at, profiles(alias, wallet_address)";
@@ -147,8 +149,15 @@ export async function createRoom(params: {
   profileId: string;
   entryUnits: bigint;
   maxPlayers: number;
+  deckMode: DeckMode;
 }): Promise<RoomResult<RoomRow>> {
   const db = getSupabaseAdmin();
+
+  // Última barrera antes de escribir. La ruta ya rechazó lo que no cuadraba,
+  // pero una sala con un reparto imposible no se puede jugar y tampoco se
+  // puede arreglar después: mejor no crearla.
+  if (!isDealValid(params.deckMode, params.maxPlayers)) return fail("invalid_setup");
+
   await leaveAllRooms(params.profileId);
 
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -160,6 +169,7 @@ export async function createRoom(params: {
         host_profile_id: params.profileId,
         entry_units: params.entryUnits.toString(),
         max_players: params.maxPlayers,
+        deck_mode: params.deckMode,
       })
       .select(ROOM_COLUMNS)
       .single();
@@ -354,6 +364,8 @@ export async function readRoom(params: {
       status: live ? "open" : "closed",
       entryUnits: String(room.entry_units),
       maxPlayers: room.max_players,
+      deckMode: room.deck_mode,
+      cardsPerPlayer: cardsPerPlayer(room.deck_mode, room.max_players),
       players: views,
       you: views.find((p) => p.isYou) ?? null,
       matchStarted: (count ?? 0) > 0,

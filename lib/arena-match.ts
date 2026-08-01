@@ -102,8 +102,15 @@ export interface MatchView {
   finishedAt: string | null;
   winnerProfileId: string | null;
   endReason: "cleared" | "abandoned" | null;
+  /** Cuántas cartas recibió cada uno al repartir. La misma cifra para todos. */
+  cardsPerPlayer: number;
   you: MatchPlayerView | null;
-  rival: MatchPlayerView | null;
+  /**
+   * Los demás, en orden de silla. Es una lista y no un rival suelto porque el
+   * reparto ya funciona para 3 y 4; que hoy solo se pueda jugar de a dos es una
+   * decisión de producto, no una forma de la partida.
+   */
+  rivals: MatchPlayerView[];
 }
 
 /** ¿Ya se puede tocar? */

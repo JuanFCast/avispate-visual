@@ -15,11 +15,14 @@
  */
 
 import {
-  CARDS_PER_PLAYER,
-  MATCH_CARDS,
   PLANE_CARDS,
   buildMatchDeck,
+  cardsPerPlayer,
+  dealtCards,
+  isDealValid,
+  parseDeckMode,
   sharedSymbol,
+  type DeckMode,
 } from "../arena-deck";
 import {
   ABANDON_MS,
@@ -45,6 +48,8 @@ interface MatchRow {
   finished_at: string | null;
   winner_profile_id: string | null;
   end_reason: "cleared" | "abandoned" | null;
+  deck_mode: DeckMode;
+  cards_per_player: number;
 }
 
 interface MatchPlayerRow {
@@ -62,7 +67,7 @@ interface MatchPlayerRow {
 }
 
 const MATCH_COLUMNS =
-  "id, room_id, code, seed, base_card, move_seq, starts_at, finished_at, winner_profile_id, end_reason";
+  "id, room_id, code, seed, base_card, move_seq, starts_at, finished_at, winner_profile_id, end_reason, deck_mode, cards_per_player";
 
 const PLAYER_COLUMNS =
   "id, profile_id, seat, deck, correct, errors, penalties, finished_at, left_at, last_seen_at, profiles(alias, wallet_address)";
@@ -139,10 +144,18 @@ export async function startMatch(params: {
     last_seen_at: string;
   }[];
 
-  // Esta fase es de dos. La mesa tiene que estar exactamente llena y con todos
-  // listos: el botón del anfitrión ya lo exige, pero el botón es del navegador.
-  if (players.length !== 2 || room.max_players !== 2) return fail("room_not_ready");
+  // La mesa tiene que estar exactamente llena y con todos listos: el botón del
+  // anfitrión ya lo exige, pero el botón es del navegador.
+  if (players.length !== room.max_players) return fail("room_not_ready");
   if (!players.every((p) => p.is_ready)) return fail("room_not_ready");
+
+  // El reparto se vuelve a validar aquí aunque la sala se creara validando: si
+  // alguna vez se pudiera editar una sala, o cambiara la fórmula, repartir
+  // cartas que el plano no tiene sería un error silencioso y sin arreglo.
+  const mode = parseDeckMode(room.deck_mode) ?? "full";
+  if (!isDealValid(mode, room.max_players)) return fail("room_not_ready");
+
+  const perPlayer = cardsPerPlayer(mode, room.max_players);
 
   const seed = crypto.randomUUID();
   const { data, error } = await db
@@ -151,8 +164,10 @@ export async function startMatch(params: {
       room_id: room.id,
       code: room.code,
       seed,
+      deck_mode: mode,
+      cards_per_player: perPlayer,
       // El mazo ya viene barajado por la semilla: la carta 0 es la base y los
-      // dos tramos siguientes son las manos. Repartir es cortar, no sortear.
+      // tramos siguientes son las manos. Repartir es cortar, no sortear.
       base_card: 0,
       starts_at: new Date(Date.now() + COUNTDOWN_MS).toISOString(),
     })
@@ -169,14 +184,13 @@ export async function startMatch(params: {
   }
 
   const match = data as MatchRow;
+  // Cortes consecutivos del mazo barajado: la carta 0 es la base y cada jugador
+  // se lleva el tramo siguiente. Sin solapes y con el mismo tamaño para todos.
   const hands = players.map((p, i) => ({
     match_id: match.id,
     profile_id: p.profile_id,
     seat: i,
-    deck: Array.from(
-      { length: CARDS_PER_PLAYER },
-      (_, k) => 1 + i * CARDS_PER_PLAYER + k
-    ),
+    deck: Array.from({ length: perPlayer }, (_, k) => 1 + i * perPlayer + k),
   }));
 
   const { error: handError } = await db.from("arena_match_players").insert(hands);
@@ -220,20 +234,23 @@ async function closeIfAbandoned(
   if (match.finished_at) return match;
   if (now < new Date(match.starts_at).getTime()) return match;
 
-  const gone = players.find(
-    (p) =>
-      p.left_at !== null ||
-      now - new Date(p.last_seen_at).getTime() > ABANDON_MS
-  );
-  if (!gone) return match;
+  const isGone = (p: MatchPlayerRow) =>
+    p.left_at !== null || now - new Date(p.last_seen_at).getTime() > ABANDON_MS;
 
-  const survivor = players.find((p) => p.profile_id !== gone.profile_id);
+  const standing = players.filter((p) => !isGone(p) && p.finished_at === null);
+
+  // Con gente de sobra la partida sigue: que uno se caiga de una mesa de cuatro
+  // no es motivo para cerrarla a los otros tres. Solo cuando queda uno solo hay
+  // que dar un final, porque no le queda contra quién correr.
+  if (standing.length > 1) return match;
+  if (standing.length === players.length) return match;
+
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("arena_matches")
     .update({
       finished_at: new Date().toISOString(),
-      winner_profile_id: survivor?.profile_id ?? null,
+      winner_profile_id: standing[0]?.profile_id ?? null,
       end_reason: "abandoned",
     })
     .eq("id", match.id)
@@ -288,7 +305,7 @@ export async function readMatch(params: {
   const cards = buildMatchDeck(match.seed);
   const views = players.map((p) => toPlayerView(p, params.viewerProfileId ?? null, now));
   const you = views.find((v) => v.isYou) ?? null;
-  const rival = views.find((v) => !v.isYou) ?? null;
+  const rivals = views.filter((v) => !v.isYou);
 
   const myRow = players.find((p) => p.profile_id === params.viewerProfileId);
   const myCard = myRow && myRow.deck.length > 0 ? myRow.deck[0] : null;
@@ -312,8 +329,9 @@ export async function readMatch(params: {
       finishedAt: match.finished_at,
       winnerProfileId: match.winner_profile_id,
       endReason: match.end_reason,
+      cardsPerPlayer: match.cards_per_player,
       you,
-      rival,
+      rivals,
     },
   };
 }
@@ -321,17 +339,25 @@ export async function readMatch(params: {
 /**
  * La carta que cae por fallar.
  *
- * Puede ser cualquiera del plano —dos cartas cualesquiera comparten exactamente
- * un símbolo, así que reciclar no rompe nada— con dos excepciones que sí lo
- * romperían: la base (una carta contra sí misma comparte los ocho y no habría
- * respuesta única) y una que ya esté en el mazo del jugador.
+ * Empieza por la RESERVA: las cartas del plano que no se repartieron. Cuántas
+ * son depende de la mesa —36 en una partida rápida de dos, solo 2 en una
+ * completa— y por eso el punto de partida es `dealt` y no un número fijo.
  *
- * Empieza por las dos que nunca se repartieron y sigue dando la vuelta.
+ * Agotada la reserva, sigue dando la vuelta y recicla descartes. Eso es seguro
+ * por construcción: dos cartas cualesquiera del plano comparten exactamente un
+ * símbolo, así que una carta reciclada encaja con la base igual que una nueva.
+ * Las dos únicas que no valen son la base (contra sí misma comparte los ocho y
+ * no habría respuesta única) y una que el jugador ya tenga en la mano.
  */
-function pickPenaltyCard(deck: number[], baseCard: number, spins: number): number {
+function pickPenaltyCard(
+  deck: number[],
+  baseCard: number,
+  spins: number,
+  dealt: number
+): number {
   const held = new Set(deck);
   for (let i = 0; i < PLANE_CARDS; i++) {
-    const card = (MATCH_CARDS + spins + i) % PLANE_CARDS;
+    const card = (dealt + spins + i) % PLANE_CARDS;
     if (card !== baseCard && !held.has(card)) return card;
   }
   // Mazo imposible (tendría 56 cartas en la mano). Cualquiera que no sea la
@@ -395,7 +421,12 @@ export async function applyMove(params: {
     p_seq: params.seq,
     p_card: params.card,
     p_correct: correct,
-    p_penalty_card: pickPenaltyCard(mine.deck, match.base_card, mine.penalties),
+    p_penalty_card: pickPenaltyCard(
+      mine.deck,
+      match.base_card,
+      mine.penalties,
+      dealtCards(match.deck_mode, players.length)
+    ),
   });
   if (error) throw error;
 

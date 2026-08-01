@@ -153,6 +153,19 @@ export default function ArenaRoom({ code }: { code: string }) {
             </dd>
           </div>
           <div className="arena-recap-item">
+            <dt>{t("room.config.cards")}</dt>
+            <dd>
+              {t("room.cards.value", {
+                n: room.cardsPerPlayer,
+                mode: t(
+                  room.deckMode === "sprint"
+                    ? "room.cards.sprint"
+                    : "room.cards.full"
+                ),
+              })}
+            </dd>
+          </div>
+          <div className="arena-recap-item">
             <dt>{t("arena.prize.pot")}</dt>
             <dd>{fmtUsdt(prize.potUnits)} USDT</dd>
           </div>

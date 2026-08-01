@@ -61,7 +61,9 @@ export default function ArenaMatchOver({
         </thead>
         <tbody>
           <Row player={view.you} t={t} winner={view.winnerProfileId} />
-          <Row player={view.rival} t={t} winner={view.winnerProfileId} />
+          {view.rivals.map((r) => (
+            <Row key={r.profileId} player={r} t={t} winner={view.winnerProfileId} />
+          ))}
         </tbody>
       </table>
 

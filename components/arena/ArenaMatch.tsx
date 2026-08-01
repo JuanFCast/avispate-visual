@@ -266,7 +266,7 @@ export default function ArenaMatch({ code }: { code: string }) {
   if (phase === "countdown") {
     return (
       <>
-        <ArenaMatchPlayers you={view.you} rival={view.rival} />
+        <ArenaMatchPlayers you={view.you} rivals={view.rivals} />
         <div className="countdown">
           <div className="countdown-badge" key={count}>
             {count > 0 ? count : t("match.go")}
@@ -281,7 +281,7 @@ export default function ArenaMatch({ code }: { code: string }) {
 
   return (
     <>
-      <ArenaMatchPlayers you={view.you} rival={view.rival} />
+      <ArenaMatchPlayers you={view.you} rivals={view.rivals} />
 
       {failures >= OFFLINE_AFTER && (
         <p className="room-warn" role="status">
