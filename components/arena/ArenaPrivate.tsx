@@ -3,12 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { arenaPrize, fmtEntry, fmtUsdt } from "@/lib/arena";
+import {
+  ARENA_ENTRY_UNITS,
+  ARENA_PLAYER_OPTIONS,
+  arenaPrize,
+  fmtEntry,
+  fmtUsdt,
+} from "@/lib/arena";
 import {
   ROOM_CODE_DIGITS,
   formatRoomCodeInput,
   normalizeRoomCode,
+  roomIsFull,
   type RoomError,
+  type RoomView,
 } from "@/lib/arena-rooms";
 import { useProfile } from "@/lib/profile-context";
 import { useT } from "@/lib/i18n/client";
@@ -25,14 +33,23 @@ interface Props {
 }
 
 /**
- * /arena/privada — los dos caminos a una sala: armarla o entrar con el código.
+ * /arena/privada — dos recorridos que NO comparten configuración.
  *
- * La mesa NO se elige aquí. La entrada y el número de jugadores vienen del
- * lobby en la URL y esta pantalla solo los repite antes de crear, para que el
- * anfitrión confirme lo que va a proponer sin volver atrás. Quien entra con
- * código no elige nada: acepta la mesa que armó el otro.
+ * Esa era la mentira que había que quitar: el lobby deja elegir entrada y
+ * jugadores, y el invitado llegaba aquí con "1 USDT, 2 jugadores" en la cabeza,
+ * escribía un código y aterrizaba en una mesa de 0,10. El servidor hacía lo
+ * correcto —en una sala privada manda el anfitrión— pero la pantalla le había
+ * hecho creer que su elección contaba.
  *
- * Nada de esto cobra. Crear o entrar no mueve USDT ni bloquea fondos.
+ * Ahora:
+ *   · CREAR enseña los selectores de verdad, editables. Es tu mesa, la propones
+ *     tú, y puedes cambiarla aquí mismo antes de repartir el código.
+ *   · UNIRSE no enseña ningún selector. Lo que traías del lobby se ignora por
+ *     completo, y antes de sentarte se te muestra la mesa REAL del anfitrión
+ *     para que aceptes esa y no otra.
+ *
+ * La silla no se reserva hasta que confirmas: mirar una sala y entrar a ella
+ * son dos actos distintos.
  */
 export default function ArenaPrivate({ entry, players }: Props) {
   const t = useT();
@@ -40,17 +57,21 @@ export default function ArenaPrivate({ entry, players }: Props) {
   const { ready, authenticated, getToken } = useProfile();
 
   const [choice, setChoice] = useState<Choice>("create");
+
+  // Lo que trae el lobby es el punto de partida de la mesa que vas a proponer,
+  // no una decisión cerrada.
+  const [entryUnits, setEntryUnits] = useState<bigint>(BigInt(entry));
+  const [maxPlayers, setMaxPlayers] = useState<number>(players);
+
   const [code, setCode] = useState("");
+  /** La sala que se está mirando antes de decidir. Null = todavía en el código. */
+  const [preview, setPreview] = useState<RoomView | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RoomError | null>(null);
-  /** La sala en la que ya estaba sentado, si volvió después de irse. */
   const [activeCode, setActiveCode] = useState<string | null>(null);
 
-  const entryUnits = BigInt(entry);
-  const prize = arenaPrize(entryUnits, players);
+  const prize = arenaPrize(entryUnits, maxPlayers);
 
-  // Una sala abierta a su nombre es lo primero que hay que decirle: crear otra
-  // cerraría la anterior y dejaría a sus amigos esperando en una mesa muerta.
   useEffect(() => {
     if (!ready || !authenticated) {
       setActiveCode(null);
@@ -76,43 +97,17 @@ export default function ArenaPrivate({ entry, players }: Props) {
     };
   }, [ready, authenticated, getToken]);
 
-  const post = useCallback(
-    async (path: string, body: unknown): Promise<string | null> => {
-      const token = await getToken();
-      if (!token) {
-        setError("unauthorized");
-        return null;
-      }
-      const res = await fetch(path, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(body),
-      });
-      const data = await res.json().catch(() => null);
-      if (!res.ok) {
-        setError((data?.error as RoomError) ?? "server_error");
-        return null;
-      }
-      return (data?.code as string) ?? null;
-    },
-    [getToken]
-  );
-
-  async function create() {
+  function pick(next: Choice) {
+    setChoice(next);
     setError(null);
-    setBusy(true);
-    const created = await post("/api/arena/rooms", {
-      entry: entryUnits.toString(),
-      players,
-    });
-    if (created) router.push(`/arena/sala/${created}`);
-    else setBusy(false);
+    setPreview(null);
   }
 
-  async function join(e: React.FormEvent) {
+  /**
+   * Paso 1 de unirse: MIRAR. Lee el estado público de la sala sin token y sin
+   * tocar nada — nadie ocupa una silla por escribir un código.
+   */
+  async function lookup(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     const normalized = normalizeRoomCode(code);
@@ -121,10 +116,96 @@ export default function ArenaPrivate({ entry, players }: Props) {
       return;
     }
     setBusy(true);
-    const joined = await post("/api/arena/rooms/join", { code: normalized });
-    if (joined) router.push(`/arena/sala/${joined}`);
-    else setBusy(false);
+    try {
+      const res = await fetch(`/api/arena/rooms/${normalized}`, {
+        cache: "no-store",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError((data?.error as RoomError) ?? "server_error");
+        return;
+      }
+      const room = data as RoomView;
+      if (room.status === "closed") {
+        setError("room_closed");
+        return;
+      }
+      setPreview(room);
+    } catch {
+      setError("server_error");
+    } finally {
+      setBusy(false);
+    }
   }
+
+  /** Paso 2 de unirse: ACEPTAR. Recién aquí se reserva la silla. */
+  async function confirmJoin() {
+    if (!preview) return;
+    setError(null);
+    setBusy(true);
+    const token = await getToken();
+    if (!token) {
+      setError("unauthorized");
+      setBusy(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/arena/rooms/join", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: preview.code }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError((data?.error as RoomError) ?? "server_error");
+        setBusy(false);
+        return;
+      }
+      router.push(`/arena/sala/${data.code}`);
+    } catch {
+      setError("server_error");
+      setBusy(false);
+    }
+  }
+
+  async function create() {
+    setError(null);
+    setBusy(true);
+    const token = await getToken();
+    if (!token) {
+      setError("unauthorized");
+      setBusy(false);
+      return;
+    }
+    try {
+      const res = await fetch("/api/arena/rooms", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          entry: entryUnits.toString(),
+          players: maxPlayers,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setError((data?.error as RoomError) ?? "server_error");
+        setBusy(false);
+        return;
+      }
+      router.push(`/arena/sala/${data.code}`);
+    } catch {
+      setError("server_error");
+      setBusy(false);
+    }
+  }
+
+  const needsAccess = ready && !authenticated;
 
   return (
     <>
@@ -167,10 +248,7 @@ export default function ArenaPrivate({ entry, players }: Props) {
             role="radio"
             aria-checked={opt.id === choice}
             className={`arena-mode${opt.id === choice ? " selected" : ""}`}
-            onClick={() => {
-              setChoice(opt.id);
-              setError(null);
-            }}
+            onClick={() => pick(opt.id)}
           >
             <span className="arena-mode-emoji" aria-hidden="true">
               {opt.emoji}
@@ -194,34 +272,77 @@ export default function ArenaPrivate({ entry, players }: Props) {
         ))}
       </section>
 
-      {ready && !authenticated ? (
+      {needsAccess ? (
         <section className="arena-card room-login">
           <h2 className="arena-hero-title">{t("room.login.title")}</h2>
           <p className="arena-hero-text">{t("room.login.text")}</p>
           <AccessCard />
         </section>
       ) : choice === "create" ? (
+        /* ---- CREAR: tu mesa, con los selectores a la vista ---- */
         <section className="arena-card arena-setup" aria-label={t("arena.setup.aria")}>
-          <dl className="arena-recap">
-            <div className="arena-recap-item">
-              <dt>{t("arena.entry.label")}</dt>
-              <dd>{fmtEntry(entryUnits)} USDT</dd>
+          <div className="field">
+            <label id="room-entry-label">{t("arena.entry.label")}</label>
+            <div
+              className="rounds-options"
+              role="radiogroup"
+              aria-labelledby="room-entry-label"
+            >
+              {ARENA_ENTRY_UNITS.map((units) => (
+                <button
+                  key={units.toString()}
+                  type="button"
+                  role="radio"
+                  aria-checked={units === entryUnits}
+                  className={units === entryUnits ? "selected" : ""}
+                  onClick={() => setEntryUnits(units)}
+                  disabled={busy}
+                >
+                  {fmtEntry(units)}
+                  <small className="deck-price">USDT</small>
+                </button>
+              ))}
             </div>
-            <div className="arena-recap-item">
-              <dt>{t("room.config.max")}</dt>
-              <dd>
-                {players} {t("arena.players.unit")}
-              </dd>
+          </div>
+
+          <div className="field">
+            <label id="room-players-label">{t("room.config.max")}</label>
+            <div
+              className="rounds-options"
+              role="radiogroup"
+              aria-labelledby="room-players-label"
+            >
+              {ARENA_PLAYER_OPTIONS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={n === maxPlayers}
+                  className={n === maxPlayers ? "selected" : ""}
+                  onClick={() => setMaxPlayers(n)}
+                  disabled={busy}
+                >
+                  {n}
+                  <small className="deck-price">{t("arena.players.unit")}</small>
+                </button>
+              ))}
             </div>
-            <div className="arena-recap-item">
-              <dt>{t("arena.prize.pot")}</dt>
-              <dd>{fmtUsdt(prize.potUnits)} USDT</dd>
+          </div>
+
+          <div className="arena-prize" aria-live="polite">
+            <div className="arena-prize-row">
+              <span>{t("arena.prize.pot")}</span>
+              <strong>{fmtUsdt(prize.potUnits)} USDT</strong>
             </div>
-            <div className="arena-recap-item arena-recap-win">
-              <dt>{t("arena.prize.winner")}</dt>
-              <dd>{fmtUsdt(prize.winnerUnits)} USDT</dd>
+            <div className="arena-prize-row arena-prize-fee">
+              <span>{t("arena.prize.fee")}</span>
+              <strong>−{fmtUsdt(prize.commissionUnits)} USDT</strong>
             </div>
-          </dl>
+            <div className="arena-prize-row arena-prize-win">
+              <span>{t("arena.prize.winner")}</span>
+              <strong>{fmtUsdt(prize.winnerUnits)} USDT</strong>
+            </div>
+          </div>
 
           <p className="arena-prize-note">{t("room.create.note")}</p>
 
@@ -240,10 +361,23 @@ export default function ArenaPrivate({ entry, players }: Props) {
             {t("arena.soon.back_lobby")}
           </Link>
         </section>
+      ) : preview ? (
+        /* ---- UNIRSE, paso 2: la mesa del anfitrión, tal cual es ---- */
+        <RoomPreview
+          room={preview}
+          busy={busy}
+          error={error}
+          onConfirm={confirmJoin}
+          onBack={() => {
+            setPreview(null);
+            setError(null);
+          }}
+        />
       ) : (
+        /* ---- UNIRSE, paso 1: solo el código. Ni un selector. ---- */
         <form
           className="arena-card arena-setup"
-          onSubmit={join}
+          onSubmit={lookup}
           aria-label={t("room.option.join")}
         >
           <div className="field">
@@ -273,9 +407,9 @@ export default function ArenaPrivate({ entry, players }: Props) {
           <button
             type="submit"
             className="btn-primary"
-            disabled={busy || !ready || !normalizeRoomCode(code)}
+            disabled={busy || !normalizeRoomCode(code)}
           >
-            {busy ? t("room.join.joining") : t("room.join.cta")}
+            {busy ? t("room.join.looking") : t("room.join.lookup")}
           </button>
 
           <Link className="lobby-ranking-link" href="/arena">
@@ -284,5 +418,94 @@ export default function ArenaPrivate({ entry, players }: Props) {
         </form>
       )}
     </>
+  );
+}
+
+/**
+ * La mesa que armó otro, antes de aceptarla.
+ *
+ * Enseña lo mismo que vería el anfitrión —entrada, cupo, pozo, premio— más la
+ * ocupación, que es lo único que el invitado necesita y el anfitrión no: saber
+ * si todavía cabe. Y lo dice sin rodeos: esto lo decidió el anfitrión.
+ */
+function RoomPreview({
+  room,
+  busy,
+  error,
+  onConfirm,
+  onBack,
+}: {
+  room: RoomView;
+  busy: boolean;
+  error: RoomError | null;
+  onConfirm: () => void;
+  onBack: () => void;
+}) {
+  const t = useT();
+  const entryUnits = BigInt(room.entryUnits);
+  const prize = arenaPrize(entryUnits, room.maxPlayers);
+  const full = roomIsFull(room);
+  const alreadyIn = room.you !== null;
+
+  return (
+    <section className="arena-card arena-setup" aria-label={t("room.preview.aria")}>
+      <header className="room-preview-head">
+        <span className="room-preview-code">{room.code}</span>
+        <h2 className="arena-hero-title">{t("room.preview.title")}</h2>
+        <p className="arena-prize-note">{t("room.preview.host_decides")}</p>
+      </header>
+
+      <dl className="arena-recap">
+        <div className="arena-recap-item">
+          <dt>{t("arena.entry.label")}</dt>
+          <dd>{fmtEntry(entryUnits)} USDT</dd>
+        </div>
+        <div className="arena-recap-item">
+          <dt>{t("room.config.max")}</dt>
+          <dd>
+            {room.maxPlayers} {t("arena.players.unit")}
+          </dd>
+        </div>
+        <div className="arena-recap-item">
+          <dt>{t("room.preview.occupancy")}</dt>
+          <dd>
+            {room.players.length}/{room.maxPlayers}
+          </dd>
+        </div>
+        <div className="arena-recap-item">
+          <dt>{t("arena.prize.pot")}</dt>
+          <dd>{fmtUsdt(prize.potUnits)} USDT</dd>
+        </div>
+        <div className="arena-recap-item arena-recap-win">
+          <dt>{t("arena.prize.winner")}</dt>
+          <dd>{fmtUsdt(prize.winnerUnits)} USDT</dd>
+        </div>
+      </dl>
+
+      <p className="arena-prize-note">{t("room.create.note")}</p>
+
+      {error && <p className="room-error">{roomErrorText(t, error)}</p>}
+
+      {alreadyIn ? (
+        <Link className="btn-primary room-preview-link" href={`/arena/sala/${room.code}`}>
+          {t("room.preview.already")}
+        </Link>
+      ) : full ? (
+        <p className="room-warn">{t("room.error.full")}</p>
+      ) : (
+        <button
+          type="button"
+          className="btn-primary"
+          onClick={onConfirm}
+          disabled={busy}
+        >
+          {busy ? t("room.join.joining") : t("room.preview.confirm")}
+        </button>
+      )}
+
+      <button type="button" className="room-leave" onClick={onBack} disabled={busy}>
+        {t("room.preview.back")}
+      </button>
+    </section>
   );
 }

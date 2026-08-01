@@ -12,10 +12,13 @@ interface Props {
 }
 
 /**
- * Destino temporal de los dos modos: repite la mesa que se acaba de elegir y
- * dice sin rodeos que todavía no se puede jugar. Existe para que el lobby sea
- * un camino de verdad y no un botón muerto; cuando haya emparejamiento y salas
- * esta pantalla se cae y en su sitio queda la partida.
+ * Destino de la partida rápida mientras no hay emparejamiento.
+ *
+ * Aquí la entrada y el número de jugadores SÍ son la decisión del jugador, al
+ * revés que en una sala privada: cuando el emparejamiento exista, serán filtros
+ * exactos —solo se sienta con gente que eligió lo mismo— y por eso la pantalla
+ * los llama filtros y no "tu mesa". Es el contraste que evita que alguien crea
+ * que su selección viaja también cuando entra con el código de otro.
  */
 export default async function ArenaSoon({
   titleKey,
@@ -36,6 +39,8 @@ export default async function ArenaSoon({
 
       <h1 className="arena-hero-title">{t(titleKey)}</h1>
       <p className="arena-hero-text">{t(textKey)}</p>
+
+      <p className="arena-entries-label">{t("arena.quick.filters")}</p>
 
       <dl className="arena-recap">
         <div className="arena-recap-item">

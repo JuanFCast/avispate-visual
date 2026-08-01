@@ -161,8 +161,9 @@ export const en = {
     "Whoever empties their deck first takes the pot, minus the 20% fee. It lands in their wallet.",
   "arena.howto.note":
     "It's the same game as the daily challenge — here you're racing other people instead of the clock.",
+  "arena.quick.filters": "Your matchmaking filters",
   "arena.soon.quick":
-    "Matchmaking isn't connected yet, so there's no table to sit at for now. This is the setup you picked.",
+    "Matchmaking isn't connected yet, so there's no table to sit at for now. When it is, these two are exact filters: you'll only be seated with people who picked the same entry and the same table size.",
   "arena.soon.back_lobby": "← Back to the Arena",
 
   /* ---------------------------- Salas privadas --------------------------- */
@@ -174,15 +175,25 @@ export const en = {
     "You set the table and get a code to share. You're the host.",
   "room.option.join": "Join with a code",
   "room.option.join.text":
-    "Type the 4 digits your friend sent you and sit at their table.",
+    "Type the 4 digits your friend sent you. Their table, their setup.",
   "room.create.cta": "Create room",
   "room.create.creating": "Creating room…",
+  "room.preview.aria": "The room you're about to join",
+  "room.preview.title": "This is the table",
+  "room.preview.host_decides":
+    "The host set this up. Whatever you picked in the lobby doesn't apply here.",
+  "room.preview.occupancy": "Seats taken",
+  "room.preview.confirm": "Accept and join",
+  "room.preview.back": "Use a different code",
+  "room.preview.already": "You're already here — back to the room",
   "room.create.note":
     "This is the table you're proposing. Nothing is charged yet: no USDT moves and no funds are locked.",
   "room.join.label": "Room code",
   "room.join.hint": "Just the 4 digits — we add the AVP- part.",
+  "room.join.lookup": "See the room",
+  "room.join.looking": "Looking for it…",
   "room.join.cta": "Enter room",
-  "room.join.joining": "Getting you in…",
+  "room.join.joining": "Taking your seat…",
   "room.resume.title": "You still have a room open",
   "room.resume.text": "You're sitting at table {code}.",
   "room.resume.cta": "Back to my room",
@@ -791,8 +802,9 @@ export const es: Record<MessageKey, string> = {
     "El primero que vacía su mazo se lleva el pozo menos la comisión del 20%, directo a su wallet.",
   "arena.howto.note":
     "Es el mismo juego del reto diario: aquí compites contra otras personas en vez de contra el reloj.",
+  "arena.quick.filters": "Tus filtros de emparejamiento",
   "arena.soon.quick":
-    "Todavía no está conectado el emparejamiento, así que por ahora no hay mesa a la que sentarse. Esta es la configuración que elegiste.",
+    "Todavía no está conectado el emparejamiento, así que por ahora no hay mesa a la que sentarse. Cuando lo esté, estos dos son filtros exactos: solo te sentarás con gente que eligió la misma entrada y el mismo número de jugadores.",
   "arena.soon.back_lobby": "← Volver a la Arena",
 
   /* ---------------------------- Salas privadas --------------------------- */
@@ -804,15 +816,25 @@ export const es: Record<MessageKey, string> = {
     "Tú pones la mesa y te damos un código para compartir. Eres el anfitrión.",
   "room.option.join": "Unirme con código",
   "room.option.join.text":
-    "Escribe los 4 dígitos que te pasó tu amigo y siéntate en su mesa.",
+    "Escribe los 4 dígitos que te pasó tu amigo. Su mesa, su configuración.",
   "room.create.cta": "Crear sala",
   "room.create.creating": "Creando la sala…",
+  "room.preview.aria": "La sala a la que vas a entrar",
+  "room.preview.title": "Esta es la mesa",
+  "room.preview.host_decides":
+    "La puso el anfitrión. Lo que hayas elegido en el lobby no cuenta aquí.",
+  "room.preview.occupancy": "Sillas ocupadas",
+  "room.preview.confirm": "Aceptar y unirme",
+  "room.preview.back": "Usar otro código",
+  "room.preview.already": "Ya estás aquí — volver a la sala",
   "room.create.note":
     "Esta es la mesa que vas a proponer. Todavía no se cobra nada: no se mueve USDT ni se bloquean fondos.",
   "room.join.label": "Código de la sala",
   "room.join.hint": "Solo los 4 dígitos; el AVP- lo ponemos nosotros.",
+  "room.join.lookup": "Ver la sala",
+  "room.join.looking": "Buscándola…",
   "room.join.cta": "Entrar a la sala",
-  "room.join.joining": "Entrando…",
+  "room.join.joining": "Tomando tu silla…",
   "room.resume.title": "Todavía tienes una sala abierta",
   "room.resume.text": "Estás sentado en la mesa {code}.",
   "room.resume.cta": "Volver a mi sala",

@@ -3912,6 +3912,39 @@ body {
   text-align: center;
 }
 
+/*
+ * Confirmación antes de sentarse. Es una pantalla de "esto es lo que hay",
+ * así que va centrada y con el código arriba: lo primero que el invitado
+ * necesita comprobar es que escribió bien los cuatro dígitos.
+ */
+.room-preview-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+
+.room-preview-code {
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: var(--yellow-faint);
+  border: 2px solid var(--yellow-line);
+  border-radius: 999px;
+  padding: 4px 18px;
+}
+
+/* Un enlace que hace de botón: mismo peso, sin heredar el subrayado. */
+.room-preview-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
 /* ---------------------- La partida de dos de la Arena ---------------------- */
 
 /*
