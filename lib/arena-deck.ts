@@ -15,8 +15,9 @@
  *
  * ── El plano ────────────────────────────────────────────────────────────────
  * Orden 7 sobre GF(7): 57 cartas, 57 símbolos, 8 símbolos por carta, y dos
- * cartas cualesquiera se cruzan en exactamente uno. La partida usa 55 (una base
- * inicial + 27 para cada jugador) y las 2 sobrantes abren el montón de castigo.
+ * cartas cualesquiera se cruzan en exactamente uno. De ahí sale el tope de 55
+ * repartidas (una base inicial + las manos); las sobrantes abren el montón de
+ * castigo.
  *
  * Como la propiedad vale para el plano ENTERO, una carta de castigo puede ser
  * cualquiera de las 57 sin romper nada: reciclar es seguro por construcción.
@@ -32,33 +33,31 @@ const ORDER = 7;
 export const PLANE_CARDS = ORDER * ORDER + ORDER + 1;
 
 /**
- * Cuántas cartas se reparten.
+ * Cuánto dura la partida, en cartas por jugador.
  *
- * OJO con el nombre: esto NO es el modo de entrar a la Arena (partida rápida vs
- * sala privada). Es cuánto dura la partida. En pantalla se llaman "Rápida" y
- * "Completa"; aquí `sprint` y `full` para que nadie confunda las dos cosas al
- * leer el código.
+ * Antes esto eran dos botones —"Rápida" y "Completa"— y el número salía de una
+ * tabla. Ahora es un entero que elige el anfitrión, entre `CARDS_MIN` y lo que
+ * quepa. Los dos extremos siguen existiendo como atajos en pantalla, pero ya no
+ * son el modelo: el modelo es la cifra.
+ *
+ * Todos reciben exactamente lo mismo, y por eso el reparto se mide por jugador
+ * y no en total: la carrera solo es justa si las manos empiezan iguales.
  */
-export type DeckMode = "sprint" | "full";
 
-export const DECK_MODES = ["sprint", "full"] as const;
-
-/** La partida larga es la que había hasta ahora. */
-export const DEFAULT_DECK_MODE: DeckMode = "full";
-
-/** "Rápida": diez cartas, sin importar cuánta gente haya. */
-export const SPRINT_CARDS_PER_PLAYER = 10;
+/** Menos de diez cartas no es una carrera, es un golpe de suerte. */
+export const CARDS_MIN = 10;
 
 /**
- * "Completa": lo máximo que se puede repartir en partes iguales sin pasarse del
- * tope. Con 2 son 27, con 3 son 18 y con 4 son 13 — y siempre le toca lo mismo
- * a todo el mundo, que es lo que hace justa la carrera.
+ * Cuánta gente cabe en una sala.
+ *
+ * No es una restricción del mazo —de hecho el plano repartiría bien para cinco:
+ * 5 × 10 + 1 = 51, que cabe de sobra— sino de la partida, que se juega con
+ * `ARENA_PLAYER_OPTIONS` de `lib/arena.ts`. Vive aquí duplicado a propósito:
+ * `isDealValid` es la última barrera antes de escribir una sala en la base, y
+ * una barrera que solo sabe de aritmética dejaría pasar una sala de cinco.
  */
-const FULL_CARDS_BY_PLAYERS: Readonly<Record<number, number>> = {
-  2: 27,
-  3: 18,
-  4: 13,
-};
+export const PLAYERS_MIN = 2;
+export const PLAYERS_MAX = 4;
 
 /**
  * Tope de cartas repartidas, contando la base compartida.
@@ -70,35 +69,138 @@ const FULL_CARDS_BY_PLAYERS: Readonly<Record<number, number>> = {
  */
 export const MAX_DEALT_CARDS = 55;
 
-/** Cuántas cartas recibe cada jugador. Todos la misma cantidad, siempre. */
-export function cardsPerPlayer(mode: DeckMode, players: number): number {
-  return mode === "sprint"
-    ? SPRINT_CARDS_PER_PLAYER
-    : (FULL_CARDS_BY_PLAYERS[players] ?? 0);
+/**
+ * Cuántas cartas quedan como reserva en el reparto más grande.
+ *
+ * Son 2, y no una cifra más generosa, precisamente porque aquí reciclar es
+ * seguro por construcción: cuando la reserva se agota se barajan los descartes
+ * y cualquier carta del plano sirve de castigo. En un mazo físico esto tendría
+ * que ser mucho mayor; en este no, y fingir lo contrario solo le quitaría
+ * cartas a la partida sin comprarle seguridad a nadie.
+ */
+export const RESERVE_MIN = 2;
+
+/**
+ * Segundos por carta, solo para el estimado de duración en pantalla.
+ *
+ * Sale del ritmo del reto diario (unos 7 s/carta en solo) redondeado a la baja:
+ * en la Arena se juega más rápido porque hay alguien corriendo al lado. Es una
+ * cifra de copy, no una regla — no la usa nada del juego.
+ */
+export const SEC_PER_CARD = 6;
+
+/**
+ * Lo máximo que se puede repartir en partes iguales sin pasarse del tope.
+ * Con 2 son 27, con 3 son 18 y con 4 son 13.
+ *
+ * Las dos restricciones dan lo mismo aquí (`floor(54/n)`), pero se escriben las
+ * dos: si algún día cambia el orden del plano, la que mande será la correcta y
+ * no la que se quedó escrita a mano.
+ */
+export function maxCardsPerPlayer(players: number): number {
+  if (players < 2) return 0;
+  const byDealCap = Math.floor((MAX_DEALT_CARDS - 1) / players);
+  const byDeck = Math.floor((PLANE_CARDS - RESERVE_MIN - 1) / players);
+  return Math.min(byDealCap, byDeck);
+}
+
+/** Cuánto dura una partida si nadie toca el control: lo más largo que cabe. */
+export function defaultCardsPerPlayer(players: number): number {
+  return maxCardsPerPlayer(players);
+}
+
+/**
+ * El valor dentro de sus límites. Es lo que se usa al cambiar el tamaño de la
+ * sala: bajar de 27 a 13 se avisa en pantalla, pero el estado nunca se queda
+ * en una cifra que no se puede repartir.
+ */
+export function clampCards(cards: number, players: number): number {
+  return Math.min(Math.max(cards, CARDS_MIN), maxCardsPerPlayer(players));
+}
+
+/** Los tres atajos del control. Se re-etiquetan al cambiar de jugadores. */
+export function cardPresets(players: number): {
+  short: number;
+  mid: number;
+  long: number;
+} {
+  const max = maxCardsPerPlayer(players);
+  return {
+    short: CARDS_MIN,
+    // A la baja: con 2 jugadores da 18, que es el punto medio de siempre.
+    mid: Math.floor((CARDS_MIN + max) / 2),
+    long: max,
+  };
 }
 
 /** Cartas que salen del mazo al repartir: la base más las manos. */
-export function dealtCards(mode: DeckMode, players: number): number {
-  return 1 + cardsPerPlayer(mode, players) * players;
+export function dealtCards(cards: number, players: number): number {
+  return 1 + cards * players;
+}
+
+/** Lo que la pantalla enseña debajo del control, ya calculado. */
+export function dealSummary(cards: number, players: number) {
+  const dealt = cards * players;
+  return {
+    /** Las que se van a las manos. */
+    dealt,
+    /** La del centro. Siempre una. */
+    base: 1,
+    inPlay: dealt + 1,
+    reserve: PLANE_CARDS - dealt - 1,
+    /** Redondeado al minuto: un estimado con decimales miente sobre su propia
+        precisión. Mínimo uno, que "0 min" no es una duración. */
+    minutes: Math.max(1, Math.round((dealt * SEC_PER_CARD) / 60)),
+  };
 }
 
 /**
  * ¿Este reparto cabe? Se comprueba en el servidor antes de crear la sala y otra
- * vez antes de repartir, porque una combinación inventada desde la URL o desde
- * la API sacaría cartas que el plano no tiene.
+ * vez antes de repartir, porque una cifra inventada desde la API sacaría cartas
+ * que el plano no tiene.
  */
-export function isDealValid(mode: DeckMode, players: number): boolean {
-  const per = cardsPerPlayer(mode, players);
-  if (per <= 0) return false;
-  const dealt = dealtCards(mode, players);
+export function isDealValid(cards: number, players: number): boolean {
+  if (players < PLAYERS_MIN || players > PLAYERS_MAX) return false;
+  if (!Number.isInteger(cards) || cards < CARDS_MIN) return false;
+  if (cards > maxCardsPerPlayer(players)) return false;
+  const dealt = dealtCards(cards, players);
   return dealt <= MAX_DEALT_CARDS && dealt <= PLANE_CARDS;
 }
 
-/** El modo del cliente, si es uno de los nuestros. Estricto: nada de suponer. */
-export function parseDeckMode(value: unknown): DeckMode | null {
-  return (DECK_MODES as readonly string[]).includes(value as string)
-    ? (value as DeckMode)
-    : null;
+/**
+ * La cifra que mandó el cliente, si es una que se puede repartir en esta sala.
+ * Estricto y sin corregir: aquí no se hace `clamp`. Un cuerpo de API que pide
+ * 40 cartas para cuatro jugadores está pidiendo algo que no existe, y darle en
+ * silencio otra cosa es peor que decirle que no.
+ */
+export function parseCardsPerPlayer(
+  value: unknown,
+  players: number
+): number | null {
+  const n = Number(value);
+  return isDealValid(n, players) ? n : null;
+}
+
+/* ------------------------------------------------------------------------ *
+ * Compatibilidad con las salas de antes                                     *
+ * ------------------------------------------------------------------------ */
+
+/**
+ * El modo de mazo que se guardaba hasta ahora. La columna sigue en la base y se
+ * sigue escribiendo derivada de la cifra, pero ya no decide nada: quien reparte
+ * lee `cards_per_player`. Vive aquí para que las filas viejas y las nuevas
+ * signifiquen lo mismo, no para que alguien vuelva a ramificar por ella.
+ */
+export type DeckMode = "sprint" | "full";
+
+/** Qué modo describe mejor a esta cifra. Solo para escribir la columna. */
+export function deckModeFor(cards: number, players: number): DeckMode {
+  return cards >= maxCardsPerPlayer(players) ? "full" : "sprint";
+}
+
+/** Cuántas cartas repartía una sala de antes, para rellenarla al migrar. */
+export function legacyCardsPerPlayer(mode: string, players: number): number {
+  return mode === "sprint" ? CARDS_MIN : maxCardsPerPlayer(players);
 }
 
 /**

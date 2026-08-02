@@ -7,17 +7,20 @@
 //
 // Sin dependencias: Node 22+ ejecuta TypeScript quitando los tipos.
 import {
-  DECK_MODES,
+  CARDS_MIN,
   MAX_DEALT_CARDS,
   PLANE_CARDS,
+  RESERVE_MIN,
   buildMatchDeck,
-  cardsPerPlayer,
+  cardPresets,
+  clampCards,
+  dealSummary,
   dealtCards,
   isDealValid,
-  parseDeckMode,
+  maxCardsPerPlayer,
+  parseCardsPerPlayer,
   placeMatchCard,
   sharedSymbol,
-  type DeckMode,
 } from "../lib/arena-deck.ts";
 import { SYMBOLS } from "../lib/symbols.ts";
 
@@ -91,89 +94,158 @@ console.log("\nLa propiedad que sostiene la base compartida");
   );
 }
 
-console.log("\nCuántas cartas toca a cada uno");
-{
-  // La tabla completa de la que depende que la mesa sea justa.
-  const want: [DeckMode, number, number][] = [
-    ["sprint", 2, 10],
-    ["sprint", 3, 10],
-    ["sprint", 4, 10],
-    ["full", 2, 27],
-    ["full", 3, 18],
-    ["full", 4, 13],
-  ];
-  for (const [mode, players, per] of want) {
-    check(`${mode} con ${players} → ${per} por jugador`, cardsPerPlayer(mode, players), per);
-  }
+/** Los tamaños de sala que el reparto tiene que saber servir. */
+const SIZES = [2, 3, 4];
 
-  for (const [mode, players] of want) {
-    const dealt = dealtCards(mode, players);
+/** Cada tamaño con las cifras que hay que probar: mínimo, medio y máximo. */
+function rangeFor(players: number): number[] {
+  const { short, mid, long } = cardPresets(players);
+  return [short, mid, long];
+}
+
+console.log("\nEl máximo de cartas por jugador");
+{
+  // La tabla de la que depende que la sala sea justa y que quepa en el plano.
+  check("con 2 jugadores el máximo es 27", maxCardsPerPlayer(2), 27);
+  check("con 3 jugadores el máximo es 18", maxCardsPerPlayer(3), 18);
+  check("con 4 jugadores el máximo es 13", maxCardsPerPlayer(4), 13);
+
+  check("el mínimo es 10 para todos", CARDS_MIN, 10);
+  ok(
+    "y el mínimo cabe en las tres salas",
+    SIZES.every((p) => CARDS_MIN <= maxCardsPerPlayer(p))
+  );
+
+  for (const players of SIZES) {
+    const max = maxCardsPerPlayer(players);
+    const dealt = dealtCards(max, players);
     ok(
-      `${mode} con ${players}: reparte ${dealt} y no pasa de ${MAX_DEALT_CARDS}`,
+      `${players} jugadores: en el máximo reparte ${dealt} y no pasa de ${MAX_DEALT_CARDS}`,
       dealt <= MAX_DEALT_CARDS,
       `reparte ${dealt}`
     );
-    ok(`${mode} con ${players}: cabe en el plano`, dealt <= PLANE_CARDS);
-    ok(`${mode} con ${players}: queda reserva de castigos`, PLANE_CARDS - dealt > 0,
-      `${PLANE_CARDS - dealt}`);
-    ok(`${mode} con ${players}: el reparto es válido`, isDealValid(mode, players));
+    ok(`${players} jugadores: cabe en el plano`, dealt <= PLANE_CARDS);
+    ok(
+      `${players} jugadores: quedan al menos ${RESERVE_MIN} de reserva`,
+      PLANE_CARDS - dealt >= RESERVE_MIN,
+      `quedan ${PLANE_CARDS - dealt}`
+    );
   }
 
-  check("completa con 2 reparte 55 justos", dealtCards("full", 2), 55);
-  check("completa con 3 también 55", dealtCards("full", 3), 55);
-  check("completa con 4 reparte 53", dealtCards("full", 4), 53);
-
-  // Lo que hace justa la carrera: nadie empieza con más cartas que otro.
-  for (const mode of DECK_MODES) {
-    for (const players of [2, 3, 4]) {
-      const per = cardsPerPlayer(mode, players);
-      ok(
-        `${mode} con ${players}: todos reciben lo mismo`,
-        dealtCards(mode, players) === 1 + per * players
-      );
-    }
-  }
-
-  ok("un modo inventado no se acepta", parseDeckMode("gigante") === null);
-  ok("ni un número donde va el modo", parseDeckMode(27) === null);
-  ok("los dos reales sí", parseDeckMode("sprint") === "sprint" && parseDeckMode("full") === "full");
-  ok("una mesa de 5 no tiene reparto", !isDealValid("full", 5));
-  ok("ni una de 1", !isDealValid("full", 1));
+  check("el máximo con 2 reparte 55 justos", dealtCards(27, 2), 55);
+  check("con 3 también 55", dealtCards(18, 3), 55);
+  check("con 4 reparte 53", dealtCards(13, 4), 53);
 }
 
-console.log("\nLo que se reparte de verdad, mesa por mesa");
+console.log("\nValidación: lo que se acepta y lo que no");
 {
-  for (const mode of DECK_MODES) {
-    for (const players of [2, 3, 4]) {
-      const per = cardsPerPlayer(mode, players);
+  for (const players of SIZES) {
+    for (const cards of rangeFor(players)) {
+      ok(`${cards} cartas con ${players} jugadores es válido`, isDealValid(cards, players));
+    }
+    const max = maxCardsPerPlayer(players);
+    ok(
+      `${max + 1} con ${players} jugadores NO`,
+      !isDealValid(max + 1, players),
+      "se pasa del máximo"
+    );
+    ok(`9 cartas con ${players} jugadores NO`, !isDealValid(9, players));
+  }
+
+  ok("una cifra con decimales no es un reparto", !isDealValid(12.5, 2));
+  ok("ni un negativo", !isDealValid(-3, 2));
+  ok("una sala de 5 no tiene reparto", !isDealValid(10, 5));
+  ok("ni una de 1", !isDealValid(10, 1));
+
+  // El caso del checklist: un cuerpo de API manipulado.
+  ok(
+    "el servidor rechaza 40 cartas con 4 jugadores",
+    parseCardsPerPlayer(40, 4) === null
+  );
+  ok("y no lo recorta en silencio a 13", parseCardsPerPlayer(40, 4) !== 13);
+  ok("un texto donde va la cifra tampoco pasa", parseCardsPerPlayer("muchas", 2) === null);
+  ok("13 con 4 jugadores sí pasa", parseCardsPerPlayer(13, 4) === 13);
+  ok("y '18' como texto numérico también", parseCardsPerPlayer("18", 3) === 18);
+}
+
+console.log("\nClamp al cambiar el tamaño de la sala");
+{
+  // Los dos casos del checklist, que son asimétricos a propósito.
+  check("27 con 2 → cambiar a 4 baja a 13", clampCards(27, 4), 13);
+  check("10 con 4 → cambiar a 2 se queda en 10", clampCards(10, 2), 10);
+  check("por debajo del mínimo sube a 10", clampCards(3, 2), 10);
+  ok(
+    "el clamp siempre deja un reparto válido",
+    SIZES.every((p) => [1, 10, 19, 27, 99].every((c) => isDealValid(clampCards(c, p), p)))
+  );
+}
+
+console.log("\nLos atajos del control");
+{
+  check("con 2: 10 / 18 / 27", cardPresets(2), { short: 10, mid: 18, long: 27 });
+  check("con 3: 10 / 14 / 18", cardPresets(3), { short: 10, mid: 14, long: 18 });
+  check("con 4: 10 / 11 / 13", cardPresets(4), { short: 10, mid: 11, long: 13 });
+  ok(
+    "los tres son válidos en su sala",
+    SIZES.every((p) => rangeFor(p).every((c) => isDealValid(c, p)))
+  );
+}
+
+console.log("\nEl resumen que se enseña en pantalla");
+{
+  // El ejemplo del anexo: 18 cartas con 2 jugadores.
+  check("18 con 2 jugadores", dealSummary(18, 2), {
+    dealt: 36,
+    base: 1,
+    inPlay: 37,
+    reserve: 20,
+    minutes: 4,
+  });
+  ok(
+    "nunca muestra decimales",
+    SIZES.every((p) =>
+      rangeFor(p).every((c) => {
+        const s = dealSummary(c, p);
+        return Object.values(s).every((v) => Number.isInteger(v));
+      })
+    )
+  );
+  ok(
+    "y nunca dice que dura 0 minutos",
+    SIZES.every((p) => rangeFor(p).every((c) => dealSummary(c, p).minutes >= 1))
+  );
+}
+
+console.log("\nLo que se reparte de verdad, sala por sala");
+{
+  for (const players of SIZES) {
+    for (const per of rangeFor(players)) {
+      const tag = `${per}×${players}`;
       const base = deck[0];
       const hands: string[][][] = [];
       for (let i = 0; i < players; i++) {
         hands.push(deck.slice(1 + i * per, 1 + (i + 1) * per));
       }
 
-      ok(
-        `${mode}/${players}: cada mano tiene ${per} cartas`,
-        hands.every((h) => h.length === per)
-      );
+      ok(`${tag}: cada mano tiene ${per} cartas`, hands.every((h) => h.length === per));
       // Cortes consecutivos: si dos jugadores compartieran una carta, uno
       // podría jugar la que el otro tiene en la mano.
       const all = hands.flat();
       ok(
-        `${mode}/${players}: ninguna carta se reparte dos veces`,
+        `${tag}: ninguna carta se reparte dos veces`,
         new Set(all.map((c) => c.join(","))).size === all.length
       );
       ok(
-        `${mode}/${players}: la base no está en ninguna mano`,
+        `${tag}: la base no está en ninguna mano`,
         !all.some((c) => c.join(",") === base.join(","))
       );
       ok(
-        `${mode}/${players}: toda carta encaja con la base`,
+        `${tag}: toda carta encaja con la base`,
         all.every((c) => sharedSymbol(c, base) !== null)
       );
       // La de verdad: cualquier carta de cualquiera puede volverse base.
       ok(
-        `${mode}/${players}: toda carta encaja con la de cualquier otro`,
+        `${tag}: toda carta encaja con la de cualquier otro`,
         hands.every((h, i) =>
           h.every((c) =>
             hands.every((other, j) =>
@@ -184,13 +256,13 @@ console.log("\nLo que se reparte de verdad, mesa por mesa");
       );
 
       // La reserva: lo que no se repartió, y que sigue siendo jugable.
-      const reserve = deck.slice(dealtCards(mode, players));
+      const reserve = deck.slice(dealtCards(per, players));
       ok(
-        `${mode}/${players}: la reserva son ${PLANE_CARDS - dealtCards(mode, players)}`,
-        reserve.length === PLANE_CARDS - dealtCards(mode, players)
+        `${tag}: la reserva son ${PLANE_CARDS - dealtCards(per, players)}`,
+        reserve.length === PLANE_CARDS - dealtCards(per, players)
       );
       ok(
-        `${mode}/${players}: toda carta de reserva encaja con todo el mazo`,
+        `${tag}: toda carta de reserva encaja con todo el mazo`,
         reserve.every((r) =>
           deck.every((c) => c === r || sharedSymbol(r, c) !== null)
         )
@@ -201,10 +273,10 @@ console.log("\nLo que se reparte de verdad, mesa por mesa");
 
 console.log("\nReciclar descartes cuando la reserva se acaba");
 {
-  // El caso apretado: completa con 3, solo 2 cartas de reserva. A partir del
+  // El caso apretado: el máximo con 3, solo 2 cartas de reserva. A partir del
   // tercer castigo hay que reutilizar cartas ya jugadas.
-  const dealt = dealtCards("full", 3);
-  ok("completa con 3 deja solo 2 de reserva", PLANE_CARDS - dealt === 2);
+  const dealt = dealtCards(18, 3);
+  ok("el máximo con 3 deja solo 2 de reserva", PLANE_CARDS - dealt === RESERVE_MIN);
   ok(
     "y aun así CUALQUIER carta del mazo sirve de castigo contra cualquier base",
     deck.every((candidate) =>

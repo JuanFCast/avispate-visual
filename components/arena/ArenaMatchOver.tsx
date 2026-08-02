@@ -69,11 +69,13 @@ export default function ArenaMatchOver({
 
       <p className="arena-prize-note">{t("match.over.no_prize")}</p>
 
-      <Link className="arena-cta" href="/arena/privada">
+      {/* Los dos enlaces no van al mismo sitio: la revancha es armar otra sala,
+          y volver a la Arena es lo otro que se puede querer hacer. */}
+      <Link className="arena-cta" href="/arena/crear">
         {t("match.over.again")}
       </Link>
       <Link className="lobby-ranking-link" href="/arena">
-        {t("arena.soon.back_lobby")}
+        {t("join.exit.arena")}
       </Link>
     </section>
   );

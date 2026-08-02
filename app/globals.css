@@ -3468,9 +3468,293 @@ body {
   color: var(--ink);
 }
 
-/* Configuración: los dos selectores, el cálculo y el botón, en una tarjeta. */
+/*
+ * La misma tarjeta, pero como ENLACE. En /arena ya no se elige una opción para
+ * confirmarla con un botón de abajo: tocar la tarjeta es la acción. Por eso no
+ * lleva el círculo del check —no hay nada que marcar— sino un chevrón, que es
+ * lo que en un teléfono significa "esto te lleva a otro sitio".
+ */
+.arena-mode-link {
+  text-decoration: none;
+}
+
+.arena-mode-go {
+  flex: none;
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--gray);
+}
+
+.arena-mode-link:active .arena-mode-go {
+  color: var(--ink);
+}
+
+/* Lo que todavía no existe, dicho en una línea y sin ocupar un botón. */
+.arena-next-up {
+  margin: 0;
+  text-align: center;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0.6;
+}
+
+/* --- Encabezado con vuelta atrás: crear, código y sala --- */
+
+.arena-head-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+/* La flecha se saca del flujo para que el título quede centrado de verdad y no
+   descentrado por el ancho del botón. */
+.arena-head-nav {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+
+.arena-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 44 px: el tamaño mínimo de un objetivo táctil. Volver no se falla. */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-soft);
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.arena-back:active {
+  background: var(--gray-soft);
+}
+
+.arena-back:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.arena-head-bar .page-title {
+  padding: 0 52px;
+}
+
+/* Configuración: los selectores, el cálculo y el botón, en una tarjeta. */
 .arena-setup {
   gap: 16px;
+}
+
+/* Un dato que no se elige (hoy, los jugadores). Se ve que es información y no
+   un control apagado: sin borde, sin sombra, sin nada que invite al dedo. */
+.arena-fixed-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+}
+
+.arena-fixed-value strong {
+  font-family: var(--font-title);
+  font-size: 1.4rem;
+  font-weight: 600;
+}
+
+.arena-fixed-value span {
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.arena-field-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.4;
+  opacity: 0.6;
+}
+
+/* --- Cartas por jugador: slider, pasos, atajos y resumen --- */
+
+.arena-cards-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* El número, grande y a la derecha de su etiqueta: es el dato que se está
+   moviendo, y tiene que leerse sin buscar dónde quedó el pulgar. */
+.arena-cards-value {
+  font-family: var(--font-title);
+  font-size: 1.6rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.arena-cards-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.arena-cards-step {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--white);
+  font-family: var(--font-title);
+  font-size: 1.3rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.arena-cards-step:active {
+  background: var(--yellow-soft);
+}
+
+.arena-cards-step:disabled {
+  cursor: default;
+  border-color: var(--gray-soft);
+  color: var(--gray);
+}
+
+.arena-cards-step:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+/*
+ * El slider. Se estiliza a mano en los dos motores porque el nativo cambia de
+ * altura, de color y de tamaño de pulgar según el teléfono, y aquí conviven con
+ * botones de 44 px que sí son nuestros.
+ */
+.arena-cards-range {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.arena-cards-range::-webkit-slider-runnable-track {
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--yellow-faint);
+}
+
+.arena-cards-range::-moz-range-track {
+  height: 10px;
+  border-radius: 999px;
+  border: 2px solid var(--ink);
+  background: var(--yellow-faint);
+}
+
+.arena-cards-range::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  /* El track mide 10 px con 2 de borde: (14 − 26) / 2 centra el pulgar. */
+  margin-top: -10px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  box-shadow: 0 2px 0 var(--yellow-press);
+}
+
+.arena-cards-range::-moz-range-thumb {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--ink);
+  background: var(--yellow);
+  box-shadow: 0 2px 0 var(--yellow-press);
+}
+
+.arena-cards-range:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 4px;
+  border-radius: 999px;
+}
+
+.arena-cards-ends {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.55;
+}
+
+.arena-cards-presets {
+  margin-top: 2px;
+}
+
+/* Lo que significa la cifra: cuántas se reparten, cuántas quedan en juego y
+   cuánto dura. Sin esto, "18" no es una decisión, es un número. */
+.arena-cards-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 2px solid var(--gray-soft);
+  background: var(--white);
+}
+
+.arena-cards-summary > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.arena-cards-summary dt {
+  font-size: 0.84rem;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.arena-cards-summary dd {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 0.98rem;
+  font-weight: 600;
+}
+
+/* La línea del tope, separada: es el límite contra el que se decide. */
+.arena-cards-total {
+  padding-top: 6px;
+  border-top: 2px solid var(--gray-soft);
+}
+
+.arena-cards-total dt,
+.arena-cards-total dd {
+  opacity: 1;
+  font-weight: 700;
 }
 
 /*
@@ -3655,13 +3939,88 @@ body {
   text-align: center;
 }
 
+/* Título de un bloque dentro de la sala. Más chico que el de la pantalla: es
+   un rótulo, no un encabezado que compita con el de arriba. */
+.room-section-title {
+  margin: 0;
+  font-family: var(--font-title);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+/*
+ * El campo del código: el `AVP-` impreso a la izquierda y los cuatro dígitos
+ * a continuación. El prefijo NO es texto editable ni un placeholder — es parte
+ * del campo, como el `$` de un campo de dinero. Antes se pedía en un
+ * placeholder y una nota explicaba que no había que escribirlo; ninguna
+ * instrucción arregla un campo que pide lo que no quiere.
+ */
+.room-code-field {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 14px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 16px;
+  background: var(--white);
+}
+
+.room-code-field:focus-within {
+  border-color: var(--cyan);
+}
+
+.room-code-prefix {
+  flex: none;
+  font-family: var(--font-title);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  color: var(--gray);
+  user-select: none;
+}
+
 /* El código, escrito por el jugador. Espaciado como se dicta: cifra a cifra. */
 .room-code-input {
   font-family: var(--font-title);
   font-size: 1.5rem;
   letter-spacing: 0.12em;
-  text-align: center;
   text-transform: uppercase;
+}
+
+/* Dentro del campo con prefijo pierde su propio borde: el borde es del grupo. */
+.room-code-field .room-code-input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: none;
+  padding-left: 0;
+}
+
+.room-code-field .room-code-input:focus {
+  outline: none;
+}
+
+/* Un error con salida: el mensaje y, cuando la hay, la puerta. */
+.room-problem {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.room-problem-exit {
+  padding: 8px 14px;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--ink);
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 /*

@@ -81,12 +81,10 @@ export interface RoomView {
   /** Unidades de USDT como texto: el JSON no sabe de `bigint`. */
   entryUnits: string;
   maxPlayers: number;
-  /** "sprint" (Rápida) o "full" (Completa). Lo eligió el anfitrión. */
-  deckMode: string;
   /**
-   * Cuántas cartas le tocarán a cada uno. Se manda calculada y no se deja
-   * deducir en la pantalla: con "Completa" depende del tamaño de la mesa, y el
-   * invitado tiene que poder LEER la cifra antes de aceptar, no inferirla.
+   * Cuántas cartas le tocarán a cada uno. Lo eligió el anfitrión y baja tal
+   * cual desde la base: quien se une tiene que poder LEER la cifra antes de
+   * sentarse, no deducirla de un modo y un número de jugadores.
    */
   cardsPerPlayer: number;
   /** Ordenados por silla, incluidas las vacías (que simplemente no aparecen). */

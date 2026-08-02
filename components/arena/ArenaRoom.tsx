@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { arenaPrize, fmtEntry, fmtUsdt } from "@/lib/arena";
+import { dealSummary } from "@/lib/arena-deck";
 import { useArenaRoom } from "@/lib/arena-room";
 import { roomErrorText } from "@/lib/arena-room-errors";
 import { roomCanStart, roomIsFull, type RoomPlayerView } from "@/lib/arena-rooms";
@@ -11,6 +12,7 @@ import { useProfile } from "@/lib/profile-context";
 import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n";
 import AccessCard from "../AccessCard";
+import ArenaHeader from "./ArenaHeader";
 
 /** Cuánto se queda "Copiado ✓" antes de volver a ser un botón normal. */
 const COPIED_MS = 1600;
@@ -19,17 +21,22 @@ const COPIED_MS = 1600;
 const OFFLINE_AFTER = 3;
 
 /**
- * /arena/sala/[codigo] — la mesa privada mientras se llena.
+ * /arena/sala/[codigo] — donde convergen los dos caminos.
  *
- * Lo que hay que ver de un vistazo, en este orden: el código (para compartirlo,
- * que es a lo que se viene), la mesa que se acordó y quién falta. El botón de
- * iniciar es del anfitrión y no arranca nada todavía —lo dice él mismo al
- * tocarlo—; los demás solo se marcan listos.
+ * El que armó la sala llega aquí desde la pantalla de configurar; el que trae
+ * un código llega desde la de escribirlo. Es la MISMA pantalla para los dos, y
+ * lo que cambia no es la estructura sino el estado: quién ya está sentado, si
+ * falta gente y de quién es el turno de tocar el botón.
  *
- * Recargar no pierde el sitio: la silla vive en el servidor, no en la pestaña,
- * así que volver a esta URL vuelve a sentarte donde estabas.
+ * Aquí el resumen de la sala es de SOLO LECTURA, y a propósito: el invitado la
+ * ve por primera vez —nunca configuró nada— y el anfitrión ya decidió. Un
+ * control editable en esta pantalla significaría que la sala puede cambiar bajo
+ * los pies de quien ya dijo que sí.
  *
- * No se cobra, no se bloquean fondos y no se reparte ningún pozo.
+ * Recargar no pierde el sitio: la silla vive en el servidor, no en la pestaña.
+ *
+ * No se cobra, no se bloquean fondos y no se reparte ningún pozo. Por eso el
+ * botón dice "Estoy listo" y no "Confirmar y pagar".
  */
 export default function ArenaRoom({ code }: { code: string }) {
   const t = useT();
@@ -88,7 +95,7 @@ export default function ArenaRoom({ code }: { code: string }) {
 
   async function onLeave() {
     await leave();
-    router.push("/arena/privada");
+    router.push("/arena");
   }
 
   if (loading && !room) {
@@ -110,6 +117,7 @@ export default function ArenaRoom({ code }: { code: string }) {
 
   const entryUnits = BigInt(room.entryUnits);
   const prize = arenaPrize(entryUnits, room.maxPlayers);
+  const runtime = dealSummary(room.cardsPerPlayer, room.maxPlayers);
   const full = roomIsFull(room);
   const canStart = roomCanStart(room);
   const emptySeats = Math.max(0, room.maxPlayers - room.players.length);
@@ -118,52 +126,56 @@ export default function ArenaRoom({ code }: { code: string }) {
 
   return (
     <>
-      <header className="arena-lobby-head">
-        <span className="arena-tag">{t("room.tag")}</span>
-        <h1 className="page-title">{t("room.title")}</h1>
-        <p className="page-lead">{t("room.subtitle")}</p>
-      </header>
+      <ArenaHeader
+        backHref="/arena"
+        title={t("room.title")}
+        lead={you?.isHost ? t("room.subtitle.host") : t("room.subtitle.guest")}
+      />
 
       {/* El código, que es a lo que se viene: grande, seleccionable y con los
-          dos botones que lo sacan de aquí. */}
-      <section className="arena-card room-code-card" aria-label={t("room.code.label")}>
-        <span className="room-code-label">{t("room.code.label")}</span>
-        <strong className="room-code-value">{room.code}</strong>
-        <div className="room-code-actions">
-          <button type="button" className="room-code-btn" onClick={copyCode}>
-            {copied === "code" ? t("room.code.copied") : t("room.code.copy")}
-          </button>
-          <button type="button" className="room-code-btn" onClick={share}>
-            {copied === "link" ? t("room.code.link_copied") : t("room.code.share")}
-          </button>
-        </div>
-        <small className="room-code-hint">{t("room.code.hint")}</small>
-      </section>
+          dos botones que lo sacan de aquí.
 
-      <section className="arena-card arena-setup" aria-label={t("arena.setup.aria")}>
+          Solo para quien ya está sentado. Al que llegó por el enlace y todavía
+          no entró no le sirve compartirlo —él lo acaba de recibir—: lo que
+          necesita ver primero es la sala y el botón de unirse. */}
+      {you && (
+        <section className="arena-card room-code-card" aria-label={t("room.code.label")}>
+          <span className="room-code-label">{t("room.code.label")}</span>
+          <strong className="room-code-value">{room.code}</strong>
+          <div className="room-code-actions">
+            <button type="button" className="room-code-btn" onClick={copyCode}>
+              {copied === "code" ? t("room.code.copied") : t("room.code.copy")}
+            </button>
+            <button type="button" className="room-code-btn" onClick={share}>
+              {copied === "link" ? t("room.code.link_copied") : t("room.code.share")}
+            </button>
+          </div>
+          <small className="room-code-hint">{t("room.code.hint")}</small>
+        </section>
+      )}
+
+      {/* La sala tal como quedó. Se lee, no se toca: quien la armó ya decidió y
+          quien llegó con el código la ve aquí por primera vez. */}
+      <section className="arena-card arena-setup" aria-label={t("room.recap.aria")}>
+        <h2 className="room-section-title">{t("room.recap.title")}</h2>
         <dl className="arena-recap">
           <div className="arena-recap-item">
             <dt>{t("arena.entry.label")}</dt>
             <dd>{fmtEntry(entryUnits)} USDT</dd>
           </div>
           <div className="arena-recap-item">
-            <dt>{t("room.config.max")}</dt>
+            <dt>{t("arena.players.label")}</dt>
             <dd>
               {room.maxPlayers} {t("arena.players.unit")}
             </dd>
           </div>
           <div className="arena-recap-item">
-            <dt>{t("room.config.cards")}</dt>
-            <dd>
-              {t("room.cards.value", {
-                n: room.cardsPerPlayer,
-                mode: t(
-                  room.deckMode === "sprint"
-                    ? "room.cards.sprint"
-                    : "room.cards.full"
-                ),
-              })}
-            </dd>
+            <dt>{t("cards.label")}</dt>
+            <dd>{t("cards.each", { n: room.cardsPerPlayer })}</dd>
+          </div>
+          <div className="arena-recap-item">
+            <dt>{t("cards.summary.time")}</dt>
+            <dd>{t("cards.summary.minutes", { n: runtime.minutes })}</dd>
           </div>
           <div className="arena-recap-item">
             <dt>{t("arena.prize.pot")}</dt>
@@ -174,7 +186,7 @@ export default function ArenaRoom({ code }: { code: string }) {
             <dd>{fmtUsdt(prize.winnerUnits)} USDT</dd>
           </div>
         </dl>
-        <p className="arena-prize-note">{t("room.create.note")}</p>
+        <p className="arena-prize-note">{t("room.no_charge")}</p>
       </section>
 
       <section className="arena-card room-players" aria-label={t("room.players.aria")}>
@@ -273,10 +285,6 @@ export default function ArenaRoom({ code }: { code: string }) {
             {you.isHost ? t("room.leave.host") : t("room.leave.guest")}
           </button>
         )}
-
-        <Link className="lobby-ranking-link" href="/arena/privada">
-          {t("room.back")}
-        </Link>
       </section>
     </>
   );
@@ -318,10 +326,9 @@ function SeatFilled({ player, t }: { player: RoomPlayerView; t: Translate }) {
 function RoomProblem({ t, message }: { t: Translate; message: string }) {
   return (
     <section className="arena-card arena-hero room-state">
-      <span className="arena-tag">{t("room.tag")}</span>
       <h1 className="arena-hero-title">{t("room.error.title")}</h1>
       <p className="arena-hero-text">{message}</p>
-      <Link className="arena-cta" href="/arena/privada">
+      <Link className="arena-cta" href="/arena">
         {t("room.error.cta")}
       </Link>
     </section>

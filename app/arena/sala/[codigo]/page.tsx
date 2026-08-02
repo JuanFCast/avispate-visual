@@ -13,9 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getServerT();
   const code = normalizeRoomCode(decodeURIComponent(codigo));
   return {
-    title: code
-      ? t("meta.arena.room.title", { code })
-      : t("meta.arena.private.title"),
+    title: code ? t("meta.arena.room.title", { code }) : t("meta.arena.title"),
     // Un código de sala en un índice de búsqueda deja de ser privado.
     robots: { index: false, follow: false },
   };

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useT } from "@/lib/i18n/client";
-import ArenaEntries from "../arena/ArenaEntries";
 import ArenaPlayers from "../arena/ArenaPlayers";
 
 /**
@@ -10,8 +9,11 @@ import ArenaPlayers from "../arena/ArenaPlayers";
  * reto diario para que al entrar se vea que Avíspate tiene dos formas de
  * jugar — solo o en la Arena — sin parecer un menú de opciones.
  *
- * Todavía no hay emparejamiento, pagos ni partidas: el botón solo lleva a
- * /arena, que cuenta lo que viene. Nada de esto toca el modo individual.
+ * Ya no lleva el badge "PRONTO" ni la fila de entradas. El badge sobraba porque
+ * la Arena se puede jugar: se arma una sala, se comparte el código y se juega.
+ * Las entradas sobraban por otra razón — eran tres fichas con precios que no se
+ * podían tocar, y un precio que no responde al dedo parece un botón roto. La
+ * entrada se elige al configurar la sala, que es donde significa algo.
  */
 export default function ArenaCard() {
   const t = useT();
@@ -19,7 +21,6 @@ export default function ArenaCard() {
   return (
     <section className="arena-card" aria-label={t("arena.aria")}>
       <div className="arena-head">
-        <span className="arena-tag">{t("arena.tag")}</span>
         <h2 className="arena-title">{t("arena.title")}</h2>
         <p className="arena-support">{t("arena.support")}</p>
       </div>
@@ -27,8 +28,6 @@ export default function ArenaCard() {
       <div className="arena-art">
         <ArenaPlayers />
       </div>
-
-      <ArenaEntries />
 
       <Link className="arena-cta" href="/arena">
         {t("arena.cta")}

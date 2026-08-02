@@ -21,7 +21,7 @@ import {
   type RoomStatus,
   type RoomView,
 } from "../arena-rooms";
-import { cardsPerPlayer, isDealValid, type DeckMode } from "../arena-deck";
+import { deckModeFor, isDealValid, type DeckMode } from "../arena-deck";
 import { getSupabaseAdmin } from "./server";
 
 export interface RoomRow {
@@ -32,7 +32,9 @@ export interface RoomRow {
   max_players: number;
   status: RoomStatus;
   created_at: string;
+  /** Legado: se escribe derivada de `cards_per_player` y no decide nada. */
   deck_mode: DeckMode;
+  cards_per_player: number;
 }
 
 interface PlayerRow {
@@ -45,7 +47,7 @@ interface PlayerRow {
 }
 
 const ROOM_COLUMNS =
-  "id, code, host_profile_id, entry_units, max_players, status, created_at, deck_mode";
+  "id, code, host_profile_id, entry_units, max_players, status, created_at, deck_mode, cards_per_player";
 
 const PLAYER_COLUMNS =
   "profile_id, seat, is_host, is_ready, last_seen_at, profiles(alias, wallet_address)";
@@ -149,14 +151,16 @@ export async function createRoom(params: {
   profileId: string;
   entryUnits: bigint;
   maxPlayers: number;
-  deckMode: DeckMode;
+  cardsPerPlayer: number;
 }): Promise<RoomResult<RoomRow>> {
   const db = getSupabaseAdmin();
 
   // Última barrera antes de escribir. La ruta ya rechazó lo que no cuadraba,
   // pero una sala con un reparto imposible no se puede jugar y tampoco se
   // puede arreglar después: mejor no crearla.
-  if (!isDealValid(params.deckMode, params.maxPlayers)) return fail("invalid_setup");
+  if (!isDealValid(params.cardsPerPlayer, params.maxPlayers)) {
+    return fail("invalid_setup");
+  }
 
   await leaveAllRooms(params.profileId);
 
@@ -169,7 +173,10 @@ export async function createRoom(params: {
         host_profile_id: params.profileId,
         entry_units: params.entryUnits.toString(),
         max_players: params.maxPlayers,
-        deck_mode: params.deckMode,
+        cards_per_player: params.cardsPerPlayer,
+        // Derivada, no decisiva: la columna vieja sigue describiendo la sala
+        // para quien la lea, pero repartir se reparte por la cifra.
+        deck_mode: deckModeFor(params.cardsPerPlayer, params.maxPlayers),
       })
       .select(ROOM_COLUMNS)
       .single();
@@ -364,8 +371,7 @@ export async function readRoom(params: {
       status: live ? "open" : "closed",
       entryUnits: String(room.entry_units),
       maxPlayers: room.max_players,
-      deckMode: room.deck_mode,
-      cardsPerPlayer: cardsPerPlayer(room.deck_mode, room.max_players),
+      cardsPerPlayer: room.cards_per_player,
       players: views,
       you: views.find((p) => p.isYou) ?? null,
       matchStarted: (count ?? 0) > 0,

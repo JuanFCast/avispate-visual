@@ -17,10 +17,9 @@
 import {
   PLANE_CARDS,
   buildMatchDeck,
-  cardsPerPlayer,
   dealtCards,
+  deckModeFor,
   isDealValid,
-  parseDeckMode,
   sharedSymbol,
   type DeckMode,
 } from "../arena-deck";
@@ -152,10 +151,8 @@ export async function startMatch(params: {
   // El reparto se vuelve a validar aquí aunque la sala se creara validando: si
   // alguna vez se pudiera editar una sala, o cambiara la fórmula, repartir
   // cartas que el plano no tiene sería un error silencioso y sin arreglo.
-  const mode = parseDeckMode(room.deck_mode) ?? "full";
-  if (!isDealValid(mode, room.max_players)) return fail("room_not_ready");
-
-  const perPlayer = cardsPerPlayer(mode, room.max_players);
+  const perPlayer = room.cards_per_player;
+  if (!isDealValid(perPlayer, room.max_players)) return fail("room_not_ready");
 
   const seed = crypto.randomUUID();
   const { data, error } = await db
@@ -164,8 +161,10 @@ export async function startMatch(params: {
       room_id: room.id,
       code: room.code,
       seed,
-      deck_mode: mode,
+      // La partida guarda lo que de verdad repartió, no lo que la sala decía:
+      // una partida terminada no se reescribe si mañana cambia la fórmula.
       cards_per_player: perPlayer,
+      deck_mode: deckModeFor(perPlayer, room.max_players),
       // El mazo ya viene barajado por la semilla: la carta 0 es la base y los
       // tramos siguientes son las manos. Repartir es cortar, no sortear.
       base_card: 0,
@@ -425,7 +424,7 @@ export async function applyMove(params: {
       mine.deck,
       match.base_card,
       mine.penalties,
-      dealtCards(match.deck_mode, players.length)
+      dealtCards(match.cards_per_player, players.length)
     ),
   });
   if (error) throw error;

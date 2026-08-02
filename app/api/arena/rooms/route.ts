@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireIdentity } from "@/lib/http";
 import { ARENA_ENTRY_UNITS, ARENA_PLAYER_OPTIONS } from "@/lib/arena";
-import { isDealValid, parseDeckMode } from "@/lib/arena-deck";
+import { parseCardsPerPlayer } from "@/lib/arena-deck";
 import { createRoom } from "@/lib/supabase/arena-rooms";
 import { ensureProfile } from "@/lib/supabase/profiles";
 
@@ -17,9 +17,10 @@ export const dynamic = "force-dynamic";
  * con 400 y quien lo mandó se entera.
  *
  * Lo que se comprueba: que la entrada sea una de las tres reales, que el número
- * de jugadores sea uno de los tres reales, que el modo de cartas exista, y que
- * la combinación de los dos últimos quepa en el mazo (`isDealValid`). Nada de
- * esto confía en lo que dijera la pantalla.
+ * de jugadores sea uno de los tres reales, y que las cartas por jugador sean un
+ * entero que QUEPA en el mazo para ese número de jugadores. Nada de esto confía
+ * en lo que dijera la pantalla, y nada se corrige en silencio: `40` cartas para
+ * cuatro jugadores se rechaza, no se recorta a 13.
  *
  * No cobra nada. Crear la sala no mueve USDT ni bloquea fondos.
  */
@@ -35,12 +36,13 @@ export async function POST(req: Request) {
   const maxPlayers = (ARENA_PLAYER_OPTIONS as readonly number[]).find(
     (n) => n === Number(body?.players)
   );
-  const deckMode = parseDeckMode(body?.cards);
+  // El límite depende del número de jugadores, así que se valida DESPUÉS de
+  // saber cuántos son: 27 es legal para dos y no para cuatro.
+  const cardsPerPlayer = maxPlayers
+    ? parseCardsPerPlayer(body?.cards, maxPlayers)
+    : null;
 
-  if (!entryUnits || !maxPlayers || !deckMode) {
-    return NextResponse.json({ error: "invalid_setup" }, { status: 400 });
-  }
-  if (!isDealValid(deckMode, maxPlayers)) {
+  if (!entryUnits || !maxPlayers || !cardsPerPlayer) {
     return NextResponse.json({ error: "invalid_setup" }, { status: 400 });
   }
 
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
       profileId: profile.id,
       entryUnits,
       maxPlayers,
-      deckMode,
+      cardsPerPlayer,
     });
     if (!result.ok) {
       return NextResponse.json(

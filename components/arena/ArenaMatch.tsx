@@ -246,7 +246,7 @@ export default function ArenaMatch({ code }: { code: string }) {
         <p className="arena-hero-text">
           {error === "not_playing" ? t("match.gone.not_yours") : t("match.gone.text")}
         </p>
-        <Link className="arena-cta" href="/arena/privada">
+        <Link className="arena-cta" href="/arena">
           {t("room.error.cta")}
         </Link>
       </section>
