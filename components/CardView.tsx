@@ -7,7 +7,7 @@ interface Props {
   symbols: PlacedSymbol[];
   /** Símbolo que debe destellar en esta carta, si alguno. */
   flashSymbolId: string | null;
-  flashType: "good" | "bad" | null;
+  flashType: "good" | "bad" | "late" | null;
   shake: boolean;
   disabled: boolean;
   onTap: (symbolId: string) => void;

@@ -13,6 +13,14 @@ import ArenaMatchPlayers from "./ArenaMatchPlayers";
 
 /** Lo que tarda la carta vieja en salir de cuadro. Igual que en el individual. */
 const EXIT_MS = 600;
+/** Cuánto se queda el destello de acierto o de error. */
+const FLASH_MS = 280;
+/**
+ * El de "llegaste tarde" dura más. No es vanidad de animación: es el único de
+ * los tres que además tiene que EXPLICARSE, y 280 ms no alcanzan para leer por
+ * qué el toque bueno que acabas de dar no movió nada.
+ */
+const LATE_FLASH_MS = 750;
 /** Cada cuánto se repinta el reloj y la cuenta regresiva. */
 const TICK_MS = 100;
 /** Latidos perdidos a partir de los cuales el desconectado eres tú. */
@@ -70,10 +78,11 @@ export default function ArenaMatch({ code }: { code: string }) {
   const [cards, setCards] = useState<VisualCard[]>([]);
   const [feedback, setFeedback] = useState<{
     symbolId: string;
-    type: "good" | "bad";
+    type: "good" | "bad" | "late";
   } | null>(null);
   const [shake, setShake] = useState(false);
   const [penaltyKey, setPenaltyKey] = useState(0);
+  const [lateKey, setLateKey] = useState(0);
   const [muted, setMutedState] = useState(false);
 
   const shown = useRef<{ base: number | null; mine: number | null }>({
@@ -210,12 +219,31 @@ export default function ArenaMatch({ code }: { code: string }) {
       }
 
       const res = await play(symbolId);
+      let hold = FLASH_MS;
 
       if (res?.outcome === "penalty") {
         setPenaltyKey((k) => k + 1);
+      } else if (res?.outcome === "stale" && looksRight) {
+        /*
+         * Los dos tocaron el símbolo bueno casi a la vez y el otro llegó
+         * primero. Aquí estaba el peor momento de la partida: el destello verde
+         * ya había salido —se adelanta a propósito, para que el toque se sienta
+         * inmediato— y luego se borraba y no pasaba nada más. Verde y quieto se
+         * lee como un juego roto, no como una carrera perdida por un pelo.
+         *
+         * Así que el verde se CORRIGE a ámbar en vez de desaparecer, y se dice
+         * por qué. No cuesta nada —el servidor no cobra castigo por esto— y esa
+         * es justamente la parte que había que poder contar.
+         */
+        setFeedback({ symbolId, type: "late" });
+        setShake(false);
+        setLateKey((k) => k + 1);
+        sound.late();
+        hold = LATE_FLASH_MS;
       } else if (res?.outcome === "stale") {
-        // Tocó bien, pero contra una base que el rival ya había cambiado. No
-        // cuesta nada: se borra el destello y a mirar de nuevo.
+        // Tarde, pero es que además NO era el símbolo. Se borra el rojo, porque
+        // castigo no hubo; y no se dice "te ganaron de mano", porque no es
+        // verdad: no lo tenías. Consolar con un mérito que no existe enseña mal.
         setFeedback(null);
         setShake(false);
       }
@@ -223,7 +251,7 @@ export default function ArenaMatch({ code }: { code: string }) {
       setTimeout(() => {
         setFeedback(null);
         setShake(false);
-      }, 280);
+      }, hold);
     },
     [view, play]
   );
@@ -240,11 +268,15 @@ export default function ArenaMatch({ code }: { code: string }) {
   /**
    * Al acertar, el símbolo común destella en las DOS cartas: es lo que
    * confirma el match. Al fallar, solo en la tuya — la base no tiene la culpa.
+   *
+   * Y al llegar tarde, también solo en la tuya, por un motivo distinto: la base
+   * contra la que acertaste ya no está en pantalla. Pintarle ese símbolo a la
+   * que acaba de llegar sería señalar una coincidencia que no existe.
    */
   function flashFor(role: Role): string | null {
     if (!feedback) return null;
-    if (feedback.type === "bad") return role === "incoming" ? feedback.symbolId : null;
-    return feedback.symbolId;
+    if (feedback.type === "good") return feedback.symbolId;
+    return role === "incoming" ? feedback.symbolId : null;
   }
 
   if (loading && !view) {
@@ -329,6 +361,13 @@ export default function ArenaMatch({ code }: { code: string }) {
           {penaltyKey > 0 && (
             <span key={penaltyKey} className="penalty-float">
               {t("match.penalty")}
+            </span>
+          )}
+          {/* La explicación del ámbar. Flota igual que el castigo pero en el
+              otro color, y dice lo que pasó en tres palabras. */}
+          {lateKey > 0 && (
+            <span key={`late-${lateKey}`} className="late-float">
+              {t("match.late")}
             </span>
           )}
           {visual.map((vc) => (

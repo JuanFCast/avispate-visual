@@ -23,6 +23,12 @@
   --bg: #fffdf6;
   --good: #2fbf71;
   --bad: #ef476f;
+  /*
+   * "Llegaste tarde": ni acierto ni error. Es ámbar y NO el amarillo de marca
+   * (--yellow), que en toda la app significa "esto se puede tocar": un estado
+   * pintado con el color de los botones se leería como una invitación.
+   */
+  --late: #e08a00;
   --font-title: var(--font-fredoka), "Comic Sans MS", system-ui, sans-serif;
   --font-body: var(--font-nunito), system-ui, sans-serif;
   --card-d: min(88vw, 40vh, 340px);
@@ -641,6 +647,25 @@ body {
   }
 }
 
+/*
+ * "Te ganaron de mano". Flota igual que el castigo, en ámbar y algo más chico:
+ * es una explicación, no una cuenta. Y va más lento, porque hay que leerla —
+ * el +1 se entiende de un vistazo y esto no.
+ */
+.late-float {
+  position: absolute;
+  top: 46%;
+  left: 50%;
+  z-index: 5;
+  font-family: var(--font-title);
+  font-size: 1.1rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--late);
+  pointer-events: none;
+  animation: float-up 1.2s ease forwards;
+}
+
 /* Mazo: una carta fantasma asomada detrás de tu carta mientras queden más. */
 .deck-stack {
   position: absolute;
@@ -788,6 +813,12 @@ body {
   .penalty-float {
     animation-duration: 0.01s;
   }
+
+  /* El de tarde NO se acelera a 0.01 s como los demás: los otros son adornos
+     de algo que ya se ve, y este es texto que hay que alcanzar a leer. */
+  .late-float {
+    animation-duration: 1.2s;
+  }
 }
 
 /*
@@ -872,6 +903,17 @@ body {
 
 .symbol-btn.flash-bad {
   background: rgba(239, 71, 111, 0.35);
+}
+
+/*
+ * Acertaste, pero otro cambió la base primero.
+ *
+ * Sin el `pulse-good` del acierto: el símbolo se queda quieto en ámbar. El
+ * verde late porque algo pasó; esto es justamente lo contrario —no pasó nada—
+ * y hacerlo latir volvería a prometer lo que no hubo.
+ */
+.symbol-btn.flash-late {
+  background: rgba(224, 138, 0, 0.35);
 }
 
 @keyframes pulse-good {

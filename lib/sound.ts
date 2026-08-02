@@ -97,6 +97,17 @@ export const sound = {
   error() {
     tone(180, { type: "sawtooth", duration: 0.22, volume: 0.1, slideTo: 110 });
   },
+  /**
+   * Llegaste tarde: dos notas que bajan, suaves.
+   *
+   * A propósito NO se parece al error —ese es un sawtooth grave y áspero— sino
+   * a un "uy, casi". No es un castigo: es que otro llegó primero, y el oído
+   * también tiene que poder distinguir las dos cosas sin mirar.
+   */
+  late() {
+    tone(520, { type: "triangle", duration: 0.1, volume: 0.11 });
+    tone(390, { type: "triangle", duration: 0.16, volume: 0.11, delay: 0.08 });
+  },
   /** Fin de partida: arpegio de cierre. */
   finish() {
     [523, 659, 784, 1047].forEach((f, i) =>

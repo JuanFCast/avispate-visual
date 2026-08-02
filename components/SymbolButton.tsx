@@ -6,16 +6,26 @@ import { useI18n } from "@/lib/i18n/client";
 
 interface Props {
   placed: PlacedSymbol;
-  flash: "good" | "bad" | null;
+  /**
+   * `late` es de la Arena: acertaste, pero otro cambió la base antes de que tu
+   * toque aterrizara. No es un acierto y tampoco es un error, así que no puede
+   * pintarse como ninguno de los dos.
+   */
+  flash: "good" | "bad" | "late" | null;
   disabled: boolean;
   onTap: (symbolId: string) => void;
 }
 
+const FLASH_CLASS = {
+  good: " flash-good",
+  bad: " flash-bad",
+  late: " flash-late",
+} as const;
+
 export default function SymbolButton({ placed, flash, disabled, onTap }: Props) {
   const { lang } = useI18n();
   const symbol = SYMBOL_BY_ID[placed.symbolId];
-  const flashClass =
-    flash === "good" ? " flash-good" : flash === "bad" ? " flash-bad" : "";
+  const flashClass = flash ? FLASH_CLASS[flash] : "";
 
   return (
     <button
