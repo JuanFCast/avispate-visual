@@ -671,6 +671,32 @@ body {
   }
 }
 
+/*
+ * La base que cambió porque la cambió OTRO.
+ *
+ * Entra por arriba, desde donde está la franja del rival, y no desde el mazo
+ * de abajo. La dirección es la única pista de quién jugó: si las dos cartas
+ * suben desde el mismo sitio, la del rival se lee como tuya y el tablero
+ * miente sobre lo que acaba de pasar.
+ *
+ * Se inclina al revés que la del mazo (−8° contra +10°) para que las dos
+ * entradas no se confundan ni siquiera de reojo, y sale ligeramente a la
+ * derecha porque la carta vieja se va hacia la izquierda: así se cruzan sin
+ * pisarse. Vale para las dos orientaciones — arriba es arriba en las dos, y
+ * la franja de jugadores tampoco se mueve de sitio.
+ */
+.chain-card.fresh-above {
+  animation: deal-in-above 0.5s cubic-bezier(0.3, 0.75, 0.3, 1.04) 0.12s backwards;
+}
+
+@keyframes deal-in-above {
+  from {
+    transform: translate(calc(var(--card-d) * 0.2), calc(var(--card-d) * -1.4))
+      rotate(-8deg) scale(0.85);
+    opacity: 0;
+  }
+}
+
 /* Pantallas anchas o celular horizontal: las cartas van lado a lado. */
 @media (min-width: 760px), (orientation: landscape) {
   .shell.playing {
@@ -751,7 +777,8 @@ body {
     transition-duration: 0.12s;
   }
 
-  .chain-card.fresh {
+  .chain-card.fresh,
+  .chain-card.fresh-above {
     animation: none;
   }
 

@@ -20,6 +20,16 @@ const OFFLINE_AFTER = 3;
 
 type Role = "base" | "incoming" | "exiting";
 
+/**
+ * Por dónde entró la carta al tablero.
+ *
+ * No es decoración: es quién la puso. Tu mazo está abajo y de ahí salen tus
+ * cartas; la base la cambia otro y por eso baja desde arriba, que es donde
+ * está la franja del rival. Cuando las dos entraban por abajo, la carta del
+ * rival parecía tuya y el tablero mentía sobre quién acababa de jugar.
+ */
+type Entry = "deck" | "above";
+
 interface VisualCard {
   /** Identidad estable del elemento. Una carta reciclada por castigo puede
       repetir índice, y dos elementos con la misma llave romperían la animación. */
@@ -27,6 +37,7 @@ interface VisualCard {
   card: number;
   symbols: string[];
   role: Role;
+  entry: Entry;
 }
 
 function vibrate(pattern: number | number[]) {
@@ -118,8 +129,11 @@ export default function ArenaMatch({ code }: { code: string }) {
    * El truco de la animación es que la carta NO se vuelve a crear cuando
    * asciende: el mismo elemento cambia de papel y el CSS lo lleva de un sitio a
    * otro. Por eso se busca primero si la carta que ahora es base ya estaba en
-   * pantalla como tuya —entonces sube— y solo si no estaba se crea (es la del
-   * rival, que llega volando).
+   * pantalla como tuya —entonces sube— y solo si no estaba se crea.
+   *
+   * Y ahí está la distinción que importa: si hubo que crearla, es que no salió
+   * de tu mano. La puso otro, así que entra por arriba. Las tuyas siempre
+   * suben desde el mazo.
    */
   useEffect(() => {
     if (!view) return;
@@ -150,6 +164,7 @@ export default function ArenaMatch({ code }: { code: string }) {
               card: view.baseCard,
               symbols: view.baseSymbols,
               role: "base",
+              entry: "above",
             });
       }
 
@@ -159,6 +174,7 @@ export default function ArenaMatch({ code }: { code: string }) {
           card: view.myCard,
           symbols: view.mySymbols,
           role: "incoming",
+          entry: "deck",
         });
       }
 
@@ -316,7 +332,12 @@ export default function ArenaMatch({ code }: { code: string }) {
             </span>
           )}
           {visual.map((vc) => (
-            <div key={vc.key} className={`chain-card slot-${vc.role} fresh`}>
+            <div
+              key={vc.key}
+              className={`chain-card slot-${vc.role} ${
+                vc.entry === "above" ? "fresh-above" : "fresh"
+              }`}
+            >
               <CardView
                 symbols={vc.placed}
                 flashSymbolId={flashFor(vc.role)}
