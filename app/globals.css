@@ -648,22 +648,70 @@ body {
 }
 
 /*
- * "Te ganaron de mano". Flota igual que el castigo, en ámbar y algo más chico:
- * es una explicación, no una cuenta. Y va más lento, porque hay que leerla —
- * el +1 se entiende de un vistazo y esto no.
+ * "Te ganaron de mano".
+ *
+ * No es texto flotando como el +1: es una PÍLDORA, con el borde tinta y la
+ * sombra dura del resto de la app. Suelto en ámbar se perdía, porque cae
+ * encima de una carta llena de emojis de colores y competía con ellos en vez
+ * de taparlos. Sobre fondo pleno no hay con qué confundirlo.
+ *
+ * Tinta sobre ámbar y no blanco: el blanco sobre este naranja se queda en 2,6
+ * de contraste y no se lee de reojo, que es justo como se lee esto.
+ *
+ * Entra con un golpe de escala antes de subir. El +1 se entiende de un vistazo
+ * y puede limitarse a flotar; esto hay que alcanzar a leerlo, así que primero
+ * aterriza y se queda quieto un momento, y solo al final se va.
  */
 .late-float {
   position: absolute;
-  top: 46%;
+  top: 44%;
   left: 50%;
-  z-index: 5;
+  z-index: 6;
+  padding: 9px 20px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--late);
+  color: var(--ink);
   font-family: var(--font-title);
-  font-size: 1.1rem;
-  font-weight: 600;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.1;
   white-space: nowrap;
-  color: var(--late);
+  box-shadow: 0 4px 0 rgba(13, 13, 15, 0.3);
+  transform: translate(-50%, -50%);
   pointer-events: none;
-  animation: float-up 1.2s ease forwards;
+  animation: late-pop 1.35s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+@keyframes late-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.6);
+  }
+  16% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+  28% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  72% {
+    opacity: 1;
+    transform: translate(-50%, -56%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -165%) scale(0.95);
+  }
+}
+
+/* En pantallas estrechas la píldora entera tiene que caber sin desbordar. */
+@media (max-width: 360px) {
+  .late-float {
+    font-size: 1.1rem;
+    padding: 7px 14px;
+    border-width: 2px;
+  }
 }
 
 /* Mazo: una carta fantasma asomada detrás de tu carta mientras queden más. */
@@ -815,9 +863,20 @@ body {
   }
 
   /* El de tarde NO se acelera a 0.01 s como los demás: los otros son adornos
-     de algo que ya se ve, y este es texto que hay que alcanzar a leer. */
+     de algo que ya se ve, y este es texto que hay que alcanzar a leer. Se
+     queda quieto y solo se desvanece — sin golpe de escala ni subida. */
   .late-float {
-    animation-duration: 1.2s;
+    animation: late-hold 1.35s ease forwards;
+  }
+
+  @keyframes late-hold {
+    0%,
+    75% {
+      opacity: 1;
+    }
+    100% {
+      opacity: 0;
+    }
   }
 }
 
