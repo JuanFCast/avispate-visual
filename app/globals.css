@@ -770,14 +770,11 @@ body {
   }
 }
 
-/* Pantallas anchas o celular horizontal: las cartas van lado a lado. */
+/* Pantallas anchas o celular horizontal: las cartas van lado a lado.
+   OJO: el `--card-d` de este layout NO va aquí. `.shell.playing` se declara más
+   abajo en el archivo, así que una medida puesta en este bloque la pisaría la
+   de allá — misma especificidad, y gana la última. Vive junto a esa. */
 @media (min-width: 760px), (orientation: landscape) {
-  .shell.playing {
-    /* una sola fila de cartas, más grandes: se resta el chrome vertical una
-       vez y el ancho de las píldoras laterales */
-    --card-d: min(calc(50vw - 150px), calc(100dvh - 156px), 420px);
-  }
-
   .play-board {
     gap: 18px;
   }
@@ -898,6 +895,25 @@ body {
 
 .shell.playing .chain-area {
   margin-bottom: 8px;
+}
+
+/*
+ * Lado a lado: las dos cartas en una fila.
+ *
+ * Esta medida tiene que ir DESPUÉS de `.shell.playing`, no dentro del bloque
+ * de arriba donde vivía. Tenían la misma especificidad y ganaba la última del
+ * archivo, así que la de la fila nunca llegó a aplicarse: hasta ahora todas
+ * las pantallas usaban la cuenta de apilado vertical —con su `50dvh`, que es
+ * "media pantalla por carta"— y su tope de 340 px. En un escritorio de 1440 ×
+ * 900 daba 340 px de carta rodeados de vacío, y en un celular horizontal daba
+ * 131 px, que es media carta.
+ *
+ * Aquí el alto se resta UNA vez, no dos, porque las cartas ya no se apilan.
+ */
+@media (min-width: 760px), (orientation: landscape) {
+  .shell.playing {
+    --card-d: min(calc(50vw - 150px), calc(100dvh - 156px), 420px);
+  }
 }
 
 /* ---------- Cartas circulares ---------- */
@@ -4685,6 +4701,140 @@ body {
 
 .match-row-crown {
   margin-left: 4px;
+}
+
+/* ==========================================================================
+ * TABLERO EN ESCRITORIO Y TABLET HORIZONTAL
+ * --------------------------------------------------------------------------
+ * Vale para el reto diario y para la Arena: las dos usan `.shell.playing` y
+ * el mismo `.chain-area`, así que el tamaño se calcula una sola vez.
+ *
+ * La condición lleva `min-height` a propósito. Con solo `min-width: 1024px`
+ * entraría también el celular horizontal —844 × 390 es ancho y bajísimo— y ahí
+ * una carta de 400 px no cabe. Pidiendo las dos cosas, esto es exactamente lo
+ * que se pidió: tablet horizontal y computador, y el celular no se entera.
+ *
+ * El tamaño sale del espacio que de verdad queda, no de una fracción del
+ * viewport: al ancho útil se le restan los dos rieles de indicadores y el
+ * hueco entre cartas, y lo que sobra se parte en dos. El `clamp` de 320–580 px
+ * es lo que evita que se deforme en los extremos.
+ *
+ * Y como el alto casi nunca es el límite en estas pantallas, el presupuesto
+ * vertical puede ser holgado sin costar tamaño: sobra alto, falta ancho.
+ * ========================================================================== */
+@media (min-width: 1024px) and (min-height: 640px) {
+  .shell.playing {
+    /* 1200 dejaba aire muerto a los lados en cualquier monitor moderno. */
+    max-width: 1500px;
+    padding: 12px 16px;
+
+    --board-w: min(100vw, 1500px);
+    /* Separación entre el riel de indicadores y la carta. */
+    --board-gap: clamp(12px, 1.4vw, 22px);
+    /* Ancho del riel completo: la píldora más su separación. */
+    --rail: clamp(84px, 8vw, 128px);
+    /* Hueco entre las dos cartas. */
+    --deal-gap: clamp(28px, 3vw, 56px);
+    /* Todo lo que no es tablero: franja de arriba, salir y los márgenes. */
+    --chrome-v: 170px;
+
+    /*
+     * Se restan 48 y no los 32 del padding: los 16 de más son colchón. En
+     * Windows `100vw` incluye el ancho de la barra de desplazamiento aunque no
+     * haya barra, y sin ese margen el tablero calza al píxel — cualquier
+     * redondeo lo desbordaría.
+     */
+    --card-d: clamp(
+      320px,
+      min(
+        calc((var(--board-w) - 48px - var(--rail) * 2 - var(--deal-gap)) / 2),
+        calc(100dvh - var(--chrome-v))
+      ),
+      580px
+    );
+  }
+
+  /* La Arena carga además la franja de jugadores y el enlace de abandonar. */
+  .shell.playing.match-shell {
+    --chrome-v: 200px;
+    gap: 8px;
+  }
+
+  .shell.playing .chain-area {
+    --card-gap: var(--deal-gap);
+    margin-bottom: 4px;
+  }
+
+  .play-board {
+    gap: var(--board-gap);
+  }
+
+  /*
+   * Los indicadores dejan de ser pastillitas sueltas al lado de una carta
+   * enorme: crecen con el riel y su número pasa a ser lo que más pesa dentro,
+   * que es lo único que se mira de reojo en mitad de una partida.
+   */
+  .side-stats {
+    gap: 12px;
+  }
+
+  .stat-pill {
+    width: calc(var(--rail) - var(--board-gap));
+    padding: 12px 6px;
+    gap: 4px;
+    border-radius: 18px;
+  }
+
+  .stat-pill .sp-emoji {
+    font-size: 1.3rem;
+  }
+
+  .stat-pill .sp-value {
+    font-size: 1.1rem;
+  }
+
+  .stat-pill .sp-label {
+    font-size: 0.6rem;
+  }
+
+  .mute-btn {
+    width: 52px;
+    height: 52px;
+    font-size: 1.3rem;
+  }
+
+  /* Arriba: la barra de progreso se ensancha con el tablero y se pega más a
+     él. Ese margen inferior era el hueco más grande de la pantalla. */
+  .play-top {
+    max-width: 900px;
+    margin-top: 0;
+    margin-bottom: clamp(8px, 1.2vh, 16px);
+  }
+
+  .play-top .mute-btn {
+    width: 42px;
+    height: 42px;
+    font-size: 1.05rem;
+  }
+
+  .progress-label {
+    font-size: 0.92rem;
+  }
+
+  /* Los rótulos crecen con la carta: en 340 px se leían, en 580 px se perdían. */
+  .slot-tag {
+    font-size: 0.82rem;
+    padding: 3px 16px;
+  }
+
+  .match-players {
+    max-width: 760px;
+  }
+
+  .match-quit {
+    margin-top: 0;
+    font-size: 0.9rem;
+  }
 }
 
 /* En horizontal el tablero ya usa todo el alto: la franja se aprieta. */
