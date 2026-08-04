@@ -81,7 +81,9 @@ for (const deck of DECKS) {
     console.log(`Pozo mazo ${deck}: ${Number(current) / 1e6} USDT (ya sembrado, se salta) ✅`);
     continue;
   }
-  await sendWithRetry({ address: POT, abi: potAbi, functionName: "seedPot", args: [deck, SEED] });
+  // Gas fijo, igual que lib/seed.ts: sembrar un pozo recién vaciado cuesta
+  // ~20k más que sembrar uno con saldo, y la estimación no siempre lo ve.
+  await sendWithRetry({ address: POT, abi: potAbi, functionName: "seedPot", args: [deck, SEED], gas: 150_000n });
   const p = await pub.readContract({ address: POT, abi: potAbi, functionName: "pot", args: [deck] });
   console.log(`Pozo mazo ${deck}: ${Number(p) / 1e6} USDT ✅`);
 }

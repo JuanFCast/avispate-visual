@@ -20,6 +20,18 @@ export const SEED_AMOUNT = BigInt(
 );
 
 /**
+ * Gas fijo para `seedPot`. NO se deja estimar: la siembra corre pisándole los
+ * talones a `settle`, y viem estimaría contra un estado que la propia tanda
+ * está a punto de invalidar. Con el pozo todavía lleno, escribir `pot[deck]`
+ * es un SSTORE de 5.000 gas; una vez que `settle` lo pone en cero, el mismo
+ * SSTORE cuesta 20.000 (y lo mismo el saldo USDT del contrato si quedó vacío).
+ * Esa diferencia se comió la siembra del mazo 10 el 2026-08-04: límite 64.299,
+ * consumido 63.298, revertida por gas. El sobrante no se cobra, así que el
+ * colchón sale gratis.
+ */
+const SEED_GAS = 150_000n;
+
+/**
  * Cliente del Funder Rewards para sembrar los pozos. Clave SOLO en el servidor
  * (`FUNDER_PRIVATE_KEY`). Solo mueve fondos HACIA el pozo (seedPot).
  */
@@ -106,6 +118,7 @@ export async function seedPots(decks: number[]): Promise<SeedResult[]> {
         functionName: "seedPot",
         args: [deck, SEED_AMOUNT],
         nonce,
+        gas: SEED_GAS,
       });
       nonce++;
       sent.push({ deck, hash: hash as Hash });

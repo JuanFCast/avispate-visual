@@ -42,6 +42,14 @@ export async function readPot(deck: number): Promise<bigint> {
   }
 }
 
+/**
+ * Gas fijo para `settle`, por la misma razón que en `seedPot` (ver `seed.ts`):
+ * las tres liquidaciones viajan juntas, así que estimar contra el estado previo
+ * subestima. Aquí el salto caro es el ganador que nunca ha tenido USDT: su
+ * saldo pasa de cero a no-cero y son 20.000 gas que la estimación no vio.
+ */
+const SETTLE_GAS = 200_000n;
+
 export interface SettleResult {
   deck: number;
   ok: boolean;
@@ -101,6 +109,7 @@ export async function settleDecks(
         functionName: "settle",
         args: [entry.deck, entry.winner as `0x${string}`],
         nonce,
+        gas: SETTLE_GAS,
       });
       nonce++;
       sent.push({ deck: entry.deck, hash: hash as Hash });
