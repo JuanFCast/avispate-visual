@@ -12,6 +12,7 @@ docs/~$*
 *.local.sql
 # Archivos privados de pendientes y notas de sesión
 docs/Pendientes de Avíspate.txt
+docs/Pendientes de Avíspate.md
 docs/Notas-sesion-*.md
 docs/Guia-uso-Avispate-SEO-tecnico.docx
 
