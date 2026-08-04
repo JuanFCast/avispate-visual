@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { usePrivy } from "@privy-io/react-auth";
 import { useAccountModal } from "@rainbow-me/rainbowkit";
+import { useIsMiniPay } from "@/lib/minipay";
 import { useWalletAuth } from "@/lib/wallet-auth";
 import { shortAddress } from "@/lib/wallet";
 import { useT } from "@/lib/i18n/client";
@@ -28,8 +30,25 @@ export default function AccessCard() {
   const { openAccountModal } = useAccountModal();
   const { needsSignature, address, stage, error, continueWithWallet } =
     useWalletAuth();
+  const inMiniPay = useIsMiniPay();
 
   const busy = stage !== null;
+
+  // Dentro de MiniPay esta tarjeta no tiene nada que ofrecer: la wallet ya
+  // entró sola, el correo sobra y la firma —que es lo que abriría la sesión—
+  // no existe como método. Lo que sí abre sesión ahí es jugar, así que la
+  // tarjeta se convierte en el empujón hacia el reto del día. Enseñar aquí un
+  // botón de "conectar" sería, además, justo lo que MiniPay penaliza.
+  if (inMiniPay) {
+    return (
+      <div className="access-card">
+        <p className="access-minipay-hint">{t("access.minipay_hint")}</p>
+        <Link href="/" className="access-btn access-btn-primary">
+          {t("access.minipay_cta")}
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="access-card">

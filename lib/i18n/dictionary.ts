@@ -72,8 +72,9 @@ export const en = {
 
   /* ------------------------- Errores del flujo de pago ------------------- */
   "pay.error.rejected": "You cancelled the signature for this game.",
-  "pay.error.insufficient":
-    "Not enough USDT (or gas) for this game.",
+  // Sin "gas": MiniPay prohíbe la palabra en texto de cara al jugador, y ya no
+  // hace falta decirla — la tarifa de red se cobra en USDT (CIP-64).
+  "pay.error.insufficient": "Not enough USDT for this game.",
   "pay.error.not_configured":
     "The game isn't available yet (contract not configured).",
   "pay.error.no_wallet": "Connect a wallet or sign in with your email.",
@@ -322,6 +323,11 @@ export const en = {
     "Wallet sign-in isn't enabled for this app yet. Use email for now.",
   "access.error.failed": "We couldn't sign you in with that wallet. Try again.",
   "access.wallet_title": "View or change wallet",
+  // MiniPay: no sign-in screen. The wallet is already there and message signing
+  // is not available, so the first play — free — is what opens the session.
+  "access.minipay_hint":
+    "Play today's challenge to join in. It's free, and your wallet is already connected.",
+  "access.minipay_cta": "Play today's challenge",
   "access.or": "or",
   "access.alias_title": "Pick your alias",
   "access.checking": "Checking your profile…",
@@ -620,7 +626,7 @@ export const en = {
   "stats.chain.plays_hint": "every game signs its transaction",
   "stats.chain.prizes": "Prize payouts",
   "stats.chain.wallets": "Wallets",
-  "stats.chain.gas": "Gas gifted",
+  "stats.chain.gas": "Network fees gifted",
   "stats.chain.gas_hint": "to {n} new wallets",
   "stats.chain.contract": "View the contract on Celoscan ↗",
   "stats.how": "How to read this",
@@ -721,8 +727,7 @@ export const es: Record<MessageKey, string> = {
 
   /* ------------------------- Errores del flujo de pago ------------------- */
   "pay.error.rejected": "Cancelaste la firma de la jugada.",
-  "pay.error.insufficient":
-    "Saldo insuficiente de USDT (o gas) para esta jugada.",
+  "pay.error.insufficient": "Saldo insuficiente de USDT para esta jugada.",
   "pay.error.not_configured":
     "El juego aún no está disponible (contrato no configurado).",
   "pay.error.no_wallet": "Conecta una wallet o entra con tu correo.",
@@ -972,6 +977,9 @@ export const es: Record<MessageKey, string> = {
     "El ingreso con wallet todavía no está habilitado en esta app. Usa el correo por ahora.",
   "access.error.failed": "No pudimos entrar con esa wallet. Inténtalo otra vez.",
   "access.wallet_title": "Ver o cambiar wallet",
+  "access.minipay_hint":
+    "Juega el reto de hoy para entrar. Es gratis y tu wallet ya está conectada.",
+  "access.minipay_cta": "Jugar el reto de hoy",
   "access.or": "o",
   "access.alias_title": "Elige tu alias",
   "access.checking": "Comprobando tu perfil…",
@@ -1270,7 +1278,7 @@ export const es: Record<MessageKey, string> = {
   "stats.chain.plays_hint": "cada partida firma su transacción",
   "stats.chain.prizes": "Pagos de premio",
   "stats.chain.wallets": "Wallets",
-  "stats.chain.gas": "Gas regalado",
+  "stats.chain.gas": "Tarifas de red regaladas",
   "stats.chain.gas_hint": "a {n} wallets nuevas",
   "stats.chain.contract": "Ver el contrato en Celoscan ↗",
   "stats.how": "Cómo leer esto",

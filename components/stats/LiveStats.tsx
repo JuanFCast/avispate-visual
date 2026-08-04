@@ -6,6 +6,7 @@ import { formatMs } from "@/lib/game";
 import { USDT_DECIMALS } from "@/lib/contracts";
 import type { StatsPayload } from "@/lib/stats";
 import { useI18n } from "@/lib/i18n/client";
+import { useIsMiniPay } from "@/lib/minipay";
 import type { MessageKey } from "@/lib/i18n";
 import StatTile from "./StatTile";
 import PlaysTrend from "./PlaysTrend";
@@ -43,6 +44,7 @@ async function fetchStats(): Promise<StatsPayload> {
  */
 export default function LiveStats() {
   const { t, locale } = useI18n();
+  const inMiniPay = useIsMiniPay();
   const { data, status, refetch, isFetching } = useQuery({
     queryKey: ["stats"],
     queryFn: fetchStats,
@@ -418,18 +420,24 @@ export default function LiveStats() {
             value={num(d?.chain.wallets ?? 0)}
             loading={loading}
           />
-          <StatTile
-            label={t("stats.chain.gas")}
-            value={d ? `${celoFromWei(d.chain.welcomeGasWei)} CELO` : "—"}
-            hint={
-              d
-                ? t("stats.chain.gas_hint", {
-                    n: num(d.chain.welcomeGasCount),
-                  })
-                : undefined
-            }
-            loading={loading}
-          />
+          {/* El único dato de la página que habla en CELO. Dentro de MiniPay no
+              se enseña: su norma es que un Mini App nunca muestre CELO —la
+              wallet lo esconde y paga las tarifas por su cuenta—, y un jugador
+              que ve una moneda que no tiene en su saldo solo se confunde. */}
+          {!inMiniPay && (
+            <StatTile
+              label={t("stats.chain.gas")}
+              value={d ? `${celoFromWei(d.chain.welcomeGasWei)} CELO` : "—"}
+              hint={
+                d
+                  ? t("stats.chain.gas_hint", {
+                      n: num(d.chain.welcomeGasCount),
+                    })
+                  : undefined
+              }
+              loading={loading}
+            />
+          )}
         </div>
         {d?.chain.potAddress && (
           <a

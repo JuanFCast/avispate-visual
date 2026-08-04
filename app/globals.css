@@ -2218,6 +2218,16 @@ body {
   text-align: center;
 }
 
+/* En MiniPay la tarjeta es una sola frase y un botón: no hay nada que conectar. */
+.access-minipay-hint {
+  margin: 0 0 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--gray);
+  text-align: center;
+}
+
 .access-switch {
   align-self: center;
   padding: 2px 6px;
