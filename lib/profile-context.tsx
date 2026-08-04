@@ -9,6 +9,10 @@ import {
   type ReactNode,
 } from "react";
 import { usePrivy } from "@privy-io/react-auth";
+import {
+  readWalletSession,
+  WALLET_SESSION_EVENT,
+} from "./wallet-session-client";
 
 interface ProfileState {
   /** Aún cargando el perfil del servidor. */
@@ -34,12 +38,34 @@ const ProfileContext = createContext<ProfileContextValue | null>(null);
 const EMPTY: ProfileState = { loading: false, alias: null, walletAddress: null };
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const { ready, authenticated, getAccessToken } = usePrivy();
+  const { ready, authenticated: privyAuth, getAccessToken } = usePrivy();
   const [state, setState] = useState<ProfileState>({ ...EMPTY, loading: true });
+  // Sesión de wallet (MiniPay, sin firma). Se lee en un efecto y no durante el
+  // render: `localStorage` no existe en el servidor y tocarlo antes de montar
+  // rompe la hidratación.
+  const [walletSession, setWalletSession] = useState(false);
 
+  useEffect(() => {
+    const sync = () => setWalletSession(Boolean(readWalletSession()));
+    sync();
+    window.addEventListener(WALLET_SESSION_EVENT, sync);
+    return () => window.removeEventListener(WALLET_SESSION_EVENT, sync);
+  }, []);
+
+  const authenticated = privyAuth || walletSession;
+
+  /**
+   * Privy manda cuando hay sesión suya: es la identidad más completa (correo,
+   * wallet embebida) y la que el jugador eligió explícitamente. La de wallet es
+   * el camino de MiniPay, donde no hay otra.
+   */
   const getToken = useCallback(async () => {
-    return (await getAccessToken()) ?? null;
-  }, [getAccessToken]);
+    if (privyAuth) {
+      const token = await getAccessToken();
+      if (token) return token;
+    }
+    return readWalletSession()?.token ?? null;
+  }, [privyAuth, getAccessToken]);
 
   const refresh = useCallback(async () => {
     if (!authenticated) {

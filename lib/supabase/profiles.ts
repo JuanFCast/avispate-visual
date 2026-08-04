@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from "./server";
-import type { PrivyIdentity } from "../privy-server";
+import type { AppIdentity } from "../identity";
 
 export interface ProfileRow {
   id: string;
@@ -30,15 +30,25 @@ const UNIQUE_VIOLATION = "23505";
  * Es lo que hace que "entrar con wallet" se sienta como volver y no como
  * empezar de cero.
  */
-export async function ensureProfile(identity: PrivyIdentity): Promise<ProfileRow> {
+export async function ensureProfile(identity: AppIdentity): Promise<ProfileRow> {
   const db = getSupabaseAdmin();
   const wallet = identity.walletAddress ?? null;
+
+  // Sesión de wallet (MiniPay): no hay `privy_id` que buscar ni que escribir —
+  // la dirección es toda la identidad. Se atiende con el mismo camino que usan
+  // las jugadas, así que un jugador de MiniPay y el mismo jugador entrando
+  // luego con Privy convergen en la MISMA fila, por `wallet_address`.
+  if (!identity.privyId) {
+    if (!wallet) throw new Error("identidad sin privyId ni wallet");
+    return await ensureProfileByWallet(wallet);
+  }
+  const privyId = identity.privyId;
 
   // 1. ¿Ya lo conocemos por su identidad de Privy? Es el camino normal.
   const { data: byPrivy, error: byPrivyError } = await db
     .from("profiles")
     .select(PROFILE_COLUMNS)
-    .eq("privy_id", identity.privyId)
+    .eq("privy_id", privyId)
     .maybeSingle();
   if (byPrivyError) throw byPrivyError;
 
@@ -73,7 +83,7 @@ export async function ensureProfile(identity: PrivyIdentity): Promise<ProfileRow
     if (orphan && orphan.privy_id === null) {
       const { data, error } = await db
         .from("profiles")
-        .update({ privy_id: identity.privyId })
+        .update({ privy_id: privyId })
         .eq("id", orphan.id)
         .is("privy_id", null)
         .select(PROFILE_COLUMNS)
@@ -81,16 +91,16 @@ export async function ensureProfile(identity: PrivyIdentity): Promise<ProfileRow
       if (error) throw error;
       if (data) return data as ProfileRow;
       // Otra petición lo adoptó primero: sirve el resultado de ella.
-      return await readByPrivyId(identity.privyId);
+      return await readByPrivyId(privyId);
     }
     if (orphan) {
       // La wallet es la identidad de OTRA cuenta de Privy. No se le quita:
       // este jugador estrena perfil, sin dirección hasta que traiga una suya.
-      return await insertProfile(identity.privyId, null);
+      return await insertProfile(privyId, null);
     }
   }
 
-  return await insertProfile(identity.privyId, wallet);
+  return await insertProfile(privyId, wallet);
 }
 
 async function readByPrivyId(privyId: string): Promise<ProfileRow> {

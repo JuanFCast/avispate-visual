@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { verifyPrivyToken, type PrivyIdentity } from "./privy-server";
+import { verifyPrivyToken } from "./privy-server";
+import type { AppIdentity } from "./identity";
+import { looksLikeWalletSession, verifyWalletSession } from "./wallet-session";
 
 /** Extrae el token `Authorization: Bearer <token>` de la petición. */
 export function bearerToken(req: Request): string | null {
@@ -10,22 +12,38 @@ export function bearerToken(req: Request): string | null {
 }
 
 /**
- * Verifica el token de Privy de la petición. Devuelve la identidad o una
- * respuesta 401 lista para retornar.
+ * Resuelve el token a una identidad, sea de la puerta que sea: los de wallet se
+ * reconocen por su prefijo y se verifican aquí mismo (HMAC local, sin red); el
+ * resto va a Privy. Devuelve null si no vale.
+ */
+async function identityFromToken(token: string): Promise<AppIdentity | null> {
+  if (looksLikeWalletSession(token)) {
+    const address = verifyWalletSession(token);
+    return address ? { privyId: null, walletAddress: address } : null;
+  }
+  try {
+    return await verifyPrivyToken(token);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Verifica la sesión de la petición. Devuelve la identidad o una respuesta 401
+ * lista para retornar.
  */
 export async function requireIdentity(
   req: Request
-): Promise<{ identity: PrivyIdentity } | { response: NextResponse }> {
+): Promise<{ identity: AppIdentity } | { response: NextResponse }> {
   const token = bearerToken(req);
   if (!token) {
     return { response: NextResponse.json({ error: "unauthorized" }, { status: 401 }) };
   }
-  try {
-    const identity = await verifyPrivyToken(token);
-    return { identity };
-  } catch {
+  const identity = await identityFromToken(token);
+  if (!identity) {
     return { response: NextResponse.json({ error: "invalid_token" }, { status: 401 }) };
   }
+  return { identity };
 }
 
 /**
@@ -34,12 +52,8 @@ export async function requireIdentity(
  * el estado de una sala privada se puede mirar con el código en la mano, y
  * pedir sesión para eso rompería el enlace que se comparte por chat.
  */
-export async function optionalIdentity(req: Request): Promise<PrivyIdentity | null> {
+export async function optionalIdentity(req: Request): Promise<AppIdentity | null> {
   const token = bearerToken(req);
   if (!token) return null;
-  try {
-    return await verifyPrivyToken(token);
-  } catch {
-    return null;
-  }
+  return await identityFromToken(token);
 }

@@ -19,6 +19,7 @@ import {
   CIP64_FEE_ADAPTER,
 } from "./contracts";
 import { isMiniPay } from "./minipay";
+import { ensureWalletSession } from "./wallet-session-client";
 import type { MessageKey } from "./i18n";
 
 // Umbral de CELO por debajo del cual pagamos el gas en USDT (CIP-64). Las
@@ -195,6 +196,14 @@ export function usePayToPlay() {
       } catch {
         // Sigue adelante con el hash; el registro en el servidor decide.
       }
+
+      // Con la jugada confirmada, esa transacción es prueba de que la wallet es
+      // suya, así que sirve para abrir sesión donde no se puede firmar un
+      // mensaje (MiniPay). Va aquí y no en cada pantalla por lo mismo que
+      // `resolveFeeCurrency`: es de toda jugada, no de una. No se espera ni se
+      // comprueba —quien ya tiene sesión no gasta nada y un fallo no puede
+      // tocar el resultado de la partida.
+      void ensureWalletSession(address, playHash);
 
       return { txHash: playHash, player: address.toLowerCase(), wasFree };
     },
