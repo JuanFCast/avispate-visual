@@ -3,17 +3,27 @@
 import Link from "next/link";
 import { formatMs } from "@/lib/game";
 import type { MatchPlayerView, MatchView } from "@/lib/arena-match";
-import { matchResultFor } from "@/lib/arena-match";
+import { matchResultFor, standingsOf } from "@/lib/arena-match";
 import { useT } from "@/lib/i18n/client";
-import type { Translate } from "@/lib/i18n";
+import type { MessageKey, Translate } from "@/lib/i18n";
+
+/** "2º" en español, "2nd" en inglés. Nunca hay más de cuatro sillas. */
+function ordinal(place: number, t: Translate): string {
+  const key = `match.ord.${Math.min(Math.max(place, 1), 4)}` as MessageKey;
+  return t(key);
+}
 
 /**
- * Final de la partida: ganaste o perdiste, y por qué.
+ * Final de la partida: en qué puesto quedaste y por qué.
  *
- * Enseña las cuatro cifras de los DOS jugadores en la misma tabla. Perder
- * sabiendo que fue por dos cartas de castigo es información; perder viendo solo
- * "perdiste" es una pared. Y como no hay dinero en juego todavía, la pantalla
- * lo dice en vez de dejar que alguien lo suponga.
+ * Enseña las cuatro cifras de TODOS en la misma tabla, ordenada por puesto.
+ * Perder sabiendo que fue por dos cartas de castigo es información; perder
+ * viendo solo "perdiste" es una pared. Con tres o cuatro en la mesa hace falta
+ * además el puesto: quedar segundo de cuatro y quedar último son dos partidas
+ * distintas y "Perdiste" las cuenta igual.
+ *
+ * Y como no hay dinero en juego todavía, la pantalla lo dice en vez de dejar
+ * que alguien lo suponga.
  */
 export default function ArenaMatchOver({
   view,
@@ -27,6 +37,27 @@ export default function ArenaMatchOver({
   const won = result === "won";
   const abandoned = view.endReason === "abandoned";
 
+  const standings = standingsOf(view);
+  const many = standings.length > 2;
+  const place = standings.findIndex((p) => p.isYou) + 1;
+  const winner = standings.find((p) => p.profileId === view.winnerProfileId);
+
+  /**
+   * Con un rival, "tu rival" señala a alguien. Con tres deja de señalar, así
+   * que se dice el nombre de quien ganó.
+   */
+  const lead = abandoned
+    ? won
+      ? many
+        ? t("match.over.everyone_left")
+        : t("match.over.rival_left")
+      : t("match.over.you_left")
+    : won
+      ? t("match.over.won_text")
+      : many && winner
+        ? t("match.over.lost_many", { name: winner.name || t("room.players.anon") })
+        : t("match.over.lost_text");
+
   return (
     <section className={`arena-card match-over${won ? " won" : ""}`}>
       <span className="match-over-emoji" aria-hidden="true">
@@ -35,15 +66,17 @@ export default function ArenaMatchOver({
       <h1 className="match-over-title">
         {won ? t("match.over.won") : t("match.over.lost")}
       </h1>
-      <p className="match-over-lead">
-        {abandoned
-          ? won
-            ? t("match.over.rival_left")
-            : t("match.over.you_left")
-          : won
-            ? t("match.over.won_text")
-            : t("match.over.lost_text")}
-      </p>
+      {/* El puesto solo aparece cuando hay puestos que repartir: en una mesa de
+          dos, "quedaste 2º de 2" es una forma rebuscada de decir "perdiste". */}
+      {many && place > 0 && !won && (
+        <p className="match-over-rank">
+          {t("match.over.rank", {
+            place: ordinal(place, t),
+            total: standings.length,
+          })}
+        </p>
+      )}
+      <p className="match-over-lead">{lead}</p>
 
       <p className="match-over-time">
         <span>{t("match.over.time")}</span>
@@ -60,9 +93,8 @@ export default function ArenaMatchOver({
           </tr>
         </thead>
         <tbody>
-          <Row player={view.you} t={t} winner={view.winnerProfileId} />
-          {view.rivals.map((r) => (
-            <Row key={r.profileId} player={r} t={t} winner={view.winnerProfileId} />
+          {standings.map((p) => (
+            <Row key={p.profileId} player={p} t={t} winner={view.winnerProfileId} />
           ))}
         </tbody>
       </table>

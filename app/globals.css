@@ -3708,27 +3708,6 @@ body {
   gap: 16px;
 }
 
-/* Un dato que no se elige (hoy, los jugadores). Se ve que es información y no
-   un control apagado: sin borde, sin sombra, sin nada que invite al dedo. */
-.arena-fixed-value {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  margin: 0;
-}
-
-.arena-fixed-value strong {
-  font-family: var(--font-title);
-  font-size: 1.4rem;
-  font-weight: 600;
-}
-
-.arena-fixed-value span {
-  font-size: 0.9rem;
-  font-weight: 600;
-  opacity: 0.72;
-}
-
 .arena-field-note {
   display: block;
   margin-top: 4px;
@@ -4458,139 +4437,259 @@ body {
   text-decoration: none;
 }
 
-/* ---------------------- La partida de dos de la Arena ---------------------- */
+/* -------------------- La partida de la Arena (2, 3 y 4) -------------------- */
 
 /*
- * El tablero NO se redefine aquí. `shell playing` y todo lo de `.chain-area`
- * vienen del reto diario tal cual, que es justo lo que se pidió: la misma
- * experiencia visual. Lo de abajo es solo lo que el individual no tiene —
- * saber cómo va el otro— y un par de ajustes de encaje.
+ * El tablero es el del reto diario —mismo `.chain-area`, mismas animaciones—
+ * pero la Arena tiene que meter algo que el individual no tiene: hasta tres
+ * rivales. La regla es que eso NO le quite sitio a las cartas.
+ *
+ * Por eso aquí no hay ninguna banda horizontal. Los jugadores viven en dos
+ * rieles laterales que se superponen al tablero, aprovechando que las cartas
+ * son círculos y no llegan a las esquinas de su caja. El resultado es que la
+ * carta pasa a medir el ancho de la pantalla en vez del ancho menos dos
+ * columnas de indicadores.
  */
 .match-shell {
   gap: 10px;
 }
 
-/* Los dos jugadores, frente a frente, arriba del todo. */
-.match-players {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-  width: 100%;
-  max-width: 460px;
-  margin: 0 auto;
-}
-
-.match-vs {
-  align-self: center;
+/*
+ * El riel: tan alto como el tablero y repartido con `space-between`.
+ *
+ * De ahí salen solas las tres posiciones —arriba, costura, abajo— sin una sola
+ * medida escrita a mano, y sin que cambie nada al pasar de 2 a 4 jugadores:
+ * con un chip quedan chip arriba e indicadores abajo; con dos, el segundo cae
+ * exactamente en el hueco entre las dos cartas.
+ */
+.match-rail {
   flex: none;
-  font-family: var(--font-title);
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--gray);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 52px;
+  align-self: stretch;
 }
 
-.match-chip {
-  flex: 1 1 0;
-  min-width: 0;
+.rail-stats {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 8px 10px;
+}
+
+/* Sin jugadores que poner, el hueco de arriba se reserva igual para que los
+   indicadores no se suban a la esquina de la carta. */
+.rail-spacer {
+  display: block;
+}
+
+.match-board .rail-stats .mute-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+}
+
+/*
+ * El chip de jugador, del ancho del riel.
+ *
+ * Tres cosas y ni una más: quién, cuántas cartas le quedan y —en pequeño— su
+ * nombre. El número manda porque es la carrera; el nombre está para distinguir
+ * a tres rivales de un vistazo, no para leerlo entero.
+ */
+.rail-chip {
+  width: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 5px 2px 4px;
   border: 2px solid var(--gray-soft);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--white);
 }
 
 /* El tuyo se distingue sin gritar: mismo tamaño, borde de marca. */
-.match-chip.is-you {
+.rail-chip.is-you {
   border-color: var(--ink);
   background: var(--yellow-faint);
 }
 
-.match-chip.is-offline {
-  opacity: 0.55;
+.rail-chip.is-offline {
+  opacity: 0.5;
 }
 
-.match-chip-empty {
-  justify-content: center;
+/* Quien terminó o se fue ya no corre: se apaga del todo y su bandera lo dice. */
+.rail-chip.is-out {
+  opacity: 0.65;
+  border-style: dashed;
+}
+
+.rail-chip-empty {
   border-style: dashed;
   color: var(--gray);
 }
 
-.match-chip-avatar {
-  flex: none;
+.rail-chip-avatar {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   border: 2px solid var(--ink);
   background: var(--yellow);
   font-family: var(--font-title);
-  font-size: 0.95rem;
+  font-size: 0.8rem;
   font-weight: 600;
   line-height: 1;
 }
 
-.match-chip-body {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  flex: 1;
-  min-width: 0;
+/* La bandera se monta en la esquina del avatar: no cabe una fila más. */
+.rail-chip-flag {
+  position: absolute;
+  right: -7px;
+  bottom: -5px;
+  font-size: 0.62rem;
+  font-style: normal;
+  line-height: 1;
 }
 
-.match-chip-name {
-  font-weight: 700;
-  font-size: 0.86rem;
-  line-height: 1.2;
+.rail-chip-cards {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.rail-chip-name {
+  max-width: 100%;
+  font-size: 0.5rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gray);
+  line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.match-chip-you {
-  font-style: normal;
-  font-weight: 700;
-  color: var(--gray);
+.rail-chip.is-you .rail-chip-name {
+  color: var(--ink);
 }
 
-.match-chip-you::before {
-  content: " · ";
-}
-
-.match-chip-state {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--gray);
-  line-height: 1.2;
-}
-
-/* Las cartas que le quedan al otro: la cifra de la carrera, en grande. */
-.match-chip-cards {
-  flex: none;
+/* En la cuenta regresiva todavía no hay tablero que proteger, así que ahí sí
+   caben todos en fila y centrados. */
+.match-countdown-players {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  line-height: 1;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
 }
 
-.match-chip-cards strong {
-  font-family: var(--font-title);
-  font-size: 1.3rem;
-  font-weight: 600;
+/*
+ * Móvil en vertical: los rieles se SUPERPONEN al tablero.
+ *
+ * Aquí está lo que hace que la carta crezca. Con los rieles en el flujo, el
+ * ancho útil era `100vw − 32 de márgenes − 116 de las dos columnas`; flotando
+ * sobre las esquinas es `100vw − 32` y ya. En un iPhone de 375 px eso pasa la
+ * carta de 223 a lo que permita el alto, que es bastante más.
+ *
+ * Que no se pisen con los símbolos no es suerte: un círculo de diámetro d deja
+ * libre un cuadrado de ~0.29d en cada esquina de su caja, y en la costura entre
+ * las dos cartas la franja libre es el hueco entero. A partir de unos 250 px de
+ * carta —cualquier teléfono— sobran 20 px entre el chip y el borde del círculo.
+ *
+ * El riel no intercepta toques: la carta ocupa toda la caja aunque se vea
+ * redonda, así que sin `pointer-events: none` los cuatro rincones dejarían de
+ * responder. Solo el botón de silencio los recupera.
+ */
+.match-board {
+  position: relative;
 }
 
-.match-chip-cards small {
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: var(--gray);
+.match-shell .match-board .match-rail {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+  pointer-events: none;
 }
 
-/* El mudo vive en la columna del reloj: durante la partida no hay barra. */
-.match-board .side-stats .mute-btn {
-  align-self: center;
+/* Solo el silencio recupera el toque. Los chips y los indicadores no son
+   botones, y dejarlos "tocables" taparía la parte del símbolo que se sale del
+   círculo: el área de toque de un símbolo tiene 44 px de mínimo y los de la
+   orilla se pasan del borde. */
+.match-shell .match-board .match-rail .mute-btn {
+  pointer-events: auto;
+}
+
+.match-shell .match-board .rail-left {
+  left: 0;
+}
+
+.match-shell .match-board .rail-right {
+  right: 0;
+}
+
+/*
+ * El hueco entre cartas sube de 24 a 32: es el sitio donde caen los chips del
+ * tercer y cuarto jugador, y con 24 quedaban rozando los dos círculos.
+ */
+.shell.playing.match-shell .chain-area {
+  --card-gap: 32px;
+  margin-bottom: 0;
+}
+
+/*
+ * El tamaño de carta de la Arena.
+ *
+ * `50dvh − 78px` sale de la cuenta de la pantalla completa, repartida entre las
+ * dos cartas apiladas: 32 de márgenes del shell, 32 del hueco entre cartas, 10
+ * hasta el enlace de abandonar y 30 de ese enlace... y 50 más de reserva para
+ * el aviso de "te quedaste sin conexión".
+ *
+ * Esos 50 no sobran. El aviso aparece en el flujo, encima del tablero, y sin
+ * reservarlos la pantalla se pasa de alto justo cuando salta — y como el shell
+ * de partida recorta lo que se sale, el jugador perdería el borde de su carta
+ * en el peor momento posible. Cuesta unos 20 px de diámetro; el tablero sigue
+ * siendo bastante más grande que con la franja de jugadores arriba.
+ *
+ * El ancho ya casi nunca manda —para eso se quitó la franja— pero se deja en la
+ * cuenta porque en un teléfono muy estrecho y muy alto sí vuelve a mandar.
+ *
+ * Lleva `.match-shell` en el selector para ganarle al `.shell.playing` de más
+ * arriba sin tocar el reto diario, que sigue exactamente como estaba.
+ */
+.shell.playing.match-shell {
+  --card-d: min(calc(100vw - 32px), calc(50dvh - 78px), 340px);
+}
+
+/*
+ * En horizontal las cartas van lado a lado y el alto es el que escasea, así que
+ * los rieles vuelven al flujo: hay ancho de sobra y superponerlos solo pondría
+ * un chip encima de un símbolo. La cuenta del alto sí mejora —ya no hay franja
+ * arriba— y por eso se restan 104 px donde antes eran 156.
+ */
+@media (min-width: 760px), (orientation: landscape) {
+  .shell.playing.match-shell {
+    --card-d: min(calc(50vw - 150px), calc(100dvh - 104px), 420px);
+  }
+
+  .match-shell .match-board .match-rail {
+    position: static;
+    pointer-events: auto;
+  }
+
+  .shell.playing.match-shell .chain-area {
+    --card-gap: clamp(32px, 6vw, 72px);
+    margin-bottom: 8px;
+  }
 }
 
 .match-quit {
@@ -4631,6 +4730,15 @@ body {
 
 .match-over.won .match-over-title {
   color: #12894f;
+}
+
+/* El puesto en mesas de 3 y 4: va entre el titular y la explicación porque es
+   lo segundo que se busca —después de "gané o no"— y antes del porqué. */
+.match-over-rank {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
 }
 
 .match-over-lead {
@@ -4764,13 +4872,33 @@ body {
     );
   }
 
-  /* La Arena carga además la franja de jugadores y el enlace de abandonar. */
+  /*
+   * La Arena ya no carga la franja de jugadores —se fue a los rieles—, así que
+   * de los 200 px que se reservaban solo quedan los del enlace de abandonar.
+   *
+   * La fórmula se repite entera en vez de heredarse: el `--card-d` de la Arena
+   * se declara con un selector de tres clases para ganarle al de móvil, y eso
+   * mismo le ganaría aquí al de `.shell.playing` si no se volviera a poner.
+   */
   .shell.playing.match-shell {
-    --chrome-v: 200px;
+    --chrome-v: 148px;
     gap: 8px;
+
+    --card-d: clamp(
+      320px,
+      min(
+        calc((var(--board-w) - 48px - var(--rail) * 2 - var(--deal-gap)) / 2),
+        calc(100dvh - var(--chrome-v))
+      ),
+      580px
+    );
   }
 
-  .shell.playing .chain-area {
+  .shell.playing .chain-area,
+  /* Repetido por lo mismo que el `--card-d`: la Arena gana en especificidad
+     desde su bloque, y sin nombrarla aquí se quedaría con el hueco de móvil
+     mientras la cuenta del ancho resta `--deal-gap`. */
+  .shell.playing.match-shell .chain-area {
     --card-gap: var(--deal-gap);
     margin-bottom: 4px;
   }
@@ -4837,8 +4965,37 @@ body {
     padding: 3px 16px;
   }
 
-  .match-players {
-    max-width: 760px;
+  /* Los chips crecen con el riel, igual que los indicadores: en un monitor,
+     52 px de columna al lado de una carta de 580 se ven como una errata. */
+  .match-rail {
+    width: auto;
+    gap: 12px;
+  }
+
+  .rail-chip {
+    width: calc(var(--rail) - var(--board-gap));
+    padding: 8px 4px 6px;
+    border-radius: 18px;
+  }
+
+  .rail-chip-avatar {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+
+  .rail-chip-cards {
+    font-size: 1.35rem;
+  }
+
+  .rail-chip-name {
+    font-size: 0.6rem;
+  }
+
+  .match-board .rail-stats .mute-btn {
+    width: 48px;
+    height: 48px;
+    font-size: 1.2rem;
   }
 
   .match-quit {
@@ -4847,14 +5004,17 @@ body {
   }
 }
 
-/* En horizontal el tablero ya usa todo el alto: la franja se aprieta. */
+/* En horizontal y bajito el riel se queda sin alto: el nombre es lo primero
+   que sobra, porque el avatar ya dice quién es y el número es el dato. */
 @media (orientation: landscape) and (max-height: 520px) {
-  .match-players {
-    max-width: 620px;
+  .rail-chip-name {
+    display: none;
   }
 
-  .match-chip-state {
-    display: none;
+  .match-board .rail-stats .mute-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 0.9rem;
   }
 }
 

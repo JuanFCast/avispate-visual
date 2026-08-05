@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n/client";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import CardView from "../CardView";
 import ArenaMatchOver from "./ArenaMatchOver";
-import ArenaMatchPlayers from "./ArenaMatchPlayers";
+import ArenaMatchPlayers, { RailChip, railsOf } from "./ArenaMatchPlayers";
 
 /** Lo que tarda la carta vieja en salir de cuadro. Igual que en el individual. */
 const EXIT_MS = 600;
@@ -326,32 +326,47 @@ export default function ArenaMatch({ code }: { code: string }) {
   }
 
   const cardsLeft = view.you?.cardsLeft ?? 0;
+  const rails = railsOf(view.you, view.rivals);
 
   return (
     <>
-      <ArenaMatchPlayers you={view.you} rivals={view.rivals} />
-
       {failures >= OFFLINE_AFTER && (
         <p className="room-warn" role="status">
           {t("match.you_offline")}
         </p>
       )}
 
+      {/*
+        Los rieles van DENTRO del tablero, no encima de él.
+        `justify-content: space-between` sobre un riel tan alto como las dos
+        cartas reparte solo: el primer jugador arriba, el segundo en la costura
+        entre carta y carta, y los indicadores abajo. Los tres sitios son el
+        hueco que dejan los círculos en las esquinas, así que la carta se queda
+        con todo el ancho de la pantalla.
+      */}
       <div className="play-board match-board">
-        <aside className="side-stats">
-          <div className="stat-pill">
-            <span className="sp-emoji">⏱️</span>
-            <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
-            <span className="sp-label">{t("game.stat.time")}</span>
+        <aside className="match-rail rail-left">
+          {rails.left.length === 0 && (
+            <span className="rail-spacer" aria-hidden="true" />
+          )}
+          {rails.left.map((p) => (
+            <RailChip key={p.profileId} player={p} />
+          ))}
+          <div className="rail-stats">
+            <div className="stat-pill">
+              <span className="sp-emoji">⏱️</span>
+              <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
+              <span className="sp-label">{t("game.stat.time")}</span>
+            </div>
+            <button
+              type="button"
+              className="mute-btn"
+              onClick={toggleMuted}
+              aria-label={muted ? t("sound.unmute") : t("sound.mute")}
+            >
+              {muted ? "🔇" : "🔊"}
+            </button>
           </div>
-          <button
-            type="button"
-            className="mute-btn"
-            onClick={toggleMuted}
-            aria-label={muted ? t("sound.unmute") : t("sound.mute")}
-          >
-            {muted ? "🔇" : "🔊"}
-          </button>
         </aside>
 
         <div className="chain-area">
@@ -389,16 +404,27 @@ export default function ArenaMatch({ code }: { code: string }) {
           ))}
         </div>
 
-        <aside className="side-stats">
-          <div className="stat-pill">
-            <span className="sp-emoji">🃏</span>
-            <span className="sp-value">{cardsLeft}</span>
-            <span className="sp-label">{t("game.stat.cards")}</span>
-          </div>
-          <div className="stat-pill">
-            <span className="sp-emoji">🧱</span>
-            <span className="sp-value">{view.you?.penalties ?? 0}</span>
-            <span className="sp-label">{t("match.stat.penalties")}</span>
+        <aside className="match-rail rail-right">
+          {rails.right.length === 0 && (
+            <span className="rail-spacer" aria-hidden="true" />
+          )}
+          {rails.right.map((p) => (
+            <RailChip key={p.profileId} player={p} />
+          ))}
+          {/* Cartas y castigos se quedan donde estaban, en la esquina de abajo:
+              ahí no estorban y son las dos cifras que uno consulta sin dejar de
+              jugar. */}
+          <div className="rail-stats">
+            <div className="stat-pill">
+              <span className="sp-emoji">🃏</span>
+              <span className="sp-value">{cardsLeft}</span>
+              <span className="sp-label">{t("game.stat.cards")}</span>
+            </div>
+            <div className="stat-pill">
+              <span className="sp-emoji">🧱</span>
+              <span className="sp-value">{view.you?.penalties ?? 0}</span>
+              <span className="sp-label">{t("match.stat.penalties")}</span>
+            </div>
           </div>
         </aside>
       </div>

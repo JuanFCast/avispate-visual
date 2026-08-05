@@ -37,8 +37,9 @@ export async function POST(req: Request) {
   try {
     const profile = await ensureProfile(auth.identity);
 
-    // La pantalla ya no deja armar mesas de 3 ni de 4, pero el botón es del
-    // navegador y las salas viejas siguen existiendo: el freno de verdad va aquí.
+    // Hoy las tres mesas se pueden jugar, pero el freno se queda: es el borde
+    // donde de verdad se decide, y lo que hoy dice "sí a las tres" es una lista
+    // de una sola línea que mañana puede volver a cerrar una.
     const room = await getRoomByCode(code);
     if (room && !isPlayableTable(room.max_players)) {
       return NextResponse.json({ error: "table_too_big" }, { status: 409 });

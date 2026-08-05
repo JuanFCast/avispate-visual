@@ -4,13 +4,14 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ARENA_ENTRY_UNITS,
+  ARENA_PLAYABLE_PLAYERS,
   DEFAULT_ENTRY_UNITS,
   DEFAULT_PLAYERS,
   arenaPrize,
   fmtEntry,
   fmtUsdt,
 } from "@/lib/arena";
-import { defaultCardsPerPlayer } from "@/lib/arena-deck";
+import { clampCards, defaultCardsPerPlayer } from "@/lib/arena-deck";
 import { roomErrorText } from "@/lib/arena-room-errors";
 import type { RoomError } from "@/lib/arena-rooms";
 import { useProfile } from "@/lib/profile-context";
@@ -42,15 +43,21 @@ export default function ArenaCreate() {
   const { ready, authenticated, getToken } = useProfile();
 
   const [entryUnits, setEntryUnits] = useState<bigint>(DEFAULT_ENTRY_UNITS);
-  /**
-   * Fijo en dos mientras la partida en pantalla sea de a dos. El reparto ya
-   * funciona para tres y cuatro y el servidor las aceptaría, pero una sala que
-   * se puede llenar y no se puede empezar es la peor forma de decir que no.
-   */
-  const players = DEFAULT_PLAYERS;
+  const [players, setPlayers] = useState<number>(DEFAULT_PLAYERS);
   const [cards, setCards] = useState<number>(() =>
     defaultCardsPerPlayer(DEFAULT_PLAYERS)
   );
+
+  /**
+   * Cambiar de tamaño de mesa cambia cuántas cartas caben: con dos jugadores el
+   * máximo son 27 y con cuatro son 13. Si el número que había se sale del nuevo
+   * rango, se recorta; si cabía, se respeta, porque elegir "una rapidita" no
+   * debería deshacerse por sumar un jugador.
+   */
+  function choosePlayers(n: number) {
+    setPlayers(n);
+    setCards((c) => clampCards(c, n));
+  }
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<RoomError | null>(null);
@@ -132,20 +139,30 @@ export default function ArenaCreate() {
             </div>
           </div>
 
-          {/*
-            Jugadores no es un selector: es un dato. Enseñar 3 y 4 apagados es
-            enseñar dos botones que no hacen nada, y "Próximamente" sobre algo
-            que ocupa el mismo sitio que lo que sí funciona lo ensucia todo. Se
-            dice en una línea, debajo, y se recupera el selector cuando haya de
-            verdad tres opciones que elegir.
-          */}
+          {/* Vuelve a ser un selector: ahora las tres mesas se pueden jugar de
+              verdad, así que hay algo que elegir. */}
           <div className="field">
             <label id="room-players-label">{t("arena.players.label")}</label>
-            <p className="arena-fixed-value" aria-labelledby="room-players-label">
-              <strong>{players}</strong>
-              <span>{t("arena.players.unit")}</span>
-            </p>
-            <small className="arena-field-note">{t("arena.players.only_two")}</small>
+            <div
+              className="rounds-options"
+              role="radiogroup"
+              aria-labelledby="room-players-label"
+            >
+              {ARENA_PLAYABLE_PLAYERS.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={n === players}
+                  className={n === players ? "selected" : ""}
+                  onClick={() => choosePlayers(n)}
+                  disabled={busy}
+                >
+                  {n}
+                  <small className="deck-price">{t("arena.players.unit")}</small>
+                </button>
+              ))}
+            </div>
           </div>
 
           <ArenaCards

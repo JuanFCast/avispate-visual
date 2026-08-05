@@ -24,16 +24,17 @@ export const DEFAULT_PLAYERS = 2;
 /**
  * De las mesas que caben, cuáles se pueden JUGAR hoy.
  *
- * El motor reparte bien para 2, 3 y 4 —está probado— pero la partida en
- * pantalla se diseñó para un rival y no para tres: el tablero, el final y el
- * abandono son de a dos. Mientras eso no cambie, una mesa de 3 o 4 se puede
- * llenar pero no empezar, que es la peor forma de decir que no.
+ * Ya son las tres. El motor repartía bien para 2, 3 y 4 desde el principio; lo
+ * que faltaba era la pantalla, que se diseñó para un rival y no para tres. Con
+ * los jugadores en los rieles laterales el tablero deja de depender de cuántos
+ * son, y el final tampoco: gana el primero que vacía su mazo y ahí se acaba
+ * para todos, que es lo que el reparto del pozo ya daba por hecho —`arenaPrize`
+ * tiene un único ganador, no un podio.
  *
- * Vive aquí, no en el motor, porque es una decisión de producto: así el
- * servidor puede frenarla en el borde y las pruebas pueden ejercitar los
- * tamaños reales sin fingir que todas las mesas son de dos.
+ * Se queda como lista y no como un booleano porque el freno tiene que seguir
+ * viviendo en un solo sitio: aquí lo lee la pantalla y también el servidor.
  */
-export const ARENA_PLAYABLE_PLAYERS = [2] as const;
+export const ARENA_PLAYABLE_PLAYERS = [2, 3, 4] as const;
 
 /** ¿Esta mesa se puede terminar, no solo llenar? */
 export function isPlayableTable(players: number): boolean {

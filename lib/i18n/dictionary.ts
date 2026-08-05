@@ -137,8 +137,6 @@ export const en = {
   "arena.entry.label": "Entry per player",
   "arena.players.label": "Players",
   "arena.players.unit": "players",
-  "arena.players.only_two":
-    "Rooms are two-player for now. Three and four are coming.",
   "arena.prize.pot": "Total pot",
   "arena.prize.fee": "Fee (20%)",
   "arena.prize.winner": "The winner takes",
@@ -282,7 +280,16 @@ export const en = {
   "match.over.lost": "You lost",
   "match.over.won_text": "You ran out of cards first. That's the whole game.",
   "match.over.lost_text": "Your rival ran out of cards first. Rematch?",
+  // Con tres o cuatro en la mesa "tu rival" ya no señala a nadie: hay que decir
+  // quién fue, y en qué puesto quedaste, que es la pregunta de verdad.
+  "match.over.lost_many": "{name} ran out of cards first. Rematch?",
+  "match.over.rank": "You came {place} of {total}",
+  "match.ord.1": "1st",
+  "match.ord.2": "2nd",
+  "match.ord.3": "3rd",
+  "match.ord.4": "4th",
   "match.over.rival_left": "Your rival left the match, so it's yours.",
+  "match.over.everyone_left": "Everyone else left the match, so it's yours.",
   "match.over.you_left": "You left the match.",
   "match.over.time": "Match time",
   "match.over.no_prize":
@@ -790,8 +797,6 @@ export const es: Record<MessageKey, string> = {
   "arena.entry.label": "Entrada por jugador",
   "arena.players.label": "Jugadores",
   "arena.players.unit": "jugadores",
-  "arena.players.only_two":
-    "Por ahora las salas son de dos. Las de tres y cuatro ya vienen.",
   "arena.prize.pot": "Pozo total",
   "arena.prize.fee": "Comisión (20%)",
   "arena.prize.winner": "Se lleva el ganador",
@@ -936,7 +941,14 @@ export const es: Record<MessageKey, string> = {
   "match.over.lost": "Perdiste",
   "match.over.won_text": "Te quedaste sin cartas primero. De eso se trataba.",
   "match.over.lost_text": "Tu rival se quedó sin cartas primero. ¿Revancha?",
+  "match.over.lost_many": "{name} se quedó sin cartas primero. ¿Revancha?",
+  "match.over.rank": "Quedaste {place} de {total}",
+  "match.ord.1": "1º",
+  "match.ord.2": "2º",
+  "match.ord.3": "3º",
+  "match.ord.4": "4º",
   "match.over.rival_left": "Tu rival abandonó la partida, así que es tuya.",
+  "match.over.everyone_left": "Los demás abandonaron la partida, así que es tuya.",
   "match.over.you_left": "Abandonaste la partida.",
   "match.over.time": "Tiempo de la partida",
   "match.over.no_prize":

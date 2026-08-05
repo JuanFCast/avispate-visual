@@ -105,11 +105,7 @@ export interface MatchView {
   /** Cuántas cartas recibió cada uno al repartir. La misma cifra para todos. */
   cardsPerPlayer: number;
   you: MatchPlayerView | null;
-  /**
-   * Los demás, en orden de silla. Es una lista y no un rival suelto porque el
-   * reparto ya funciona para 3 y 4; que hoy solo se pueda jugar de a dos es una
-   * decisión de producto, no una forma de la partida.
-   */
+  /** Los demás, en orden de silla. Pueden ser uno, dos o tres. */
   rivals: MatchPlayerView[];
 }
 
@@ -139,4 +135,28 @@ export function matchResultFor(
 ): "won" | "lost" | null {
   if (!view.finishedAt || !view.you) return null;
   return view.winnerProfileId === view.you.profileId ? "won" : "lost";
+}
+
+/**
+ * La tabla final, en orden de puesto.
+ *
+ * La partida termina para todos en cuanto el primero vacía su mazo, así que a
+ * los demás hay que ordenarlos por lo que sí se puede comparar: cuántas cartas
+ * les quedaban en ese instante. No es un podio jugado —nadie más llegó a cero—
+ * pero es honesto y contesta la única pregunta que queda en una mesa de cuatro:
+ * de los que perdimos, ¿quién iba mejor?
+ *
+ * El ganador va primero pase lo que pase. Con final por abandono puede tener
+ * MÁS cartas que los otros, y aun así ganó: coronarlo tercero en su propia
+ * tabla sería contar otra partida.
+ */
+export function standingsOf(view: MatchView): MatchPlayerView[] {
+  const all = view.you ? [view.you, ...view.rivals] : [...view.rivals];
+  return all.sort((a, b) => {
+    if (a.profileId === view.winnerProfileId) return -1;
+    if (b.profileId === view.winnerProfileId) return 1;
+    if (a.cardsLeft !== b.cardsLeft) return a.cardsLeft - b.cardsLeft;
+    if (a.penalties !== b.penalties) return a.penalties - b.penalties;
+    return a.seat - b.seat;
+  });
 }
