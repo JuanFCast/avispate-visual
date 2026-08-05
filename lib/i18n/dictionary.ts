@@ -131,8 +131,6 @@ export const en = {
     "You set the room up and share a 4-digit code with your friends.",
   "arena.way.join.title": "Join with a code",
   "arena.way.join.text": "You already have a friend's code.",
-  "arena.next_up":
-    "Coming next: rooms for 3 and 4, and quick match against whoever's around.",
   "arena.setup.aria": "Room setup",
   "arena.entry.label": "Entry per player",
   "arena.players.label": "Players",
@@ -791,8 +789,6 @@ export const es: Record<MessageKey, string> = {
     "Tú defines la sala y compartes un código de 4 dígitos con tus amigos.",
   "arena.way.join.title": "Entrar con código",
   "arena.way.join.text": "Ya tienes el código de un amigo.",
-  "arena.next_up":
-    "Ya vienen: salas de 3 y 4, y partida rápida contra quien esté disponible.",
   "arena.setup.aria": "Configuración de la sala",
   "arena.entry.label": "Entrada por jugador",
   "arena.players.label": "Jugadores",

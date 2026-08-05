@@ -3645,16 +3645,6 @@ body {
   color: var(--ink);
 }
 
-/* Lo que todavía no existe, dicho en una línea y sin ocupar un botón. */
-.arena-next-up {
-  margin: 0;
-  text-align: center;
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1.4;
-  opacity: 0.6;
-}
-
 /* --- Encabezado con vuelta atrás: crear, código y sala --- */
 
 .arena-head-bar {

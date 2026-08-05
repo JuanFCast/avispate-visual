@@ -90,13 +90,6 @@ export default function ArenaLobby() {
         ))}
       </nav>
 
-      {/*
-        Lo que viene, dicho una vez y en pequeño. No es una tarjeta apagada ni
-        un botón que no responde: prometer un camino que no existe y dejarlo a
-        la vista es la forma más cara de decir "todavía no".
-      */}
-      <p className="arena-next-up">{t("arena.next_up")}</p>
-
       {howToOpen && <ArenaHowTo onClose={() => setHowToOpen(false)} />}
     </>
   );
