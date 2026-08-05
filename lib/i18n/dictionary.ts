@@ -157,23 +157,18 @@ export const en = {
   "cards.each": "{n} each",
   "cards.less": "One card less",
   "cards.more": "One card more",
-  "cards.min": "min {n}",
-  "cards.max": "max {n}",
   "cards.presets.aria": "Length shortcuts",
   "cards.preset.short": "Quick",
   "cards.preset.mid": "Medium",
   "cards.preset.long": "Long",
-  "cards.summary.dealt": "Dealt out",
-  "cards.summary.base": "Shared base",
-  "cards.summary.in_play": "In play (cap {max})",
+  "cards.summary.in_play": "In play",
   "cards.summary.time": "Runs about",
   "cards.summary.minutes": "{n} min",
 
   /* --------------------------- Crear sala (P2) --------------------------- */
   "create.title": "Set up the room",
   "create.lead": "You're the host: what you pick here is what everyone plays.",
-  "create.note":
-    "Nothing is charged yet. No USDT moves and no funds are locked — the pot above is an estimate.",
+  "create.note": "Nothing is charged yet: the pot is an estimate.",
 
   /* ----------------------- Entrar con código (P3) ------------------------ */
   "join.title": "Join with a code",
@@ -815,23 +810,18 @@ export const es: Record<MessageKey, string> = {
   "cards.each": "{n} c/u",
   "cards.less": "Una carta menos",
   "cards.more": "Una carta más",
-  "cards.min": "mín {n}",
-  "cards.max": "máx {n}",
   "cards.presets.aria": "Atajos de duración",
   "cards.preset.short": "Rápida",
   "cards.preset.mid": "Media",
   "cards.preset.long": "Larga",
-  "cards.summary.dealt": "Se reparten",
-  "cards.summary.base": "Base compartida",
-  "cards.summary.in_play": "En juego (tope {max})",
+  "cards.summary.in_play": "En juego",
   "cards.summary.time": "Dura aprox.",
   "cards.summary.minutes": "{n} min",
 
   /* --------------------------- Crear sala (P2) --------------------------- */
   "create.title": "Configurar la sala",
   "create.lead": "Eres el anfitrión: lo que elijas aquí es lo que se juega.",
-  "create.note":
-    "Todavía no se cobra nada. No se mueve USDT ni se bloquean fondos — el pozo de arriba es un estimado.",
+  "create.note": "Todavía no se cobra nada: el pozo es un estimado.",
 
   /* ----------------------- Entrar con código (P3) ------------------------ */
   "join.title": "Entrar con código",

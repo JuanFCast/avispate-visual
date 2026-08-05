@@ -2,7 +2,6 @@
 
 import {
   CARDS_MIN,
-  MAX_DEALT_CARDS,
   cardPresets,
   clampCards,
   dealSummary,
@@ -95,11 +94,6 @@ export default function ArenaCards({
         </button>
       </div>
 
-      <div className="arena-cards-ends" aria-hidden="true">
-        <span>{t("cards.min", { n: CARDS_MIN })}</span>
-        <span>{t("cards.max", { n: max })}</span>
-      </div>
-
       <div
         className="rounds-options arena-cards-presets"
         role="radiogroup"
@@ -121,19 +115,19 @@ export default function ArenaCards({
         ))}
       </div>
 
-      {/* Se recalcula con cada toque y se anuncia entero: leer "36… 1… 37…"
-          cifra a cifra no le dice nada a nadie. */}
+      {/*
+        Dos datos, no cuatro.
+        "Se reparten 54" y "Base 1" son la aritmética de "En juego 55": suman lo
+        mismo, ocupan dos filas más y no cambian ninguna decisión. Lo que sí la
+        cambia es cuántas cartas hay en la mesa y cuánto va a durar, así que
+        queda eso y en una sola línea.
+
+        Se recalcula con cada toque y se anuncia entero: leer "36… 1… 37…" cifra
+        a cifra no le dice nada a nadie.
+      */}
       <dl className="arena-cards-summary" aria-live="polite">
         <div>
-          <dt>{t("cards.summary.dealt")}</dt>
-          <dd>{summary.dealt}</dd>
-        </div>
-        <div>
-          <dt>{t("cards.summary.base")}</dt>
-          <dd>{summary.base}</dd>
-        </div>
-        <div className="arena-cards-total">
-          <dt>{t("cards.summary.in_play", { max: MAX_DEALT_CARDS })}</dt>
+          <dt>{t("cards.summary.in_play")}</dt>
           <dd>{summary.inPlay}</dd>
         </div>
         <div>

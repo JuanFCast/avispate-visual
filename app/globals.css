@@ -3689,13 +3689,30 @@ body {
   outline-offset: 2px;
 }
 
-.arena-head-bar .page-title {
+/*
+ * El pasillo que deja libre la flecha, que está fuera del flujo en la esquina.
+ *
+ * La frase lo necesita tanto como el título, y esto faltaba: con `margin-top`
+ * negativo su primera línea empieza a unos 29 px del borde —dentro de los 44
+ * del botón— y al ir centrada y sin margen lateral se le metía debajo. Se leía
+ * "res el anfitrión" con la flecha encima.
+ */
+.arena-head-bar .page-title,
+.arena-head-bar .page-lead {
   padding: 0 52px;
 }
 
-/* Configuración: los selectores, el cálculo y el botón, en una tarjeta. */
+/*
+ * Configuración: los selectores, el cálculo y el botón, en una tarjeta.
+ *
+ * 20 y no 16: lo que se leía apretado no era la tarjeta entera, era que los
+ * grupos se tocaban entre sí mientras por dentro sobraba alto. La cura no es
+ * comprimir todo por igual —eso junta aún más lo que ya estaba junto— sino
+ * separar MÁS los grupos y apretar por dentro. Lo de dentro lo aprietan las
+ * reglas de abajo; esto es lo de fuera.
+ */
 .arena-setup {
-  gap: 16px;
+  gap: 20px;
 }
 
 .arena-field-note {
@@ -3709,11 +3726,29 @@ body {
 
 /* --- Cartas por jugador: slider, pasos, atajos y resumen --- */
 
+/*
+ * El grupo de las cartas nunca fue un contenedor: era `.field` a secas, que no
+ * es flex, así que la etiqueta, el slider, los presets y el resumen quedaban
+ * pegados unos a otros sin un solo píxel entre ellos. De ahí venía la sensación
+ * de amontonado — cuatro controles del mismo ajuste sin respirar.
+ */
+.arena-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .arena-cards-head {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+}
+
+/* El margen de `.field label` sobra aquí: ahora el hueco lo pone el `gap` del
+   grupo, y sumados daban un escalón entre la etiqueta y el slider. */
+.arena-cards-head label {
+  margin-bottom: 0;
 }
 
 /* El número, grande y a la derecha de su etiqueta: es el dato que se está
@@ -3821,28 +3856,17 @@ body {
   border-radius: 999px;
 }
 
-.arena-cards-ends {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  opacity: 0.55;
-}
-
-.arena-cards-presets {
-  margin-top: 2px;
-}
-
-/* Lo que significa la cifra: cuántas se reparten, cuántas quedan en juego y
-   cuánto dura. Sin esto, "18" no es una decisión, es un número. */
+/* Lo que significa la cifra: cuántas cartas quedan en la mesa y cuánto dura.
+   Sin esto, "18" no es una decisión, es un número. En una línea y no en cuatro:
+   son los dos datos que quedaron. */
 .arena-cards-summary {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 16px;
   margin: 0;
-  padding: 12px 14px;
+  padding: 9px 14px;
   border-radius: 16px;
   border: 2px solid var(--gray-soft);
   background: var(--white);
@@ -3851,8 +3875,7 @@ body {
 .arena-cards-summary > div {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 6px;
 }
 
 .arena-cards-summary dt {
@@ -3868,18 +3891,6 @@ body {
   font-weight: 600;
 }
 
-/* La línea del tope, separada: es el límite contra el que se decide. */
-.arena-cards-total {
-  padding-top: 6px;
-  border-top: 2px solid var(--gray-soft);
-}
-
-.arena-cards-total dt,
-.arena-cards-total dd {
-  opacity: 1;
-  font-weight: 700;
-}
-
 /*
  * El reparto del pozo. Es la cifra que decide si el jugador entra o no, así
  * que va en amarillo de marca y con el total del ganador destacado en verde,
@@ -3888,11 +3899,30 @@ body {
 .arena-prize {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 14px 16px;
+  gap: 4px;
+  padding: 10px 14px;
   border-radius: 18px;
   background: var(--yellow-faint);
   border: 2px solid var(--yellow-line);
+}
+
+/* Pozo y comisión comparten renglón: son el cálculo, no el resultado. Se
+   envuelven en dos líneas si el idioma las alarga, que es lo único que puede
+   pasar aquí y no rompe nada. */
+.arena-prize-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.arena-prize-meta strong {
+  font-family: var(--font-title);
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .arena-prize-row {
@@ -3916,8 +3946,7 @@ body {
 
 /* La línea que importa: separada del resto y con el peso de un resultado. */
 .arena-prize-win {
-  margin-top: 2px;
-  padding-top: 8px;
+  padding-top: 6px;
   border-top: 2px solid var(--yellow-line);
   font-size: 1rem;
   font-weight: 700;

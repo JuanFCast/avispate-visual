@@ -172,14 +172,25 @@ export default function ArenaCreate() {
             disabled={busy}
           />
 
+          {/*
+            El pozo y la comisión comparten renglón; lo que se lleva el ganador
+            se queda solo abajo, que es la cifra con la que se decide entrar.
+
+            La comisión NO se esconde aunque estorbe al alto. Es el corte de la
+            casa en la pantalla donde alguien está a punto de poner plata: si
+            solo se enseñara el premio, el 20% aparecería después como sorpresa.
+            El "USDT" se dice una vez, en la línea del ganador — repetirlo tres
+            veces era la mitad del ancho de las otras dos.
+          */}
           <div className="arena-prize" aria-live="polite">
-            <div className="arena-prize-row">
-              <span>{t("arena.prize.pot")}</span>
-              <strong>{fmtUsdt(prize.potUnits)} USDT</strong>
-            </div>
-            <div className="arena-prize-row arena-prize-fee">
-              <span>{t("arena.prize.fee")}</span>
-              <strong>−{fmtUsdt(prize.commissionUnits)} USDT</strong>
+            <div className="arena-prize-meta">
+              <span>
+                {t("arena.prize.pot")} <strong>{fmtUsdt(prize.potUnits)}</strong>
+              </span>
+              <span>
+                {t("arena.prize.fee")}{" "}
+                <strong>−{fmtUsdt(prize.commissionUnits)}</strong>
+              </span>
             </div>
             <div className="arena-prize-row arena-prize-win">
               <span>{t("arena.prize.winner")}</span>
