@@ -24,7 +24,7 @@ interface ProfileState {
 }
 
 interface ProfileContextValue extends ProfileState {
-  /** Privy terminó de hidratar (sabemos si hay sesión o no). */
+  /** Ya sabemos si hay sesión o no, venga de donde venga. */
   ready: boolean;
   authenticated: boolean;
   refresh: () => Promise<void>;
@@ -38,7 +38,7 @@ const ProfileContext = createContext<ProfileContextValue | null>(null);
 const EMPTY: ProfileState = { loading: false, alias: null, walletAddress: null };
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
-  const { ready, authenticated: privyAuth, getAccessToken } = usePrivy();
+  const { ready: privyReady, authenticated: privyAuth, getAccessToken } = usePrivy();
   const [state, setState] = useState<ProfileState>({ ...EMPTY, loading: true });
   // Sesión de wallet (MiniPay, sin firma). Se lee en un efecto y no durante el
   // render: `localStorage` no existe en el servidor y tocarlo antes de montar
@@ -53,6 +53,20 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const authenticated = privyAuth || walletSession;
+
+  /**
+   * "Ya sabemos si hay sesión", y no "Privy terminó de arrancar".
+   *
+   * Eran lo mismo hasta que apareció la sesión de wallet, y entonces dejó de
+   * serlo sin que nadie lo notara: dentro de MiniPay el jugador tiene sesión
+   * válida en `localStorage` y aun así toda la app se quedaba esperando a un
+   * SDK que ahí no usa para nada. Los botones colgaban de este valor, así que
+   * el efecto visible era el peor posible — tocar y que no pasara nada.
+   *
+   * Con sesión de wallet ya está contestada la pregunta y no hay a quién
+   * esperar. Sin ella sí hay que esperar a Privy, que es quien sabe.
+   */
+  const ready = walletSession || privyReady;
 
   /**
    * Privy manda cuando hay sesión suya: es la identidad más completa (correo,

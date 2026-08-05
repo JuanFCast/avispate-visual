@@ -23,6 +23,9 @@ export const en = {
   "common.done": "Done",
   "common.free": "free",
   "common.back": "Back",
+  // El botón está apagado porque la app todavía está arrancando, no porque
+  // falte algo por hacer. Decirlo evita el toque repetido.
+  "common.warming": "One moment…",
   "common.back_to_profile": "← Back to profile",
   "common.view_ranking": "View ranking",
   "common.live_stats": "Live stats",
@@ -221,6 +224,7 @@ export const en = {
   "room.players.anon": "Player",
   "room.ready.on": "I'm ready",
   "room.ready.off": "I'm not ready",
+  "room.ready.saving": "Saving…",
   "room.guest.hint": "The host starts the match once everyone is ready.",
   "room.start.cta": "Start the match",
   "room.start.need_players": "Waiting for the room to fill up.",
@@ -678,6 +682,7 @@ export const es: Record<MessageKey, string> = {
   "common.done": "Listo",
   "common.free": "gratis",
   "common.back": "Volver",
+  "common.warming": "Un momento…",
   "common.back_to_profile": "← Volver al perfil",
   "common.view_ranking": "Ver ranking",
   "common.live_stats": "Estadísticas en vivo",
@@ -874,6 +879,7 @@ export const es: Record<MessageKey, string> = {
   "room.players.anon": "Jugador",
   "room.ready.on": "Estoy listo",
   "room.ready.off": "Ya no estoy listo",
+  "room.ready.saving": "Guardando…",
   "room.guest.hint": "El anfitrión inicia la partida cuando todos estén listos.",
   "room.start.cta": "Iniciar partida",
   "room.start.need_players": "Falta que se llene la sala.",

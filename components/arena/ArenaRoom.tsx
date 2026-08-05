@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { arenaPrize, fmtEntry, fmtUsdt } from "@/lib/arena";
@@ -11,8 +12,18 @@ import { roomCanStart, roomIsFull, type RoomPlayerView } from "@/lib/arena-rooms
 import { useProfile } from "@/lib/profile-context";
 import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n";
-import AccessCard from "../AccessCard";
 import ArenaHeader from "./ArenaHeader";
+
+/**
+ * Igual que en `/arena/crear`: la tarjeta de acceso arrastra el camino SIWE de
+ * Privy con WalletConnect y el catálogo de wallets, y aquí solo se pinta cuando
+ * alguien llega por el enlace de un amigo sin sesión. Quien ya está sentado no
+ * tiene por qué descargarlo.
+ */
+const AccessCard = dynamic(() => import("../AccessCard"), {
+  ssr: false,
+  loading: () => <div className="access-card-skeleton" aria-hidden="true" />,
+});
 
 /** Cuánto se queda "Copiado ✓" antes de volver a ser un botón normal. */
 const COPIED_MS = 1600;
@@ -237,8 +248,13 @@ export default function ArenaRoom({ code }: { code: string }) {
               className="btn-primary"
               onClick={join}
               disabled={busy || !ready}
+              aria-busy={busy || !ready}
             >
-              {busy ? t("room.join.joining") : t("room.join_this.cta")}
+              {busy
+                ? t("room.join.joining")
+                : !ready
+                  ? t("common.warming")
+                  : t("room.join_this.cta")}
             </button>
           )
         ) : you.isHost ? (
@@ -266,8 +282,13 @@ export default function ArenaRoom({ code }: { code: string }) {
               className={`btn-primary${you.isReady ? " room-ready-on" : ""}`}
               onClick={() => setReady(!you.isReady)}
               disabled={busy}
+              aria-busy={busy}
             >
-              {you.isReady ? t("room.ready.off") : t("room.ready.on")}
+              {busy
+                ? t("room.ready.saving")
+                : you.isReady
+                  ? t("room.ready.off")
+                  : t("room.ready.on")}
             </button>
             <p className="arena-prize-note">{t("room.guest.hint")}</p>
           </>

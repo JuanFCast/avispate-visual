@@ -316,9 +316,27 @@ body {
   box-shadow: 0 1px 0 var(--yellow-press);
 }
 
+/*
+ * Apagado de verdad, no un poco translúcido.
+ *
+ * Con `opacity: .55` un botón amarillo sobre blanco sigue leyéndose como un
+ * botón: el jugador lo toca, no pasa nada y lo vuelve a tocar. Quitarle el
+ * color de marca y el relieve —que es lo que dice "esto se hunde"— lo saca de
+ * la categoría de cosa tocable de un vistazo.
+ */
 .btn-primary:disabled {
-  opacity: 0.55;
+  opacity: 1;
   cursor: default;
+  background: var(--gray-soft);
+  border-color: var(--gray-soft);
+  color: var(--gray);
+  box-shadow: none;
+}
+
+/* Sin relieve no hay nada que hundir: el toque no debe fingir que pasó algo. */
+.btn-primary:disabled:active {
+  transform: none;
+  box-shadow: none;
 }
 
 /*
@@ -2160,6 +2178,22 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+/*
+ * El hueco que ocupa la tarjeta de acceso mientras llega.
+ *
+ * La tarjeta se carga aparte —arrastra el camino SIWE de Privy, que es lo más
+ * pesado de la app— y sin reservarle sitio, el contenido de abajo daría un
+ * salto al aterrizar. Mismas medidas que la tarjeta, sin nada dentro.
+ */
+.access-card-skeleton {
+  width: 100%;
+  max-width: 420px;
+  min-height: 148px;
+  border: 2px dashed var(--gray-soft);
+  border-radius: 18px;
+  background: var(--white);
 }
 
 .access-btn {

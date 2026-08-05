@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
   ARENA_ENTRY_UNITS,
@@ -16,9 +17,24 @@ import { roomErrorText } from "@/lib/arena-room-errors";
 import type { RoomError } from "@/lib/arena-rooms";
 import { useProfile } from "@/lib/profile-context";
 import { useT } from "@/lib/i18n/client";
-import AccessCard from "../AccessCard";
 import ArenaCards from "./ArenaCards";
 import ArenaHeader from "./ArenaHeader";
+
+/**
+ * La tarjeta de acceso llega aparte, y es el cambio de peso más grande de la
+ * app: es la única que usa `useWalletAuth` → `useLoginWithSiwe` de Privy, y ese
+ * camino arrastra WalletConnect, Coinbase y el catálogo entero de wallets de
+ * RainbowKit. Estáticamente importada, ese megabyte viajaba al teléfono en cada
+ * visita a esta pantalla — incluida la del jugador que ya tiene sesión y por
+ * tanto NUNCA ve la tarjeta.
+ *
+ * `ssr: false` porque no hay nada que prerenderizar: solo se pinta cuando el
+ * cliente ya sabe que no hay sesión.
+ */
+const AccessCard = dynamic(() => import("../AccessCard"), {
+  ssr: false,
+  loading: () => <div className="access-card-skeleton" aria-hidden="true" />,
+});
 
 /**
  * /arena/crear — la ÚNICA pantalla de configuración del recorrido.
@@ -202,13 +218,20 @@ export default function ArenaCreate() {
 
           {error && <p className="room-error">{roomErrorText(t, error)}</p>}
 
+          {/* Tres estados, no dos: trabajando, arrancando y listo. El de
+              "arrancando" faltaba, y era el que hacía tocar tres veces. */}
           <button
             type="button"
             className="btn-primary"
             onClick={create}
             disabled={busy || !ready}
+            aria-busy={busy || !ready}
           >
-            {busy ? t("room.create.creating") : t("room.create.cta")}
+            {busy
+              ? t("room.create.creating")
+              : !ready
+                ? t("common.warming")
+                : t("room.create.cta")}
           </button>
         </section>
       )}
