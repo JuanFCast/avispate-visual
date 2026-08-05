@@ -1,108 +1,53 @@
 "use client";
 
-import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
-import { celo } from "viem/chains";
-import { useEffect, useRef, type ReactNode } from "react";
+import dynamic from "next/dynamic";
+import { usePathname } from "next/navigation";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider, useAccount, useConnect } from "wagmi";
-import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
-import "@rainbow-me/rainbowkit/styles.css";
-import { wagmiConfig } from "./wagmi";
-import { useMiniPayAutoConnect } from "./minipay";
-import { ProfileProvider } from "./profile-context";
+import type { ReactNode } from "react";
 import { I18nProvider } from "./i18n/client";
 import type { Lang } from "./i18n";
-import WelcomeGasBridge from "@/components/WelcomeGasBridge";
-import OutboxBridge from "@/components/OutboxBridge";
-
-const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 
 const queryClient = new QueryClient();
 
-// Identidad EIP-6963 con la que anunciamos la wallet embebida a wagmi/RainbowKit.
-const EMBEDDED_INFO = {
-  name: "Avíspate (Privy)",
-  rdns: "fun.avispate.embedded",
-  icon:
-    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23FFC20E'/%3E%3C/svg%3E",
-};
-
 /**
- * Puente Privy → wagmi. Hace dos cosas:
- *   1. Anuncia la wallet embebida de Privy por EIP-6963 para que wagmi (y por
- *      tanto RainbowKit) la descubran como una wallet más, sin reemplazar los
- *      conectores externos.
- *   2. Auto-conecta esa wallet embebida SOLO si no hay ninguna activa, para que
- *      el usuario recién logueado por correo ya tenga wallet lista sin pisar una
- *      wallet externa que él mismo haya elegido.
- */
-function PrivyEmbeddedBridge() {
-  const { ready, authenticated } = usePrivy();
-  const { wallets } = useWallets();
-  const { isConnected } = useAccount();
-  const { connect, connectors } = useConnect();
-  const announcedRef = useRef(false);
-  const autoConnectedRef = useRef(false);
-
-  const embedded = wallets.find((w) => w.walletClientType === "privy");
-
-  // 1. Anunciar la embebida por EIP-6963.
-  useEffect(() => {
-    if (!ready || !authenticated || !embedded || announcedRef.current) return;
-    let cancelled = false;
-
-    (async () => {
-      const provider = await embedded.getEthereumProvider();
-      if (cancelled || !provider) return;
-      announcedRef.current = true;
-
-      const detail = Object.freeze({
-        info: { ...EMBEDDED_INFO, uuid: crypto.randomUUID() },
-        provider,
-      });
-      const announce = () =>
-        window.dispatchEvent(
-          new CustomEvent("eip6963:announceProvider", { detail })
-        );
-      // Responder tanto a peticiones futuras como anunciar de inmediato.
-      window.addEventListener("eip6963:requestProvider", announce);
-      announce();
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [ready, authenticated, embedded]);
-
-  // 2. Auto-conectar la embebida si nada está conectado aún.
-  useEffect(() => {
-    if (autoConnectedRef.current || isConnected || !authenticated) return;
-    const embeddedConnector = connectors.find(
-      (c) => c.name === EMBEDDED_INFO.name
-    );
-    if (!embeddedConnector) return;
-    autoConnectedRef.current = true;
-    connect({ connector: embeddedConnector });
-  }, [isConnected, authenticated, connectors, connect]);
-
-  return null;
-}
-
-/** Dentro de MiniPay, auto-conecta su wallet inyectada. */
-function MiniPayBridge() {
-  useMiniPayAutoConnect();
-  return null;
-}
-
-/**
- * Árbol de providers de Avíspate. Orden (fuera → dentro):
- *   I18nProvider → PrivyProvider → QueryClientProvider → WagmiProvider →
- *   RainbowKitProvider.
- * La identidad y el ranking siguen atados a Privy (correo); wagmi solo gestiona
- * la wallet ACTIVA (embebida o externa) para pagos, balances y premios.
+ * El stack de wallets llega aparte y solo donde hace falta.
  *
- * El idioma va por fuera de todo: lo decide el servidor y ningún otro provider
- * depende de él, así que cambiarlo no vuelve a montar la wallet ni la sesión.
+ * Sin `ssr: false` a propósito: el HTML se sigue renderizando en el servidor.
+ * Apagarlo dejaría la pantalla de jugar en blanco hasta que el JS aterrice, que
+ * es exactamente lo contrario de lo que se busca — MiniPay mide esa pantalla.
+ * Lo único que hace `dynamic` aquí es partir el chunk, para que las rutas que
+ * no lo montan tampoco lo pidan.
+ */
+const WalletProviders = dynamic(() => import("./wallet-providers"));
+
+/**
+ * Rutas sin wallet: no hay un solo botón que firme, pague o lea un saldo.
+ *
+ * Se comprobó componente a componente antes de ponerlas aquí — `LiveStats`,
+ * `WinnersHistory` y `ProfileBottomNav` solo usan i18n y react-query, y
+ * `useIsMiniPay` mira `window.ethereum` sin necesitar provider. Ninguna llama a
+ * `useProfile`, que es lo que reventaría al quedarse fuera del árbol.
+ *
+ * Ante la duda, una ruta NO va en esta lista: sobrarle un megabyte a una página
+ * es un problema de velocidad, y faltarle un provider es una pantalla rota.
+ */
+const WALLET_FREE_ROUTES = ["/terminos", "/privacidad", "/historial", "/stats"];
+
+function isWalletFree(pathname: string): boolean {
+  return WALLET_FREE_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
+
+/**
+ * Árbol de providers de Avíspate, en dos mitades.
+ *
+ * Arriba lo barato y de todos: el idioma —que decide el servidor, y por eso va
+ * por fuera de todo: cambiarlo no vuelve a montar la wallet ni la sesión— y el
+ * caché de peticiones.
+ *
+ * Abajo, y solo en las rutas que lo usan, el megabyte: Privy, wagmi, RainbowKit
+ * y el catálogo de wallets. Ver `wallet-providers.tsx`.
  */
 export function Providers({
   lang,
@@ -111,49 +56,14 @@ export function Providers({
   lang: Lang;
   children: ReactNode;
 }) {
+  const pathname = usePathname() ?? "";
+  const walletFree = isWalletFree(pathname);
+
   return (
     <I18nProvider initialLang={lang}>
-      <PrivyProvider
-        appId={PRIVY_APP_ID}
-        config={{
-          /*
-           * Correo Y wallet. El correo va primero porque sigue siendo el
-           * camino por defecto, pero la wallet ahora es una IDENTIDAD y no
-           * solo un medio de pago: sin esto, `loginWithSiwe` no está permitido
-           * para la app y firmar no sirve de nada.
-           *
-           * Ojo: esto es la mitad del interruptor. La otra mitad está en el
-           * panel de Privy (Login methods → Wallet); si allí está apagado, la
-           * firma se hace pero el login se rechaza.
-           */
-          loginMethods: ["email", "wallet"],
-          // La wallet embebida se provisiona en Celo (red principal).
-          defaultChain: celo,
-          supportedChains: [celo],
-          embeddedWallets: {
-            // Sin UIs de Privy: gestionamos la wallet desde nuestra propia UI.
-            showWalletUIs: false,
-            ethereum: {
-              createOnLogin: "users-without-wallets",
-            },
-            solana: {
-              createOnLogin: "off",
-            },
-          },
-        }}
-      >
-        <QueryClientProvider client={queryClient}>
-          <WagmiProvider config={wagmiConfig}>
-            <RainbowKitProvider modalSize="compact">
-              <PrivyEmbeddedBridge />
-              <MiniPayBridge />
-              <WelcomeGasBridge />
-              <OutboxBridge />
-              <ProfileProvider>{children}</ProfileProvider>
-            </RainbowKitProvider>
-          </WagmiProvider>
-        </QueryClientProvider>
-      </PrivyProvider>
+      <QueryClientProvider client={queryClient}>
+        {walletFree ? children : <WalletProviders>{children}</WalletProviders>}
+      </QueryClientProvider>
     </I18nProvider>
   );
 }
