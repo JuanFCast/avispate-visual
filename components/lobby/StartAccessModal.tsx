@@ -55,7 +55,8 @@ export default function StartAccessModal({
    * paso obligatorio —conectar no es entrar—, dentro no existe como método y la
    * sesión la abre la propia jugada.
    */
-  const needsSignIn = !inMiniPay && walletAuth.needsSignature;
+  const needsSignIn =
+    !inMiniPay && !wallet.reconnecting && walletAuth.needsSignature;
   const signing = walletAuth.stage !== null;
 
   const needsEmailAlias =
@@ -228,7 +229,9 @@ export default function StartAccessModal({
             </h2>
             <WalletAliasForm onSet={onSetWalletAlias} />
           </>
-        ) : checkingWalletAlias || (profile.authenticated && profile.loading) ? (
+        ) : checkingWalletAlias ||
+          wallet.reconnecting ||
+          (profile.authenticated && profile.loading) ? (
           <>
             <h2 id="access-modal-title" className="lobby-modal-title">
               {t("access.title")}

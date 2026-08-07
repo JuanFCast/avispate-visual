@@ -137,6 +137,10 @@ export default function HomeLobby({
     if (!profile.ready || (profile.authenticated && profile.loading)) {
       return checking;
     }
+    // wagmi reenganchando la wallet de siempre: se espera en vez de ofrecerle
+    // entrar. Es un parpadeo corto, pero es el que hace pensar al jugador que
+    // la sesión no se guardó.
+    if (wallet.reconnecting) return checking;
     if (profile.authenticated) {
       if (!profile.alias) {
         return {

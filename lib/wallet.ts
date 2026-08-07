@@ -33,6 +33,16 @@ export interface ActiveWalletState {
   address: string;
   /** Hay una wallet conectada en wagmi. */
   isConnected: boolean;
+  /**
+   * wagmi está reenganchando la wallet que ya estaba conectada (al recargar o
+   * al volver a abrir). Todavía NO hay dirección, pero tampoco es un jugador
+   * desconectado: es el mismo, un segundo antes de reaparecer.
+   *
+   * Sin distinguir este momento, la pantalla lo trataba como "sin wallet" y le
+   * ofrecía volver a entrar durante ese parpadeo — que es exactamente lo que
+   * los jugadores describen como "no me mantiene la sesión".
+   */
+  reconnecting: boolean;
   /** Nombre del conector activo (p. ej. "MetaMask" o "Avíspate (Privy)"). */
   connectorName: string;
   /** Id de la red activa. */
@@ -45,10 +55,11 @@ export interface ActiveWalletState {
  * conecte por RainbowKit. Siempre hay como máximo una activa.
  */
 export function useActiveWallet(): ActiveWalletState {
-  const { address, isConnected, connector, chainId } = useAccount();
+  const { address, isConnected, connector, chainId, status } = useAccount();
   return {
     address: address ? address.toLowerCase() : "",
     isConnected,
+    reconnecting: status === "reconnecting" || status === "connecting",
     connectorName: connector?.name ?? "",
     chainId,
   };
