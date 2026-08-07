@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
+import { useIsMiniPay } from "@/lib/minipay";
 import { useT } from "@/lib/i18n/client";
 import AliasGate from "../AliasGate";
 import WalletAliasForm from "../WalletAliasForm";
@@ -32,6 +33,7 @@ export default function StartAccessModal({
   const { login } = usePrivy();
   const profile = useProfile();
   const wallet = useActiveWallet();
+  const inMiniPay = useIsMiniPay();
   const panelRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -168,6 +170,31 @@ export default function StartAccessModal({
             <p className="lobby-modal-text" aria-live="polite">
               {t("access.checking")}
             </p>
+          </>
+        ) : inMiniPay ? (
+          /**
+           * Dentro de MiniPay no se ofrece conectar NADA: la wallet ya entró
+           * sola y su reglamento de listado prohíbe el botón de conectar
+           * ("never show a Connect Wallet button when isMiniPay"). El correo
+           * tampoco sirve de nada ahí, y la firma que abriría sesión no existe
+           * como método en esa wallet. Lo que sí abre sesión es jugar, así que
+           * el modal solo empuja de vuelta al reto del día.
+           *
+           * Es el mismo criterio que ya aplicaba `AccessCard` en la Arena; esta
+           * pantalla se había quedado sin él.
+           */
+          <>
+            <h2 id="access-modal-title" className="lobby-modal-title">
+              {t("access.title")}
+            </h2>
+            <p className="lobby-modal-text">{t("access.minipay_hint")}</p>
+            <button
+              type="button"
+              className="access-btn access-btn-primary"
+              onClick={onClose}
+            >
+              {t("access.minipay_cta")}
+            </button>
           </>
         ) : (
           <>
