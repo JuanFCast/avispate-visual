@@ -12,9 +12,40 @@
 /** El prefijo que hace reconocible al código incluso suelto en un chat. */
 export const ROOM_CODE_PREFIX = "AVP";
 /** Cuatro dígitos: se dicta por teléfono y se teclea sin equivocarse. */
+/**
+ * Longitud del código VIEJO, de solo dígitos. Se conserva para poder seguir
+ * leyendo las salas que ya existen: un código que alguien tiene en un chat no
+ * puede dejar de funcionar porque nosotros cambiemos el formato.
+ */
 export const ROOM_CODE_DIGITS = 4;
 
-const CODE_RE = /^AVP-\d{4}$/;
+/**
+ * Longitud del código nuevo.
+ *
+ * Cuatro dígitos son diez mil combinaciones: se prueban enteras en un rato, y
+ * eso estaba bien mientras entrar a una sala no costara dinero — lo advierte la
+ * propia migración de salas. Con una entrada de por medio, adivinar una sala
+ * deja de ser una travesura.
+ *
+ * Seis caracteres de este alfabeto son **más de mil millones** de
+ * combinaciones. Sigue cabiendo en un mensaje, se dicta por teléfono sin
+ * deletrear y se teclea de una vez.
+ */
+export const ROOM_CODE_LENGTH = 6;
+
+/**
+ * Alfabeto de Crockford: los 10 dígitos y las letras MENOS `I`, `L`, `O` y `U`.
+ *
+ * Las tres primeras se quitan porque se confunden con `1` y `0` al leerlas en
+ * una pantalla pequeña o al dictarlas por teléfono, que es exactamente lo que
+ * hace la gente con estos códigos. La `U` se quita para no formar palabras que
+ * nadie quiere leer en su pantalla por casualidad.
+ */
+const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+// Los dos formatos: el nuevo y el viejo de cuatro dígitos, que sigue siendo
+// válido para las salas que ya existían.
+const CODE_RE = /^AVP-(?:[0-9A-Z]{6}|\d{4})$/;
 
 /**
  * Cada cuánto late el cliente contra el servidor. Es a la vez el latido de
@@ -109,30 +140,63 @@ export interface RoomView {
  * Node 18+; el módulo se rechaza para no sesgar hacia los primeros valores.
  */
 export function generateRoomCode(): string {
-  const max = 10 ** ROOM_CODE_DIGITS;
-  const limit = Math.floor(65_536 / max) * max;
-  const buf = new Uint16Array(1);
-  let n: number;
-  do {
+  const buf = new Uint8Array(ROOM_CODE_LENGTH);
+  let out = "";
+  // Rechazo por módulo: 256 no es múltiplo de 32, así que los bytes altos
+  // sesgarían hacia el principio del alfabeto. Con 32 símbolos el corte cae en
+  // 256 justo, pero se deja explícito para que cambiar el alfabeto no
+  // introduzca el sesgo en silencio.
+  const limit = Math.floor(256 / ALPHABET.length) * ALPHABET.length;
+  while (out.length < ROOM_CODE_LENGTH) {
     crypto.getRandomValues(buf);
-    n = buf[0];
-  } while (n >= limit);
-  return `${ROOM_CODE_PREFIX}-${String(n % max).padStart(ROOM_CODE_DIGITS, "0")}`;
+    for (const b of buf) {
+      if (b >= limit) continue;
+      out += ALPHABET[b % ALPHABET.length];
+      if (out.length === ROOM_CODE_LENGTH) break;
+    }
+  }
+  return `${ROOM_CODE_PREFIX}-${out}`;
 }
 
 /**
  * Lo que el jugador tecleó → un código canónico, o `null` si no lo es.
  *
- * Acepta lo que la gente escribe de verdad: `4821`, `avp4821`, `AVP 4821`,
- * `avp-4821`. Escribir bien el guion no debería ser parte del juego.
+ * Acepta lo que la gente escribe de verdad: `H7K2MP`, `avp-h7k2mp`,
+ * `AVP H7K2MP`. Escribir bien el guion no debería ser parte del juego.
+ *
+ * Y corrige las confusiones de siempre en vez de rechazarlas: quien lee `O`
+ * donde había un cero, o `l` donde había un uno, entra igual. Son letras que ni
+ * siquiera existen en el alfabeto, así que traducirlas no puede chocar con
+ * ningún código real.
+ *
+ * Los códigos viejos de cuatro dígitos siguen valiendo: las salas que ya
+ * existen no pueden dejar de abrirse porque hayamos cambiado el formato.
  */
 export function normalizeRoomCode(raw: string): string | null {
-  const clean = (raw ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-  const digits = clean.startsWith(ROOM_CODE_PREFIX)
+  const clean = (raw ?? "")
+    .toUpperCase()
+    .replace(/[IL]/g, "1")
+    .replace(/O/g, "0")
+    .replace(/[^A-Z0-9]/g, "");
+  const body = clean.startsWith(ROOM_CODE_PREFIX)
     ? clean.slice(ROOM_CODE_PREFIX.length)
     : clean;
-  if (!new RegExp(`^\\d{${ROOM_CODE_DIGITS}}$`).test(digits)) return null;
-  return `${ROOM_CODE_PREFIX}-${digits}`;
+
+  // Formato viejo: cuatro dígitos y nada más. Sin construir la expresión con
+  // una plantilla: ahí dentro `\d` se queda en `d` y el cheque pasaría a
+  // aceptar "dddd" en silencio.
+  if (body.length === ROOM_CODE_DIGITS && /^[0-9]+$/.test(body)) {
+    return `${ROOM_CODE_PREFIX}-${body}`;
+  }
+  // Formato nuevo: solo símbolos del alfabeto, para que un código con `U` —que
+  // no generamos nunca— no se dé por bueno.
+  if (
+    body.length === ROOM_CODE_LENGTH &&
+    [...body].every((c) => ALPHABET.includes(c))
+  ) {
+    return `${ROOM_CODE_PREFIX}-${body}`;
+  }
+  return null;
 }
 
 /** ¿Es un código con la forma correcta? */
@@ -142,15 +206,25 @@ export function isRoomCode(value: string): boolean {
 
 /**
  * Formato mientras se escribe: mayúsculas, el prefijo puesto por nosotros y el
- * guion donde va. El jugador solo aporta dígitos.
+ * guion donde va. El jugador solo aporta el cuerpo.
+ *
+ * Las confusiones se corrigen aquí también, y en el momento de teclearlas: ver
+ * cómo tu `O` se convierte en `0` mientras escribes enseña el alfabeto sin que
+ * nadie tenga que explicarlo.
  */
 export function formatRoomCodeInput(raw: string): string {
-  const digits = (raw ?? "")
+  const body = (raw ?? "")
     .toUpperCase()
-    .replace(/[^0-9]/g, "")
-    .slice(0, ROOM_CODE_DIGITS);
-  if (!digits) return "";
-  return `${ROOM_CODE_PREFIX}-${digits}`;
+    .replace(/[IL]/g, "1")
+    .replace(/O/g, "0")
+    .replace(/[^A-Z0-9]/g, "")
+    .replace(new RegExp(`^${ROOM_CODE_PREFIX}`), "")
+    .split("")
+    .filter((c) => ALPHABET.includes(c))
+    .slice(0, ROOM_CODE_LENGTH)
+    .join("");
+  if (!body) return "";
+  return `${ROOM_CODE_PREFIX}-${body}`;
 }
 
 /** Inicial para el avatar. Vacío o raro → la abeja. */
@@ -186,3 +260,4 @@ export function roomCanStart(room: RoomView): boolean {
 export function roomChannelName(code: string): string {
   return `arena-room:${code}`;
 }
+
