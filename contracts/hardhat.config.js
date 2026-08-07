@@ -23,9 +23,18 @@ module.exports = {
   // Verificación pública del contrato: requisito de Proof of Ship y, sobre
   // todo, lo que permite a cualquiera leer las reglas del pozo antes de pagar.
   sourcify: {
-    // No pide llave de API, así que funciona siempre. Blockscout y otras
-    // herramientas levantan la fuente desde aquí.
-    enabled: true,
+    /**
+     * APAGADO, y no porque no usemos Sourcify — sí lo usamos.
+     *
+     * `hardhat verify` solo habla su API v1, que está en apagado programado
+     * hasta enero de 2027: responde 503 y tumba el comando ENTERO, incluida la
+     * parte de Celoscan, que sí funciona. Dejarlo encendido significa que
+     * `verify` no sirve para nada.
+     *
+     * Sourcify se publica con `scripts/verify-sourcify.mjs`, que habla la v2.
+     * Así ya se verificó AvispateArena (coincidencia exacta, 2026-08-07).
+     */
+    enabled: false,
   },
   etherscan: {
     // Celoscan sí exige llave. Sin ella se desactiva para no romper `verify`;

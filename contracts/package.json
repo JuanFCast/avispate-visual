@@ -6,7 +6,8 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "deploy:celo": "hardhat run scripts/deploy.js --network celo",
-    "deploy:arena:celo": "hardhat run scripts/deploy-arena.js --network celo"
+    "deploy:arena:celo": "hardhat run scripts/deploy-arena.js --network celo",
+    "verify:sourcify": "node scripts/verify-sourcify.mjs"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
