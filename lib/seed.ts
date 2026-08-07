@@ -14,9 +14,16 @@ import {
   USDT_CELO_ADDRESS,
 } from "./contracts";
 
-/** Cuánto sembrar por mazo cada ronda (1 USDT = 1000000, 6 decimales). */
+/**
+ * Cuánto sembrar por mazo cada ronda (6 decimales: 1 USDT = 1000000).
+ *
+ * Son 0.30 por mazo y hay tres mazos, así que la casa pone **0.90 USDT al día**.
+ * Antes ponía 1.00 por mazo, o sea 3 al día, y eso lo decidió Juan el
+ * 2026-08-07: la siembra es dinero suyo y no tiene por qué crecer con el juego.
+ * Lo que los jugadores aportan (el 80% de cada entrada) se suma encima de esto.
+ */
 export const SEED_AMOUNT = BigInt(
-  process.env.AVISPATE_SEED_AMOUNT || "1000000"
+  process.env.AVISPATE_SEED_AMOUNT || "300000"
 );
 
 /**
