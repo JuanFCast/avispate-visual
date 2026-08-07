@@ -46,7 +46,8 @@ describe("AvispateArena", () => {
       operator.address,
       COMMISSION_BPS,
       SETTLE_TIMEOUT,
-      OPEN_TIMEOUT
+      OPEN_TIMEOUT,
+      owner.address
     );
 
     for (const who of [alice, bob, carol]) {
@@ -442,6 +443,53 @@ describe("AvispateArena", () => {
       )).to.equal(false);
     });
 
+    it("el owner es el que se PASA, no quien despliega", async () => {
+      const [deployer, commission, operator, futuroDueño] =
+        await ethers.getSigners();
+      const MockUSDT = await ethers.getContractFactory("MockUSDT");
+      const token = await MockUSDT.deploy();
+      const Arena = await ethers.getContractFactory("AvispateArena");
+
+      // Firma `deployer`, manda `futuroDueño`. Es el caso que importa: la llave
+      // que firma el despliegue depende de la máquina y del apuro, y el dueño
+      // de un contrato que custodia dinero ajeno no puede depender de eso.
+      const arena = await Arena.connect(deployer).deploy(
+        await token.getAddress(),
+        commission.address,
+        operator.address,
+        COMMISSION_BPS,
+        SETTLE_TIMEOUT,
+        OPEN_TIMEOUT,
+        futuroDueño.address
+      );
+
+      expect(await arena.owner()).to.equal(futuroDueño.address);
+      expect(await arena.owner()).to.not.equal(deployer.address);
+
+      // Y manda de verdad: el que desplegó no puede tocar la configuración.
+      await expect(arena.connect(deployer).setCommissionBps(0)).to.be.reverted;
+      await arena.connect(futuroDueño).setCommissionBps(1000);
+      expect(await arena.commissionBps()).to.equal(1000);
+    });
+
+    it("un owner en cero deja el contrato sin dueño: lo rechaza Ownable", async () => {
+      const [, commission, operator] = await ethers.getSigners();
+      const MockUSDT = await ethers.getContractFactory("MockUSDT");
+      const token = await MockUSDT.deploy();
+      const Arena = await ethers.getContractFactory("AvispateArena");
+      await expect(
+        Arena.deploy(
+          await token.getAddress(),
+          commission.address,
+          operator.address,
+          COMMISSION_BPS,
+          SETTLE_TIMEOUT,
+          OPEN_TIMEOUT,
+          ethers.ZeroAddress
+        )
+      ).to.be.revertedWithCustomError(Arena, "OwnableInvalidOwner");
+    });
+
     it("no acepta una comisión imposible", async () => {
       const [, commission, operator] = await ethers.getSigners();
       const MockUSDT = await ethers.getContractFactory("MockUSDT");
@@ -454,7 +502,8 @@ describe("AvispateArena", () => {
           operator.address,
           10_001, // más del 100%
           SETTLE_TIMEOUT,
-          OPEN_TIMEOUT
+          OPEN_TIMEOUT,
+          operator.address
         )
       ).to.be.revertedWithCustomError(Arena, "InvalidBps");
     });
@@ -471,7 +520,8 @@ describe("AvispateArena", () => {
           operator.address,
           COMMISSION_BPS,
           SETTLE_TIMEOUT,
-          OPEN_TIMEOUT
+          OPEN_TIMEOUT,
+          operator.address
         )
       ).to.be.revertedWithCustomError(Arena, "ZeroAddress");
     });

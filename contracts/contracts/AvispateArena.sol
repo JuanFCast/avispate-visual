@@ -200,14 +200,26 @@ contract AvispateArena is Ownable, ReentrancyGuard {
         _;
     }
 
+    /**
+     * @param owner_ Quién manda en el contrato. Va EXPLÍCITO y no se toma de
+     *        quien despliega a propósito: el dueño de un contrato que custodia
+     *        dinero ajeno tiene que ser una decisión escrita y revisada, no el
+     *        resultado accidental de con qué llave se firmó el despliegue —que
+     *        depende de la máquina, del archivo de entorno y de la prisa que
+     *        tuviera quien lo corrió.
+     */
     constructor(
         address token_,
         address commissionWallet_,
         address operator_,
         uint16 commissionBps_,
         uint256 settleTimeout_,
-        uint256 openTimeout_
-    ) Ownable(msg.sender) {
+        uint256 openTimeout_,
+        address owner_
+    ) Ownable(owner_) {
+        // `owner_` no se comprueba aquí: `Ownable` corre ANTES que este cuerpo
+        // y ya rechaza la dirección cero con `OwnableInvalidOwner`. Repetirlo
+        // sería código muerto que aparenta proteger algo.
         if (token_ == address(0) || commissionWallet_ == address(0)) {
             revert ZeroAddress();
         }

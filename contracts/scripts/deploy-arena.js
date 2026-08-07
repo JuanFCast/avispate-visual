@@ -11,6 +11,7 @@ const { ethers } = require("hardhat");
  *   COMMISSION_BPS     comisión sobre el pozo (2000 = 20%)
  *   SETTLE_TIMEOUT     segundos antes de poder anular una mesa llena sin pagar
  *   OPEN_TIMEOUT       segundos antes de poder anular una mesa que no se llenó
+ *   OWNER_ADDRESS      quién manda en el contrato (NO se toma del deployer)
  *
  * Este script comprueba MÁS de lo que parece necesario, y es a propósito. Un
  * contrato desplegado no se corrige: si el token va mal, las entradas se cobran
@@ -55,6 +56,12 @@ async function main() {
     "OPERATOR_ADDRESS",
     process.env.OPERATOR_ADDRESS
   );
+  /**
+   * Obligatorio y explícito. No cae por defecto en el deployer a propósito: si
+   * cayera, el dueño del contrato dependería de con qué llave se firmó, que es
+   * cosa de la máquina y del apuro, y no de una decisión revisada.
+   */
+  const owner = requireAddress("OWNER_ADDRESS", process.env.OWNER_ADDRESS);
   const commissionBps = Number(process.env.COMMISSION_BPS || "2000");
   const settleTimeout = Number(
     process.env.SETTLE_TIMEOUT || DEFAULT_SETTLE_TIMEOUT
@@ -100,7 +107,8 @@ async function main() {
 
   console.log("─────────────────────────────────────────────");
   console.log("Red:               ", net.name, `(chainId ${net.chainId})`);
-  console.log("Deployer / owner:  ", deployer.address);
+  console.log("Deployer (firma):  ", deployer.address);
+  console.log("Owner (manda):     ", owner);
   console.log("Saldo del deployer:", ethers.formatEther(balance), "CELO");
   console.log("Token:             ", usdt, `(${symbol}, ${decimals} decimales)`);
   console.log("Comisión a:        ", commissionWallet);
@@ -109,6 +117,15 @@ async function main() {
   console.log("Plazo sin liquidar:", `${settleTimeout}s (${settleTimeout / 3600} h)`);
   console.log("Plazo sin llenar:  ", `${openTimeout}s (${openTimeout / 3600} h)`);
   console.log("─────────────────────────────────────────────");
+
+  if (owner.toLowerCase() !== deployer.address.toLowerCase()) {
+    // No es un error: es justo lo que este parámetro permite. Pero se avisa,
+    // porque desplegar con una llave y dejar el mando en otra dirección tiene
+    // que ser algo que se lee en pantalla, no algo que se descubre después.
+    console.log(
+      "ℹ️  El owner NO es quien despliega. Intencional: revísalo igualmente."
+    );
+  }
 
   if (net.chainId !== 42220n) {
     console.log("⚠️  No estás en Celo mainnet (42220).");
@@ -124,7 +141,8 @@ async function main() {
     operator,
     commissionBps,
     settleTimeout,
-    openTimeout
+    openTimeout,
+    owner
   );
   await arena.waitForDeployment();
   const address = await arena.getAddress();
@@ -149,7 +167,7 @@ async function main() {
     ["commissionBps", String(onBps), String(commissionBps)],
     ["settleTimeout", String(onSettle), String(settleTimeout)],
     ["openTimeout", String(onOpen), String(openTimeout)],
-    ["owner", onOwner, deployer.address],
+    ["owner", onOwner, owner],
   ];
   const wrong = checks.filter(
     ([, got, want]) => String(got).toLowerCase() !== String(want).toLowerCase()
@@ -169,7 +187,7 @@ async function main() {
   console.log("\nSiguiente:");
   console.log("  1. Verificar el código:");
   console.log(
-    `     npx hardhat verify --network celo ${address} ${usdt} ${commissionWallet} ${operator} ${commissionBps} ${settleTimeout} ${openTimeout}`
+    `     npx hardhat verify --network celo ${address} ${usdt} ${commissionWallet} ${operator} ${commissionBps} ${settleTimeout} ${openTimeout} ${owner}`
   );
   console.log("  2. Poner la dirección en .env.local y en Vercel (Production):");
   console.log(`     NEXT_PUBLIC_AVISPATE_ARENA_ADDRESS=${address}`);
