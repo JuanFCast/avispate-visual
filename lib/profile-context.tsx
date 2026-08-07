@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   readWalletSession,
   WALLET_SESSION_EVENT,
@@ -39,6 +39,7 @@ const EMPTY: ProfileState = { loading: false, alias: null, walletAddress: null }
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { ready: privyReady, authenticated: privyAuth, getAccessToken } = usePrivy();
+  const { wallets } = useWallets();
   const [state, setState] = useState<ProfileState>({ ...EMPTY, loading: true });
   // Sesión de wallet (MiniPay, sin firma). Se lee en un efecto y no durante el
   // render: `localStorage` no existe en el servidor y tocarlo antes de montar
@@ -108,10 +109,24 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
   }, [authenticated, getToken]);
 
+  /**
+   * La wallet embebida de Privy no existe en el instante del login: se crea
+   * unos segundos después. Esa dirección es la que el servidor anota en el
+   * perfil, así que hay que volver a preguntar cuando aparece.
+   *
+   * No es un detalle cosmético. Sin esta relectura el perfil se queda para
+   * siempre sin dirección, la primera jugada —que llega identificada por la
+   * wallet— no encuentra a nadie con ella y le abre al jugador un SEGUNDO
+   * perfil. De ahí salían el alias que "se perdía" al volver a entrar y el
+   * "ese nombre ya está registrado" contra uno mismo.
+   */
+  const embeddedWallet =
+    wallets.find((w) => w.walletClientType === "privy")?.address ?? null;
+
   useEffect(() => {
     if (!ready) return;
     refresh();
-  }, [ready, authenticated, refresh]);
+  }, [ready, authenticated, embeddedWallet, refresh]);
 
   const setAlias = useCallback(
     async (alias: string) => {

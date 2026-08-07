@@ -61,10 +61,14 @@ export async function ensureProfile(identity: AppIdentity): Promise<ProfileRow> 
       .eq("id", row.id)
       .select(PROFILE_COLUMNS)
       .single();
-    // La wallet ya es de otro perfil: se deja la que tenía. Perder la sesión
-    // por no poder anotar una dirección sería peor que la dirección vieja.
+    // La wallet ya es de otro perfil. Casi siempre es el MISMO jugador partido
+    // en dos filas, así que se intenta volver a unirlas; si no se puede, se
+    // deja la dirección que tenía — perder la sesión por no poder anotar una
+    // dirección sería peor.
     if (error) {
-      if (error.code === UNIQUE_VIOLATION) return row;
+      if (error.code === UNIQUE_VIOLATION) {
+        return await mergeWalletProfile(privyId, row, wallet);
+      }
       throw error;
     }
     return data as ProfileRow;
@@ -101,6 +105,51 @@ export async function ensureProfile(identity: AppIdentity): Promise<ProfileRow> 
   }
 
   return await insertProfile(privyId, wallet);
+}
+
+/**
+ * Vuelve a unir al jugador que quedó partido en dos filas.
+ *
+ * Pasa cuando la wallet embebida de Privy tarda en existir: el perfil se crea
+ * con el correo y sin dirección, el jugador elige ahí su alias, y su primera
+ * jugada —que llega identificada por la WALLET— no encuentra a nadie con esa
+ * dirección y estrena una segunda fila. Desde entonces tiene el alias en una
+ * mitad y las partidas en la otra, y al volver a entrar la app le pide un nick
+ * que ya es suyo y luego se lo rechaza por "tomado".
+ *
+ * Se fusiona solo en el caso exacto: este perfil sin dirección y la otra fila
+ * sin correo. Dos cuentas de Privy con la misma wallet no se tocan.
+ *
+ * Nunca lanza: si la fusión no se puede hacer (migración sin aplicar, error
+ * transitorio), el jugador entra igual con el perfil que ya tenía.
+ */
+async function mergeWalletProfile(
+  privyId: string,
+  row: ProfileRow,
+  wallet: string
+): Promise<ProfileRow> {
+  if (row.wallet_address !== null) return row;
+  const db = getSupabaseAdmin();
+
+  const { data, error } = await db
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("wallet_address", wallet)
+    .maybeSingle();
+  if (error) return row;
+
+  const orphan = data as ProfileRow | null;
+  if (!orphan || orphan.privy_id !== null) return row;
+
+  const { error: mergeError } = await db.rpc("merge_profiles", {
+    p_keep: row.id,
+    p_drop: orphan.id,
+  });
+  if (mergeError) {
+    console.error("merge_profiles falló:", mergeError.message);
+    return row;
+  }
+  return await readByPrivyId(privyId);
 }
 
 async function readByPrivyId(privyId: string): Promise<ProfileRow> {
