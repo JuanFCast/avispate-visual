@@ -30,6 +30,28 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  *         cualquier dirección desde cualquier mesa — que es justo el ataque
  *         que un escrow tiene que hacer imposible, no improbable.
  *
+ * ── La huella de la silla: probar quién eres sin poder firmar ─────────────
+ *
+ *         MiniPay no soporta `personal_sign` ni `eth_signTypedData`. Es una
+ *         restricción de la wallet, no una preferencia, así que ahí la única
+ *         prueba de control disponible es una transacción — y una transacción
+ *         es PÚBLICA en cuanto se mina. Cualquier prueba que consista en mirar
+ *         la cadena la puede repetir otro que también mire.
+ *
+ *         La pregunta útil no es "¿cómo firmamos?", sino "¿qué puede tener el
+ *         dueño de la silla que un mirón no tenga?". Y la respuesta cabe en la
+ *         propia transacción: el jugador sortea un secreto en su dispositivo,
+ *         lo guarda, y al pagar manda solo su HUELLA. La huella queda pública
+ *         aquí; el secreto no sale del teléfono y del hash no se deduce.
+ *
+ *         Este contrato no la interpreta ni la necesita: la guarda y la publica
+ *         para que el servidor pueda comprobar después que quien dice ser dueño
+ *         de la silla conoce el secreto que hay detrás. Es deliberado que sea
+ *         opaca — cuanto menos sepa el contrato de nuestra sesión, mejor.
+ *
+ *         Con esto la web y MiniPay comparten UN solo modelo de seguridad, en
+ *         vez de tener uno bueno y otro con excepciones.
+ *
  * ── Abandonar NO es lo mismo que un fallo nuestro ─────────────────────────
  *
  *         Son dos salidas distintas a propósito, porque confundirlas crea un
@@ -126,11 +148,23 @@ contract AvispateArena is Ownable, ReentrancyGuard {
     /// @dev Quién pagó qué mesa. Es la prueba de la silla y la lista blanca de
     ///      ganadores posibles.
     mapping(bytes32 => mapping(address => bool)) public paid;
+    /**
+     * @dev Huella del secreto de cada silla. Se escribe una sola vez, al pagar,
+     *      y ya no cambia: una silla cuya prueba se pudiera reescribir no
+     *      probaría nada. El contrato no la usa para decidir nada — solo la
+     *      guarda para que se pueda comprobar fuera.
+     */
+    mapping(bytes32 => mapping(address => bytes32)) public seatCommitment;
     /// @dev Entradas ya devueltas, para que nadie cobre su devolución dos veces.
     mapping(bytes32 => mapping(address => bool)) public refunded;
 
     event TableOpened(bytes32 indexed tableId, uint256 entry, uint8 maxPlayers);
-    event Joined(bytes32 indexed tableId, address indexed player, uint8 seats);
+    event Joined(
+        bytes32 indexed tableId,
+        address indexed player,
+        uint8 seats,
+        bytes32 seatCommitment
+    );
     event TableFilled(bytes32 indexed tableId);
     event Settled(
         bytes32 indexed tableId,
@@ -154,6 +188,7 @@ contract AvispateArena is Ownable, ReentrancyGuard {
     error TableNotOpen();
     error TermsMismatch();
     error AlreadyJoined();
+    error EmptyCommitment();
     error TableNotPlayable();
     error WinnerNotInTable();
     error NotVoided();
@@ -191,18 +226,30 @@ contract AvispateArena is Ownable, ReentrancyGuard {
      *
      *         Requiere `approve` previo de este contrato por `entry`.
      *
+     *         `seatCommitment_` es la huella del secreto que el jugador acaba de
+     *         guardar en su dispositivo. Viaja con el pago porque tiene que
+     *         quedar fijada ANTES de que la silla exista: una huella que se
+     *         pudiera añadir después la podría poner cualquiera que viera la
+     *         transacción.
+     *
      * @dev El `tableId` lo calcula el servidor a partir del código de sala Y de
      *      los términos, así que una mesa con otra entrada o con otro número de
      *      jugadores es OTRO identificador. Por eso `TermsMismatch` no puede
      *      usarse para estorbar a nadie: quien invente términos distintos se
      *      queda jugando solo en una mesa que no existe para los demás.
      */
-    function join(bytes32 tableId, uint256 entry, uint8 maxPlayers)
-        external
-        nonReentrant
-    {
+    function join(
+        bytes32 tableId,
+        uint256 entry,
+        uint8 maxPlayers,
+        bytes32 seatCommitment_
+    ) external nonReentrant {
         if (maxPlayers < 2 || maxPlayers > 4) revert InvalidPlayers();
         if (entry == 0) revert InvalidEntry();
+        // Sin huella la silla no se podría reclamar después: quedaría pagada y
+        // muda. Se rechaza aquí y no más tarde, que es cuando ya habría dinero
+        // dentro.
+        if (seatCommitment_ == bytes32(0)) revert EmptyCommitment();
 
         Table storage t = tables[tableId];
 
@@ -225,8 +272,9 @@ contract AvispateArena is Ownable, ReentrancyGuard {
         token.safeTransferFrom(msg.sender, address(this), entry);
 
         paid[tableId][msg.sender] = true;
+        seatCommitment[tableId][msg.sender] = seatCommitment_;
         t.players.push(msg.sender);
-        emit Joined(tableId, msg.sender, uint8(t.players.length));
+        emit Joined(tableId, msg.sender, uint8(t.players.length), seatCommitment_);
 
         if (t.players.length == t.maxPlayers) {
             t.status = Status.Full;

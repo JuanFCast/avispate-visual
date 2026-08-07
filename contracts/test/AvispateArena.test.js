@@ -24,6 +24,11 @@ const Status = {
 };
 
 const TABLE = ethers.id("AVP-4821|100000|2");
+
+/** El secreto vive en el dispositivo; a la cadena solo va su huella. */
+const secretoDe = (quien) => ethers.id(`secreto-de-${quien}`);
+const huellaDe = (quien) => ethers.keccak256(secretoDe(quien));
+const HUELLA = huellaDe("alice");
 const OTRA = ethers.id("AVP-9999|100000|2");
 
 describe("AvispateArena", () => {
@@ -57,8 +62,8 @@ describe("AvispateArena", () => {
   /** Mesa de 2 con alice y bob dentro: el punto de partida de casi todo. */
   async function llena() {
     const f = await loadFixture(deploy);
-    await f.arena.connect(f.alice).join(TABLE, ENTRY, 2);
-    await f.arena.connect(f.bob).join(TABLE, ENTRY, 2);
+    await f.arena.connect(f.alice).join(TABLE, ENTRY, 2, huellaDe("alice"));
+    await f.arena.connect(f.bob).join(TABLE, ENTRY, 2, huellaDe("bob"));
     return f;
   }
 
@@ -67,11 +72,11 @@ describe("AvispateArena", () => {
       const { arena, token, alice } = await loadFixture(deploy);
       const antes = await token.balanceOf(alice.address);
 
-      await expect(arena.connect(alice).join(TABLE, ENTRY, 2))
+      await expect(arena.connect(alice).join(TABLE, ENTRY, 2, HUELLA))
         .to.emit(arena, "TableOpened")
         .withArgs(TABLE, ENTRY, 2)
         .and.to.emit(arena, "Joined")
-        .withArgs(TABLE, alice.address, 1);
+        .withArgs(TABLE, alice.address, 1, HUELLA);
 
       expect(await token.balanceOf(alice.address)).to.equal(antes - ENTRY);
       expect(await arena.paid(TABLE, alice.address)).to.equal(true);
@@ -83,27 +88,80 @@ describe("AvispateArena", () => {
       const t = await arena.tableOf(TABLE);
       expect(t.status).to.equal(Status.Full);
       await expect(
-        arena.connect(carol).join(TABLE, ENTRY, 2)
+        arena.connect(carol).join(TABLE, ENTRY, 2, HUELLA)
       ).to.be.revertedWithCustomError(arena, "TableNotOpen");
     });
 
     it("nadie paga dos veces la misma silla", async () => {
       const { arena, alice } = await loadFixture(deploy);
-      await arena.connect(alice).join(TABLE, ENTRY, 2);
+      await arena.connect(alice).join(TABLE, ENTRY, 2, HUELLA);
       await expect(
-        arena.connect(alice).join(TABLE, ENTRY, 2)
+        arena.connect(alice).join(TABLE, ENTRY, 2, HUELLA)
       ).to.be.revertedWithCustomError(arena, "AlreadyJoined");
     });
 
     it("los términos de la mesa no se pueden cambiar a mitad", async () => {
       const { arena, alice, bob } = await loadFixture(deploy);
-      await arena.connect(alice).join(TABLE, ENTRY, 2);
+      await arena.connect(alice).join(TABLE, ENTRY, 2, HUELLA);
       await expect(
-        arena.connect(bob).join(TABLE, USDT(1), 2)
+        arena.connect(bob).join(TABLE, USDT(1), 2, HUELLA)
       ).to.be.revertedWithCustomError(arena, "TermsMismatch");
       await expect(
-        arena.connect(bob).join(TABLE, ENTRY, 4)
+        arena.connect(bob).join(TABLE, ENTRY, 4, HUELLA)
       ).to.be.revertedWithCustomError(arena, "TermsMismatch");
+    });
+  });
+
+  describe("la huella de la silla", () => {
+    it("queda registrada al pagar y se puede comprobar contra el secreto", async () => {
+      const { arena, alice } = await loadFixture(deploy);
+      await arena.connect(alice).join(TABLE, ENTRY, 2, huellaDe("alice"));
+
+      const guardada = await arena.seatCommitment(TABLE, alice.address);
+      expect(guardada).to.equal(huellaDe("alice"));
+      // Quien conoce el secreto puede demostrarlo; quien solo mira la cadena
+      // ve la huella y no puede darle la vuelta.
+      expect(ethers.keccak256(secretoDe("alice"))).to.equal(guardada);
+      expect(ethers.keccak256(secretoDe("ladrón"))).to.not.equal(guardada);
+    });
+
+    it("cada silla tiene la suya: la de uno no sirve para la del otro", async () => {
+      const { arena, alice, bob } = await llena();
+      expect(await arena.seatCommitment(TABLE, alice.address)).to.equal(
+        huellaDe("alice")
+      );
+      expect(await arena.seatCommitment(TABLE, bob.address)).to.equal(
+        huellaDe("bob")
+      );
+      expect(await arena.seatCommitment(TABLE, alice.address)).to.not.equal(
+        await arena.seatCommitment(TABLE, bob.address)
+      );
+    });
+
+    it("sin huella no se puede pagar la entrada: la silla quedaría muda", async () => {
+      const { arena, alice } = await loadFixture(deploy);
+      await expect(
+        arena.connect(alice).join(TABLE, ENTRY, 2, ethers.ZeroHash)
+      ).to.be.revertedWithCustomError(arena, "EmptyCommitment");
+    });
+
+    it("no se puede reescribir la huella de una silla ya pagada", async () => {
+      const { arena, alice } = await loadFixture(deploy);
+      await arena.connect(alice).join(TABLE, ENTRY, 2, huellaDe("alice"));
+      // Volver a entrar es la única vía para reescribirla, y está cerrada.
+      await expect(
+        arena.connect(alice).join(TABLE, ENTRY, 2, huellaDe("ladrón"))
+      ).to.be.revertedWithCustomError(arena, "AlreadyJoined");
+      expect(await arena.seatCommitment(TABLE, alice.address)).to.equal(
+        huellaDe("alice")
+      );
+    });
+
+    it("quien no pagó no tiene huella en esa mesa", async () => {
+      const { arena, carol } = await llena();
+      expect(await arena.seatCommitment(TABLE, carol.address)).to.equal(
+        ethers.ZeroHash
+      );
     });
   });
 
@@ -136,7 +194,7 @@ describe("AvispateArena", () => {
 
     it("NO se puede pagar a alguien que pagó OTRA mesa", async () => {
       const { arena, operator, carol } = await llena();
-      await arena.connect(carol).join(OTRA, ENTRY, 2);
+      await arena.connect(carol).join(OTRA, ENTRY, 2, HUELLA);
       await expect(
         arena.connect(operator).settle(TABLE, carol.address, CLEARED)
       ).to.be.revertedWithCustomError(arena, "WinnerNotInTable");
@@ -154,7 +212,7 @@ describe("AvispateArena", () => {
 
     it("una mesa a medio llenar no se puede pagar", async () => {
       const { arena, operator, alice } = await loadFixture(deploy);
-      await arena.connect(alice).join(TABLE, ENTRY, 2);
+      await arena.connect(alice).join(TABLE, ENTRY, 2, HUELLA);
       await expect(
         arena.connect(operator).settle(TABLE, alice.address, CLEARED)
       ).to.be.revertedWithCustomError(arena, "TableNotPlayable");
@@ -278,7 +336,7 @@ describe("AvispateArena", () => {
 
     it("una mesa que nunca se llenó devuelve con su propio plazo, más corto", async () => {
       const { arena, token, alice } = await loadFixture(deploy);
-      await arena.connect(alice).join(TABLE, ENTRY, 2);
+      await arena.connect(alice).join(TABLE, ENTRY, 2, HUELLA);
 
       await time.increase(OPEN_TIMEOUT - 60);
       await expect(
@@ -294,9 +352,9 @@ describe("AvispateArena", () => {
 
     it("el reloj de la mesa llena empieza al LLENARSE, no al abrirse", async () => {
       const { arena, alice, bob, extraño } = await loadFixture(deploy);
-      await arena.connect(alice).join(TABLE, ENTRY, 2);
+      await arena.connect(alice).join(TABLE, ENTRY, 2, HUELLA);
       await time.increase(OPEN_TIMEOUT + HOUR); // se llenó tarde
-      await arena.connect(bob).join(TABLE, ENTRY, 2);
+      await arena.connect(bob).join(TABLE, ENTRY, 2, HUELLA);
 
       // El plazo largo se cuenta desde ahora: no hereda la espera del lobby.
       await expect(
@@ -311,11 +369,11 @@ describe("AvispateArena", () => {
         await loadFixture(deploy);
       const ID = ethers.id("AVP-3333|100000|3");
 
-      await arena.connect(alice).join(ID, ENTRY, 3);
-      await arena.connect(bob).join(ID, ENTRY, 3);
+      await arena.connect(alice).join(ID, ENTRY, 3, HUELLA);
+      await arena.connect(bob).join(ID, ENTRY, 3, HUELLA);
       expect((await arena.tableOf(ID)).status).to.equal(Status.Open);
 
-      await arena.connect(carol).join(ID, ENTRY, 3);
+      await arena.connect(carol).join(ID, ENTRY, 3, HUELLA);
       expect((await arena.tableOf(ID)).status).to.equal(Status.Full);
 
       const pozo = ENTRY * 3n;
@@ -333,10 +391,10 @@ describe("AvispateArena", () => {
     it("una mesa fuera de 2–4 no existe", async () => {
       const { arena, alice } = await loadFixture(deploy);
       await expect(
-        arena.connect(alice).join(TABLE, ENTRY, 1)
+        arena.connect(alice).join(TABLE, ENTRY, 1, HUELLA)
       ).to.be.revertedWithCustomError(arena, "InvalidPlayers");
       await expect(
-        arena.connect(alice).join(TABLE, ENTRY, 5)
+        arena.connect(alice).join(TABLE, ENTRY, 5, HUELLA)
       ).to.be.revertedWithCustomError(arena, "InvalidPlayers");
     });
   });
