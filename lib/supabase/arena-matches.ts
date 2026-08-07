@@ -25,6 +25,7 @@ import {
 } from "../arena-deck";
 import {
   ABANDON_MS,
+  PAID_ABANDON_MS,
   COUNTDOWN_MS,
   RIVAL_STALE_MS,
   type MatchError,
@@ -230,13 +231,20 @@ function toPlayerView(
 async function closeIfAbandoned(
   match: MatchRow,
   players: MatchPlayerRow[],
-  now: number
+  now: number,
+  /**
+   * Cuánto se espera sin ver a alguien antes de darlo por ido. Lo decide quien
+   * llama porque depende de la mesa: en una con entrada es más largo (90 s
+   * contra 45), y perder la entrada por un túnel de cincuenta segundos sería
+   * un castigo desproporcionado.
+   */
+  graceMs: number
 ): Promise<MatchRow> {
   if (match.finished_at) return match;
   if (now < new Date(match.starts_at).getTime()) return match;
 
   const isGone = (p: MatchPlayerRow) =>
-    p.left_at !== null || now - new Date(p.last_seen_at).getTime() > ABANDON_MS;
+    p.left_at !== null || now - new Date(p.last_seen_at).getTime() > graceMs;
 
   const standing = players.filter((p) => !isGone(p) && p.finished_at === null);
 
@@ -296,6 +304,24 @@ async function settleClosedMatch(match: MatchRow): Promise<void> {
   }
 }
 
+/** ¿La mesa de esta partida cobra entrada? Decide el margen del abandono. */
+async function roomChargesEntry(roomId: string): Promise<boolean> {
+  try {
+    const db = getSupabaseAdmin();
+    const { data } = await db
+      .from("arena_rooms")
+      .select("table_id")
+      .eq("id", roomId)
+      .maybeSingle();
+    return Boolean(data?.table_id);
+  } catch {
+    // Si no se sabe, se usa el margen LARGO: equivocarse esperando de más solo
+    // retrasa un final, y equivocarse esperando de menos le quita la entrada a
+    // alguien que sí estaba.
+    return true;
+  }
+}
+
 async function touchMatchPlayer(playerRowId: string): Promise<void> {
   const db = getSupabaseAdmin();
   const { error } = await db
@@ -331,7 +357,13 @@ export async function readMatch(params: {
     mine.last_seen_at = new Date().toISOString();
   }
 
-  const closed = await closeIfAbandoned(match, players, now);
+  const paid = await roomChargesEntry(match.room_id);
+  const closed = await closeIfAbandoned(
+    match,
+    players,
+    now,
+    paid ? PAID_ABANDON_MS : ABANDON_MS
+  );
   if (closed !== match) {
     match = closed;
     players = await listMatchPlayers(match.id);
