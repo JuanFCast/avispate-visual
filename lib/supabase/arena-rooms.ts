@@ -23,6 +23,7 @@ import {
 } from "../arena-rooms";
 import { deckModeFor, isDealValid, type DeckMode } from "../arena-deck";
 import { getSupabaseAdmin } from "./server";
+import { escrowEnabled, tableIdFor } from "../arena-escrow";
 
 export interface RoomRow {
   id: string;
@@ -187,14 +188,42 @@ export async function createRoom(params: {
     }
 
     const room = data as RoomRow;
-    const { error: seatError } = await db.from("arena_room_players").insert({
-      room_id: room.id,
-      profile_id: params.profileId,
-      seat: 0,
-      is_host: true,
-      is_ready: true,
-    });
-    if (seatError) throw seatError;
+
+    /**
+     * El anfitrión NO se sienta al crear la mesa cuando hay entrada.
+     *
+     * No es una restricción, es el orden real de los hechos: hasta que la sala
+     * no existe no hay código, sin código no hay mesa en el contrato, y sin
+     * mesa no se puede pagar. Sentarlo aquí sería darle una silla gratis a
+     * quien monta la partida mientras a los demás se les cobra.
+     *
+     * Con escrow su camino es el mismo que el de todos: ve el código, paga
+     * `join`, y `/api/arena/rooms/[code]/paid` lo sienta contra la cadena.
+     */
+    if (!escrowEnabled()) {
+      const { error: seatError } = await db.from("arena_room_players").insert({
+        room_id: room.id,
+        profile_id: params.profileId,
+        seat: 0,
+        is_host: true,
+        is_ready: true,
+      });
+      if (seatError) throw seatError;
+    } else {
+      // La mesa del contrato queda anotada al crear la sala: es el dato que
+      // el cliente necesita para pagar y el que cruza la sala con la cadena.
+      const { error: tableError } = await db
+        .from("arena_rooms")
+        .update({
+          table_id: tableIdFor(
+            room.code,
+            params.entryUnits,
+            params.maxPlayers
+          ).toLowerCase(),
+        })
+        .eq("id", room.id);
+      if (tableError) throw tableError;
+    }
 
     return { ok: true, value: room };
   }

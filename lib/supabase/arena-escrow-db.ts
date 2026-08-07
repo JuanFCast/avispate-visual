@@ -1,0 +1,170 @@
+import { getSupabaseAdmin } from "./server";
+import { classifySeatWrite } from "../arena-idempotency";
+
+/**
+ * El registro de que el dinero de la Arena se movió: pagos por silla,
+ * liquidaciones y devoluciones.
+ *
+ * Todo lo de aquí es idempotente, y lo es apoyándose en los índices únicos de
+ * la migración, no en un `if` previo. La diferencia importa: entre "mirar si ya
+ * existe" y "escribir" cabe otra petición, y con dinero eso significa dos
+ * sillas por un pago o dos liquidaciones del mismo pozo. Se escribe, y si la
+ * base dice que ya estaba (23505), eso ES el éxito.
+ */
+
+/** 23505 = índice único violado. Aquí siempre significa "ya estaba". */
+const UNIQUE_VIOLATION = "23505";
+
+export type EscrowWrite =
+  /** Escrito ahora. */
+  | { status: "ok" }
+  /** Ya estaba: un reintento, no un error. */
+  | { status: "duplicate" }
+  /** Ese hueco ya lo ocupa OTRA cosa. Nunca se pisa: se avisa. */
+  | { status: "conflict"; reason: string };
+
+/**
+ * Sienta a quien pagó, dejando constancia de con qué transacción.
+ *
+ * La silla se crea aquí y solo aquí cuando la mesa cobra: ya no la crea el
+ * hecho de entrar a la sala. Reintentar con el mismo hash no crea una segunda
+ * —lo impide `arena_room_players_join_tx_key`—, y una segunda transacción de la
+ * misma dirección en la misma sala tampoco, por `arena_room_players_wallet_key`.
+ */
+export async function recordSeatPayment(params: {
+  roomId: string;
+  profileId: string;
+  /** Dirección que pagó, según la CADENA. Nunca la que dijo el navegador. */
+  address: string;
+  txHash: string;
+  seat: number;
+}): Promise<EscrowWrite> {
+  const db = getSupabaseAdmin();
+  const { error } = await db.from("arena_room_players").insert({
+    room_id: params.roomId,
+    profile_id: params.profileId,
+    seat: params.seat,
+    is_host: params.seat === 0,
+    is_ready: false,
+    wallet_address: params.address.toLowerCase(),
+    join_tx_hash: params.txHash.toLowerCase(),
+    paid_at: new Date().toISOString(),
+  });
+
+  if (!error) return { status: "ok" };
+  if (error.code !== UNIQUE_VIOLATION) throw error;
+
+  // Chocó contra un índice único. Cuál importa: si es el del hash, es el mismo
+  // pago reintentado y está bien. Si es el de la silla o el de la dirección, es
+  // otra cosa ocupando el sitio y hay que decirlo en vez de fingir éxito.
+  const { data } = await db
+    .from("arena_room_players")
+    .select("join_tx_hash, wallet_address")
+    .eq("room_id", params.roomId)
+    .eq("wallet_address", params.address.toLowerCase())
+    .maybeSingle();
+
+  return classifySeatWrite(data, params.txHash);
+}
+
+/**
+ * Deja constancia de la liquidación. UNA por mesa: el índice único sobre
+ * `table_id` es lo que impide que un cron solapado pague dos veces el pozo.
+ *
+ * Se escribe ANTES de mandar la transacción, sin hash, y se confirma después.
+ * Ese orden es a propósito: si se escribiera al confirmar, una caída entre la
+ * transacción y el registro dejaría un pozo pagado del que no queda rastro, y
+ * el siguiente intento lo pagaría otra vez.
+ */
+export async function claimSettlement(params: {
+  roomId: string;
+  tableId: string;
+  winnerProfileId: string | null;
+  winnerAddress: string;
+  reason: "cleared" | "abandoned";
+  prizeUnits: bigint;
+  commissionUnits: bigint;
+}): Promise<EscrowWrite> {
+  const db = getSupabaseAdmin();
+  const { error } = await db.from("arena_settlements").insert({
+    room_id: params.roomId,
+    table_id: params.tableId.toLowerCase(),
+    winner_profile_id: params.winnerProfileId,
+    winner_address: params.winnerAddress.toLowerCase(),
+    reason: params.reason,
+    prize_units: params.prizeUnits.toString(),
+    commission_units: params.commissionUnits.toString(),
+  });
+
+  if (!error) return { status: "ok" };
+  if (error.code === UNIQUE_VIOLATION) return { status: "duplicate" };
+  throw error;
+}
+
+/** Anota el hash de la liquidación una vez la cadena la confirmó. */
+export async function confirmSettlement(
+  tableId: string,
+  txHash: string
+): Promise<void> {
+  const db = getSupabaseAdmin();
+  const { error } = await db
+    .from("arena_settlements")
+    .update({
+      tx_hash: txHash.toLowerCase(),
+      confirmed_at: new Date().toISOString(),
+    })
+    .eq("table_id", tableId.toLowerCase())
+    .is("tx_hash", null);
+  if (error && error.code !== UNIQUE_VIOLATION) throw error;
+}
+
+/**
+ * Deja constancia de una devolución. Una por dirección y mesa: cobrar dos veces
+ * la misma entrada sería sacar dinero de las entradas de los demás.
+ */
+export async function recordRefund(params: {
+  tableId: string;
+  address: string;
+  amountUnits: bigint;
+  txHash?: string;
+}): Promise<EscrowWrite> {
+  const db = getSupabaseAdmin();
+  const { error } = await db.from("arena_refunds").insert({
+    table_id: params.tableId.toLowerCase(),
+    address: params.address.toLowerCase(),
+    amount_units: params.amountUnits.toString(),
+    tx_hash: params.txHash?.toLowerCase() ?? null,
+  });
+
+  if (!error) return { status: "ok" };
+  if (error.code === UNIQUE_VIOLATION) return { status: "duplicate" };
+  throw error;
+}
+
+/** La liquidación de una mesa, si ya se reclamó. */
+export async function settlementOf(tableId: string): Promise<{
+  winner_address: string;
+  tx_hash: string | null;
+} | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("arena_settlements")
+    .select("winner_address, tx_hash")
+    .eq("table_id", tableId.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+/** El siguiente asiento libre de una sala. La carrera la arbitra el índice único. */
+export async function nextFreeSeat(roomId: string): Promise<number> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("arena_room_players")
+    .select("seat")
+    .eq("room_id", roomId)
+    .order("seat", { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  return data?.length ? Number(data[0].seat) + 1 : 0;
+}

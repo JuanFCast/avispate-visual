@@ -1,6 +1,15 @@
-import { createPublicClient, keccak256, toHex, type Hash } from "viem";
+import {
+  createPublicClient,
+  parseEventLogs,
+  type Hash,
+} from "viem";
 import { celo } from "viem/chains";
+import { tableIdFor } from "./arena-table-id";
 import { CELO_TRANSPORT } from "./chain";
+
+// Se reexporta para que quien ya hablaba con el escrow no tenga que cambiar de
+// puerta: la derivación vive aparte porque es pura y la usan las dos orillas.
+export { tableIdFor };
 
 /**
  * El puente con el escrow de la Arena (`contracts/AvispateArena.sol`).
@@ -38,6 +47,16 @@ const ARENA_ABI = [
     outputs: [{ name: "", type: "address[]" }],
   },
   {
+    type: "event",
+    name: "Joined",
+    inputs: [
+      { name: "tableId", type: "bytes32", indexed: true },
+      { name: "player", type: "address", indexed: true },
+      { name: "seats", type: "uint8", indexed: false },
+      { name: "seatCommitment", type: "bytes32", indexed: false },
+    ],
+  },
+  {
     type: "function",
     name: "seatCommitment",
     stateMutability: "view",
@@ -51,35 +70,6 @@ const ARENA_ABI = [
 
 const client = createPublicClient({ chain: celo, transport: CELO_TRANSPORT });
 
-/**
- * El identificador de la mesa en el contrato.
- *
- * Se calcula a partir del código de sala Y de los términos, no solo del código.
- * Así una mesa con otra entrada o con otro número de jugadores es OTRA mesa: si
- * alguien intentara adelantarse abriendo la misma sala con condiciones
- * distintas, se quedaría solo en una mesa que para los demás no existe.
- *
- * El cliente calcula lo mismo antes de firmar el `join`, así que las dos partes
- * hablan de la misma mesa sin tener que ponerse de acuerdo por otro canal.
- */
-export function tableIdFor(
-  roomCode: string,
-  entryUnits: bigint,
-  maxPlayers: number
-): Hash {
-  return keccak256(
-    toHex(`${roomCode.toUpperCase()}|${entryUnits.toString()}|${maxPlayers}`)
-  );
-}
-
-/**
- * Quiénes pagaron esta mesa, según el contrato. En minúsculas.
- *
- * Falla CERRADO, igual que el guardián del cobro: si la cadena no responde se
- * devuelve lista vacía, y sin lista no hay silla. Dejar pasar a alguien porque
- * el RPC iba lento sería exactamente la puerta que este cheque existe para
- * cerrar.
- */
 /**
  * La huella que esa dirección dejó al pagar su silla, o `null`.
  *
@@ -106,6 +96,14 @@ export async function seatCommitmentOf(
   }
 }
 
+/**
+ * Quiénes pagaron esta mesa, según el contrato. En minúsculas.
+ *
+ * Falla CERRADO, igual que el guardián del cobro: si la cadena no responde se
+ * devuelve lista vacía, y sin lista no hay silla. Dejar pasar a alguien porque
+ * el RPC iba lento sería exactamente la puerta que este cheque existe para
+ * cerrar.
+ */
 export async function paidPlayersOf(tableId: Hash): Promise<string[]> {
   if (!escrowEnabled()) return [];
   try {
@@ -118,5 +116,61 @@ export async function paidPlayersOf(tableId: Hash): Promise<string[]> {
     return players.map((p) => p.toLowerCase());
   } catch {
     return [];
+  }
+}
+
+export interface JoinVerification {
+  ok: boolean;
+  /** Quién pagó DE VERDAD, leído del evento. La cadena manda sobre el cliente. */
+  player?: string;
+  /** La huella que dejó al pagar. */
+  commitment?: string;
+  /** Pagó una dirección distinta a la que afirmó el navegador. */
+  payerMismatch?: boolean;
+}
+
+/**
+ * Verifica ON-CHAIN que `txHash` es el pago de esta mesa.
+ *
+ * Mismo criterio que en el reto diario y por las mismas razones: el pagador se
+ * LEE del evento en vez de exigir que coincida con lo que dijo el cliente, y
+ * los logs se filtran por el contrato que los emite —no por a quién iba
+ * dirigida la transacción—, que es más estricto contra un evento falsificado y
+ * además no deja fuera a las wallets de contrato inteligente.
+ *
+ * La mesa sí se exige: un pago de otra mesa no sienta a nadie aquí.
+ */
+export async function verifyJoinTx(
+  txHash: string,
+  tableId: Hash,
+  expectedPlayer: string
+): Promise<JoinVerification> {
+  if (!escrowEnabled()) return { ok: false };
+  try {
+    const receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
+    if (receipt.status !== "success") return { ok: false };
+
+    const logs = parseEventLogs({
+      abi: ARENA_ABI,
+      eventName: "Joined",
+      logs: receipt.logs.filter(
+        (l) => l.address.toLowerCase() === ARENA_ESCROW_ADDRESS
+      ),
+    });
+
+    const match = logs.find(
+      (l) => (l.args.tableId as string).toLowerCase() === tableId.toLowerCase()
+    );
+    if (!match) return { ok: false };
+
+    const player = (match.args.player as string).toLowerCase();
+    return {
+      ok: true,
+      player,
+      commitment: (match.args.seatCommitment as string).toLowerCase(),
+      payerMismatch: player !== expectedPlayer.toLowerCase(),
+    };
+  } catch {
+    return { ok: false };
   }
 }
