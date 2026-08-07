@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireIdentity } from "@/lib/http";
+import { forfeitBlocked } from "@/lib/arena-guard";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { leaveRoom } from "@/lib/supabase/arena-rooms";
 import { ensureProfile } from "@/lib/supabase/profiles";
@@ -25,6 +26,11 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!code) {
     return NextResponse.json({ error: "invalid_code" }, { status: 400 });
   }
+
+  // Irse de una mesa con entrada es regalar el pozo al que se queda: no puede
+  // ser un botón al alcance de una sesión. Ausentarse sigue siendo posible.
+  const blocked = forfeitBlocked();
+  if (blocked) return blocked.response;
 
   try {
     const profile = await ensureProfile(auth.identity);

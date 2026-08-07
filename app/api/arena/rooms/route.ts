@@ -42,7 +42,11 @@ export async function POST(req: Request) {
     ? parseCardsPerPlayer(body?.cards, maxPlayers)
     : null;
 
-  if (!entryUnits || !maxPlayers || !cardsPerPlayer) {
+  // `entryUnits` es bigint y `0n` es falsy: con `!entryUnits` una entrada de
+  // cero se leería como "no vino ninguna". Hoy no muerde porque la mínima es
+  // 100_000n, pero el día de una mesa gratis sí, y sería un fallo silencioso
+  // en el camino del dinero. Se compara contra ausencia, no contra verdad.
+  if (entryUnits === undefined || !maxPlayers || !cardsPerPlayer) {
     return NextResponse.json({ error: "invalid_setup" }, { status: 400 });
   }
 

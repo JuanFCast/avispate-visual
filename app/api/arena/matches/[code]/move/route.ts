@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireIdentity } from "@/lib/http";
+import { guardRoomSeat } from "@/lib/arena-guard";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { applyMove } from "@/lib/supabase/arena-matches";
 import { ensureProfile } from "@/lib/supabase/profiles";
@@ -29,6 +30,10 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!code) {
     return NextResponse.json({ error: "invalid_code" }, { status: 400 });
   }
+
+  // Actuar sobre una silla de una mesa con entrada exige haberla pagado.
+  const seat = await guardRoomSeat(auth.identity, code, "act");
+  if ("response" in seat) return seat.response;
 
   const body = await req.json().catch(() => null);
   const seq = Number(body?.seq);

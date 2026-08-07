@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireIdentity } from "@/lib/http";
+import { guardRoomSeat } from "@/lib/arena-guard";
 import { getRoomByCode } from "@/lib/supabase/arena-rooms";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { isPlayableTable } from "@/lib/arena";
@@ -33,6 +34,10 @@ export async function POST(req: Request) {
   if (!code) {
     return NextResponse.json({ error: "invalid_code" }, { status: 400 });
   }
+
+  // Empezar la partida es una acción de silla: solo desde una pagada.
+  const seat = await guardRoomSeat(auth.identity, code, "act");
+  if ("response" in seat) return seat.response;
 
   try {
     const profile = await ensureProfile(auth.identity);

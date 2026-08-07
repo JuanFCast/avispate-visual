@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireIdentity } from "@/lib/http";
+import { guardRoomSeat } from "@/lib/arena-guard";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { joinRoom } from "@/lib/supabase/arena-rooms";
 import { ensureProfile } from "@/lib/supabase/profiles";
@@ -29,6 +30,10 @@ export async function POST(req: Request) {
   if (!code) {
     return NextResponse.json({ error: "invalid_code" }, { status: 400 });
   }
+
+  // La silla de una mesa con entrada la da el contrato, no esta sesión.
+  const seat = await guardRoomSeat(auth.identity, code, "join");
+  if ("response" in seat) return seat.response;
 
   try {
     const profile = await ensureProfile(auth.identity);
