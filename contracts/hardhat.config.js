@@ -40,7 +40,16 @@ module.exports = {
     // Celoscan sí exige llave. Sin ella se desactiva para no romper `verify`;
     // en cuanto exista CELOSCAN_API_KEY, el mismo comando lo publica allá.
     enabled: Boolean(CELOSCAN_API_KEY),
-    apiKey: { celo: CELOSCAN_API_KEY },
+    /**
+     * La llave va como CADENA, no como `{ celo: ... }`.
+     *
+     * No es cosmético: el plugin elige el endpoint por ahí. Con el objeto por
+     * red usa la API v1 de Etherscan, que está retirada y responde "You are
+     * using a deprecated V1 endpoint"; con una cadena suelta usa la v2, que es
+     * multired y resuelve Celo por su chainId. Una misma llave de etherscan.io
+     * sirve para todas las redes que cubre.
+     */
+    apiKey: CELOSCAN_API_KEY,
     customChains: [
       {
         network: "celo",
