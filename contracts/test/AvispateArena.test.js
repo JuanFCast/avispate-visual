@@ -417,6 +417,66 @@ describe("AvispateArena", () => {
     });
   });
 
+  describe("el despliegue guarda lo que se le pide", () => {
+    // Lo mismo que relee `scripts/deploy-arena.js` justo después de desplegar.
+    // Un contrato no se corrige: si algo quedó distinto de lo pedido hay que
+    // saberlo antes de que alguien pague una entrada, no después.
+    it("token, comisión, operator, plazos y owner quedan como se pasaron", async () => {
+      const { arena, token, owner, commission, operator } =
+        await loadFixture(deploy);
+
+      expect(await arena.token()).to.equal(await token.getAddress());
+      expect(await arena.commissionWallet()).to.equal(commission.address);
+      expect(await arena.operator()).to.equal(operator.address);
+      expect(await arena.commissionBps()).to.equal(COMMISSION_BPS);
+      expect(await arena.settleTimeout()).to.equal(SETTLE_TIMEOUT);
+      expect(await arena.openTimeout()).to.equal(OPEN_TIMEOUT);
+      expect(await arena.owner()).to.equal(owner.address);
+    });
+
+    it("el token es inmutable: no hay forma de cambiarlo después", async () => {
+      const { arena } = await loadFixture(deploy);
+      // Si algún día apareciera un setter, esta prueba lo delata.
+      expect(arena.interface.fragments.some(
+        (f) => f.type === "function" && /setToken/i.test(f.name ?? "")
+      )).to.equal(false);
+    });
+
+    it("no acepta una comisión imposible", async () => {
+      const [, commission, operator] = await ethers.getSigners();
+      const MockUSDT = await ethers.getContractFactory("MockUSDT");
+      const token = await MockUSDT.deploy();
+      const Arena = await ethers.getContractFactory("AvispateArena");
+      await expect(
+        Arena.deploy(
+          await token.getAddress(),
+          commission.address,
+          operator.address,
+          10_001, // más del 100%
+          SETTLE_TIMEOUT,
+          OPEN_TIMEOUT
+        )
+      ).to.be.revertedWithCustomError(Arena, "InvalidBps");
+    });
+
+    it("no acepta direcciones cero donde iría el dinero", async () => {
+      const [, , operator] = await ethers.getSigners();
+      const MockUSDT = await ethers.getContractFactory("MockUSDT");
+      const token = await MockUSDT.deploy();
+      const Arena = await ethers.getContractFactory("AvispateArena");
+      await expect(
+        Arena.deploy(
+          await token.getAddress(),
+          ethers.ZeroAddress,
+          operator.address,
+          COMMISSION_BPS,
+          SETTLE_TIMEOUT,
+          OPEN_TIMEOUT
+        )
+      ).to.be.revertedWithCustomError(Arena, "ZeroAddress");
+    });
+  });
+
   describe("administración", () => {
     it("los plazos se pueden ajustar sin desplegar otro contrato", async () => {
       const { arena, owner, extraño } = await llena();
