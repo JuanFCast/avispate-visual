@@ -1,0 +1,80 @@
+# Red de seguridad de los premios de la Arena.
+#
+# El camino normal NO es este: cuando una partida termina, el servidor paga en
+# ese momento. Esto solo recoge lo que se cayó — el nodo que no respondió, el
+# servidor que se reinició a mitad, la tarifa que falló. Mientras tanto el
+# dinero sigue en el contrato: no se ha perdido, no se ha entregado.
+#
+# Y GitHub NO es un reloj: entrega los `schedule` con retraso, a veces de horas
+# (medido en `settle-round.yml`). Aquí eso se tolera precisamente porque es una
+# red y no el camino principal. Si algún día hiciera falta puntualidad de
+# verdad, el sitio correcto es pg_cron en Supabase, no esto.
+#
+# Requiere el secret CRON_SECRET en el repo (Settings → Secrets → Actions), con
+# EXACTAMENTE el mismo valor que la variable CRON_SECRET de producción en
+# Vercel. Si no coinciden, el endpoint responde 401 y este workflow falla — que
+# es lo que se quiere: un 401 silencioso significaría que la red no existe.
+name: arena-settle
+
+on:
+  schedule:
+    # Cada quince minutos nominales. La hora real la pone GitHub.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+# Dos ejecuciones a la vez no pagan dos veces —lo impide el índice único de
+# `arena_settlements` y el propio contrato—, pero tampoco aportan nada.
+concurrency:
+  group: arena-settle
+  cancel-in-progress: false
+
+jobs:
+  settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Recoger liquidaciones pendientes
+        id: settle
+        run: |
+          code=$(curl -sS --max-time 300 --retry 2 --retry-delay 15 \
+            -o /tmp/arena.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://avispate.fun/api/cron/arena-settle" || echo 000)
+          echo "HTTP $code"
+          cat /tmp/arena.json || true
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      - name: Revisar el resultado
+        run: |
+          code="${{ steps.settle.outputs.code }}"
+
+          if [ "$code" = "401" ]; then
+            echo "::error::El endpoint respondió 401: el secret CRON_SECRET del repo no coincide con el de producción en Vercel. Sin esto, ninguna liquidación caída se recoge nunca."
+            exit 1
+          fi
+
+          if [ "$code" != "200" ]; then
+            echo "::error::El endpoint respondió $code. Revisa los logs de /api/cron/arena-settle en Vercel."
+            exit 1
+          fi
+
+          # Con el escrow apagado la respuesta es un 200 que dice que no hay
+          # nada que hacer. No es un fallo: es que la Arena todavía es gratis.
+          if jq -e '.skipped == "escrow_disabled"' /tmp/arena.json >/dev/null; then
+            echo "Escrow apagado: la Arena sigue gratis. Nada que liquidar."
+            exit 0
+          fi
+
+          settled=$(jq -r '.settled // 0' /tmp/arena.json)
+          failed=$(jq -r '.failed // 0' /tmp/arena.json)
+          echo "Liquidadas ahora: $settled · no se pudo: $failed"
+
+          # `failed` NO tumba el job. Una mesa puede no ser pagable por razones
+          # legítimas —ya la pagó otro intento, o se anuló— y convertir eso en
+          # una alarma enseñaría a ignorar las alarmas. Lo que sí importa es que
+          # una misma mesa siga fallando: eso se ve en los logs de Vercel.
+          if [ "$failed" -gt 0 ]; then
+            echo "::warning::$failed mesa(s) no se pudieron liquidar en esta pasada. Si el número no baja en las siguientes, míralo."
+          fi

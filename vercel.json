@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/roll-day",
       "schedule": "5 0 * * *"
+    },
+    {
+      "path": "/api/cron/arena-settle",
+      "schedule": "30 1 * * *"
     }
   ]
 }
