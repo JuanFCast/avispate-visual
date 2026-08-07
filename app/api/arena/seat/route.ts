@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { keccak256 } from "viem";
 import { getRoomByCode } from "@/lib/supabase/arena-rooms";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
-import { seatCommitmentOf, tableIdFor, escrowEnabled } from "@/lib/arena-escrow";
+import { seatCommitmentOf, escrowConfigured } from "@/lib/arena-escrow";
 import { signSeatToken, seatTokensEnabled } from "@/lib/seat-token";
 
 export const dynamic = "force-dynamic";
@@ -25,7 +25,7 @@ const SECRET_RE = /^0x[0-9a-f]{64}$/i;
  * tampoco es una sesión — es un permiso para una mesa y punto (`seat-token.ts`).
  */
 export async function POST(req: Request) {
-  if (!escrowEnabled()) {
+  if (!escrowConfigured()) {
     return NextResponse.json({ error: "escrow_disabled" }, { status: 503 });
   }
   if (!seatTokensEnabled()) {
@@ -57,11 +57,12 @@ export async function POST(req: Request) {
 
     // La mesa se identifica por el código Y por sus términos: así una sala con
     // otra entrada es otra mesa y no hay forma de canjear una silla cruzada.
-    const tableId = tableIdFor(
-      room.code,
-      BigInt(room.entry_units),
-      room.max_players
-    );
+    // La mesa la dice la SALA, no un cálculo: es lo que fija si esta sala cobra
+    // y cuál es su mesa, y no cambia aunque cambie la configuración.
+    const tableId = room.table_id as `0x${string}` | null;
+    if (!tableId) {
+      return NextResponse.json({ error: "room_is_free" }, { status: 409 });
+    }
 
     const onchain = await seatCommitmentOf(tableId, address);
     if (!onchain) {

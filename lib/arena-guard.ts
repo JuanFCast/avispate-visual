@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { escrowEnabled, paidPlayersOf, tableIdFor } from "./arena-escrow";
+import { paidPlayersOf, roomIsEscrowed } from "./arena-escrow";
 import { decideSeatAccess, type SeatAction } from "./arena-seat";
 import { getRoomByCode } from "./supabase/arena-rooms";
 import { verifySeatToken } from "./seat-token";
@@ -34,9 +34,8 @@ const STATUS: Record<string, number> = {
 };
 
 export interface RoomTerms {
-  code: string;
-  entryUnits: bigint;
-  maxPlayers: number;
+  /** La mesa en el contrato, o `null` si la sala es gratis. */
+  tableId: string | null;
 }
 
 /**
@@ -51,18 +50,18 @@ export async function requireSeat(
   room: RoomTerms,
   action: SeatAction
 ): Promise<{ ok: true } | { response: NextResponse }> {
-  const escrowed = escrowEnabled();
-  if (!escrowed) return { ok: true };
+  const tableId = room.tableId;
+  // Sala gratis: nada que proteger, todo sigue como estaba.
+  if (!tableId) return { ok: true };
 
-  const tableId = tableIdFor(room.code, room.entryUnits, room.maxPlayers);
   const raw = req.headers.get(SEAT_HEADER);
   const seat = raw ? verifySeatToken(raw.trim()) : null;
 
   const verdict = decideSeatAccess({
-    escrowed,
+    escrowed: true,
     tableId,
     seat,
-    onchainPlayers: await paidPlayersOf(tableId),
+    onchainPlayers: await paidPlayersOf(tableId as `0x${string}`),
     action,
   });
   if (verdict.ok) return { ok: true };
@@ -87,20 +86,11 @@ export async function guardRoomSeat(
   code: string,
   action: SeatAction
 ): Promise<{ ok: true } | { response: NextResponse }> {
-  if (!escrowEnabled()) return { ok: true };
-
   const room = await getRoomByCode(code);
-  if (!room) return { ok: true };
+  // Sala inexistente o gratis: el 404 lo da la ruta con su propio mensaje.
+  if (!room || !roomIsEscrowed(room)) return { ok: true };
 
-  return await requireSeat(
-    req,
-    {
-      code: room.code,
-      entryUnits: BigInt(room.entry_units),
-      maxPlayers: room.max_players,
-    },
-    action
-  );
+  return await requireSeat(req, { tableId: room.table_id ?? null }, action);
 }
 
 /**
@@ -112,8 +102,11 @@ export async function guardRoomSeat(
  * aparecer, y el servidor lo declara pasado el tiempo de gracia—, pero eso no
  * lo puede provocar un tercero desde fuera.
  */
-export function forfeitBlocked(): { response: NextResponse } | null {
-  if (!escrowEnabled()) return null;
+export async function forfeitBlocked(
+  code: string
+): Promise<{ response: NextResponse } | null> {
+  const room = await getRoomByCode(code);
+  if (!room || !roomIsEscrowed(room)) return null;
   return {
     response: NextResponse.json(
       { error: "forfeit_not_allowed_on_paid_table" },

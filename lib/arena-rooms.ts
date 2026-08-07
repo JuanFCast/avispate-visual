@@ -96,6 +96,12 @@ export interface RoomView {
    * invitado nunca tocó "iniciar", así que su pantalla se entera por aquí.
    */
   matchStarted: boolean;
+  /**
+   * Mesa en el contrato del escrow, o `null` si la sala es gratis. Decide si
+   * hay que pagar para sentarse — y lo decide la SALA, no la configuración del
+   * servidor: una sala nace gratis o nace paga y no cambia de naturaleza.
+   */
+  tableId: string | null;
 }
 
 /**

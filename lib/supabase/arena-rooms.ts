@@ -23,7 +23,7 @@ import {
 } from "../arena-rooms";
 import { deckModeFor, isDealValid, type DeckMode } from "../arena-deck";
 import { getSupabaseAdmin } from "./server";
-import { escrowEnabled, tableIdFor } from "../arena-escrow";
+import { escrowConfigured, tableIdFor } from "../arena-escrow";
 
 export interface RoomRow {
   id: string;
@@ -36,6 +36,8 @@ export interface RoomRow {
   /** Legado: se escribe derivada de `cards_per_player` y no decide nada. */
   deck_mode: DeckMode;
   cards_per_player: number;
+  /** Mesa en el contrato del escrow. `null` = sala gratis, y lo será siempre. */
+  table_id: string | null;
 }
 
 interface PlayerRow {
@@ -48,7 +50,7 @@ interface PlayerRow {
 }
 
 const ROOM_COLUMNS =
-  "id, code, host_profile_id, entry_units, max_players, status, created_at, deck_mode, cards_per_player";
+  "id, code, host_profile_id, entry_units, max_players, status, created_at, deck_mode, cards_per_player, table_id";
 
 const PLAYER_COLUMNS =
   "profile_id, seat, is_host, is_ready, last_seen_at, profiles(alias, wallet_address)";
@@ -200,7 +202,7 @@ export async function createRoom(params: {
      * Con escrow su camino es el mismo que el de todos: ve el código, paga
      * `join`, y `/api/arena/rooms/[code]/paid` lo sienta contra la cadena.
      */
-    if (!escrowEnabled()) {
+    if (!escrowConfigured()) {
       const { error: seatError } = await db.from("arena_room_players").insert({
         room_id: room.id,
         profile_id: params.profileId,
@@ -404,6 +406,7 @@ export async function readRoom(params: {
       players: views,
       you: views.find((p) => p.isYou) ?? null,
       matchStarted: (count ?? 0) > 0,
+    tableId: room.table_id ?? null,
     },
   };
 }

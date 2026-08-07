@@ -25,17 +25,31 @@ export const ARENA_ESCROW_ADDRESS = (
 ).toLowerCase();
 
 /**
- * ¿Las mesas de la Arena cobran entrada?
+ * ¿Hay contrato de escrow configurado?
  *
- * Hoy es un interruptor global: mientras no haya contrato configurado, todo
- * sigue gratis y `decideSeatAccess` deja pasar a todo el mundo — que es lo que
- * permite desplegar la regla ANTES que el contrato sin romperle la partida a
- * nadie. Cuando el escrow exista de verdad, esto pasa a ser por mesa (una
- * columna `table_id` en `arena_rooms`), porque habrá que poder tener mesas
- * gratis y mesas pagas a la vez.
+ * OJO con lo que significa y con lo que NO: dice si las salas que se creen A
+ * PARTIR DE AHORA pueden cobrar entrada. **No dice si una sala concreta cobra.**
+ * Eso lo dice `roomIsEscrowed`, mirando si esa sala tiene mesa en el contrato.
+ *
+ * La diferencia no es teórica. Si esto gobernara el cobro, el día que se
+ * configurara la dirección todas las salas abiertas —creadas gratis, con gente
+ * dentro que nunca pagó nada— se volverían pagas de golpe y sus jugadores se
+ * quedarían fuera de su propia partida. Una sala nace gratis o nace paga, y no
+ * cambia de naturaleza a mitad.
  */
-export function escrowEnabled(): boolean {
+export function escrowConfigured(): boolean {
   return /^0x[0-9a-f]{40}$/.test(ARENA_ESCROW_ADDRESS);
+}
+
+/**
+ * ¿ESTA sala cobra entrada?
+ *
+ * La respuesta está en la propia sala: tiene mesa en el contrato o no la tiene.
+ * Se decide al crearla y ya no cambia, así que ni configurar el contrato ni
+ * quitarlo puede alterar lo que se le prometió a quien ya está sentado.
+ */
+export function roomIsEscrowed(room: { table_id?: string | null }): boolean {
+  return Boolean(room.table_id);
 }
 
 const ARENA_ABI = [
@@ -81,7 +95,7 @@ export async function seatCommitmentOf(
   tableId: Hash,
   player: string
 ): Promise<`0x${string}` | null> {
-  if (!escrowEnabled()) return null;
+  if (!escrowConfigured()) return null;
   try {
     const commitment = (await client.readContract({
       address: ARENA_ESCROW_ADDRESS as `0x${string}`,
@@ -105,7 +119,7 @@ export async function seatCommitmentOf(
  * cerrar.
  */
 export async function paidPlayersOf(tableId: Hash): Promise<string[]> {
-  if (!escrowEnabled()) return [];
+  if (!escrowConfigured()) return [];
   try {
     const players = (await client.readContract({
       address: ARENA_ESCROW_ADDRESS as `0x${string}`,
@@ -145,7 +159,7 @@ export async function verifyJoinTx(
   tableId: Hash,
   expectedPlayer: string
 ): Promise<JoinVerification> {
-  if (!escrowEnabled()) return { ok: false };
+  if (!escrowConfigured()) return { ok: false };
   try {
     const receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
     if (receipt.status !== "success") return { ok: false };

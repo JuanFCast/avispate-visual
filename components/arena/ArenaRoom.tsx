@@ -20,6 +20,8 @@ import ArenaHeader from "./ArenaHeader";
  * alguien llega por el enlace de un amigo sin sesión. Quien ya está sentado no
  * tiene por qué descargarlo.
  */
+import ArenaSeatPayment from "./ArenaSeatPayment";
+
 const AccessCard = dynamic(() => import("../AccessCard"), {
   ssr: false,
   loading: () => <div className="access-card-skeleton" aria-hidden="true" />,
@@ -53,8 +55,19 @@ export default function ArenaRoom({ code }: { code: string }) {
   const t = useT();
   const router = useRouter();
   const { ready, authenticated } = useProfile();
-  const { room, error, loading, busy, failures, join, setReady, leave, start } =
-    useArenaRoom(code);
+  const {
+    room,
+    error,
+    loading,
+    busy,
+    failures,
+    join,
+    setReady,
+    leave,
+    start,
+    authHeaders,
+    refresh,
+  } = useArenaRoom(code);
 
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
 
@@ -197,7 +210,9 @@ export default function ArenaRoom({ code }: { code: string }) {
             <dd>{fmtUsdt(prize.winnerUnits)} USDT</dd>
           </div>
         </dl>
-        <p className="arena-prize-note">{t("room.no_charge")}</p>
+        {!room.tableId && (
+          <p className="arena-prize-note">{t("room.no_charge")}</p>
+        )}
       </section>
 
       <section className="arena-card room-players" aria-label={t("room.players.aria")}>
@@ -242,6 +257,18 @@ export default function ArenaRoom({ code }: { code: string }) {
               <p className="room-warn">{t("room.join_this.login")}</p>
               <AccessCard />
             </>
+          ) : room.tableId ? (
+            /* Mesa con entrada: aquí no se "entra", se paga. La silla la crea
+               la transacción, no este botón, y por eso vale igual para el
+               anfitrión —que con escrow tampoco se sentó al crear la sala—. */
+            <ArenaSeatPayment
+              code={room.code}
+              tableId={room.tableId}
+              entryUnits={entryUnits}
+              maxPlayers={room.maxPlayers}
+              authHeaders={authHeaders}
+              onSeated={refresh}
+            />
           ) : (
             <button
               type="button"

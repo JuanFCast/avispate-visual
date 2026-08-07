@@ -106,6 +106,26 @@ export const en = {
     "Your game is already paid for — we just couldn't register it. Do not pay again: finish registering it.",
   "pay.block.payer_mismatch":
     "The payment came from {address}, not from the wallet we had. Connect that one to finish. You have not been charged twice.",
+  /* ---- Arena con entrada: pagar la silla ---- */
+  "arena.pay.title": "Pay your entry to take your seat",
+  "arena.pay.support":
+    "{entry} USDT goes into the pot. The winner takes it minus the {commission}% house cut. Nobody sits without paying — not even the host.",
+  "arena.pay.button": "Pay {entry} USDT and sit",
+  "arena.pay.stage.checking": "Checking your wallet…",
+  "arena.pay.stage.approving": "Approving USDT…",
+  "arena.pay.stage.confirm": "Confirm in your wallet…",
+  "arena.pay.stage.confirming": "Confirming on Celo…",
+  "arena.pay.stage.registering": "Registering your seat…",
+  "arena.pay.stage.claiming": "Claiming your seat…",
+  "arena.pay.seated": "You're in. Your seat is paid.",
+  // Estos dos dicen SIEMPRE que no se vuelve a pagar: el dinero ya salió y lo
+  // único que falta es contarlo.
+  "arena.pay.registered_failed":
+    "You paid, but we couldn't register your seat yet. Do not pay again — try again in a moment.",
+  "arena.pay.seat_failed":
+    "You paid, but we couldn't hand you your seat yet. Do not pay again — try again in a moment.",
+  "arena.pay.no_storage":
+    "We can't save your seat key on this device, so we won't take your money. Turn off private browsing or free up storage and try again.",
   "pay.action.connect": "Change or connect wallet",
   "pay.action.retry": "Try again",
   "pay.action.another_name": "Use a different name",
@@ -811,6 +831,24 @@ export const es: Record<MessageKey, string> = {
     "Tu jugada ya está pagada, solo faltó registrarla. No vuelvas a pagar: termina de registrarla.",
   "pay.block.payer_mismatch":
     "El pago salió de {address}, no de la billetera que teníamos. Conéctala para terminar. No se te ha cobrado dos veces.",
+  /* ---- Arena con entrada: pagar la silla ---- */
+  "arena.pay.title": "Paga tu entrada para tomar tu silla",
+  "arena.pay.support":
+    "{entry} USDT van al pozo. Quien gane se lo lleva menos el {commission}% de la casa. Nadie se sienta sin pagar, tampoco quien creó la sala.",
+  "arena.pay.button": "Pagar {entry} USDT y sentarme",
+  "arena.pay.stage.checking": "Comprobando tu billetera…",
+  "arena.pay.stage.approving": "Autorizando USDT…",
+  "arena.pay.stage.confirm": "Confirma en tu billetera…",
+  "arena.pay.stage.confirming": "Confirmando en Celo…",
+  "arena.pay.stage.registering": "Registrando tu silla…",
+  "arena.pay.stage.claiming": "Reclamando tu silla…",
+  "arena.pay.seated": "Estás dentro. Tu silla está pagada.",
+  "arena.pay.registered_failed":
+    "Pagaste, pero todavía no pudimos registrar tu silla. No vuelvas a pagar: inténtalo de nuevo en un momento.",
+  "arena.pay.seat_failed":
+    "Pagaste, pero todavía no pudimos entregarte tu silla. No vuelvas a pagar: inténtalo de nuevo en un momento.",
+  "arena.pay.no_storage":
+    "No podemos guardar la llave de tu silla en este dispositivo, así que no te cobramos. Desactiva la navegación privada o libera espacio e inténtalo otra vez.",
   "pay.action.connect": "Cambiar o conectar billetera",
   "pay.action.retry": "Reintentar",
   "pay.action.another_name": "Usar otro nombre",

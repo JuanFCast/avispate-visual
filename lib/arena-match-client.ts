@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { withSeatHeader } from "./seat-token-client";
 import {
   MATCH_POLL_MS,
   type MatchError,
@@ -67,10 +68,16 @@ export function useArenaMatch(code: string): ArenaMatchApi {
    */
   const offset = useRef(0);
 
+  /**
+   * La sesión y, en una mesa con entrada, la ficha de la silla. Van en
+   * cabeceras distintas a propósito: una dice quién eres y la otra qué silla
+   * probaste, y no deben compartir canal.
+   */
   const authHeaders = useCallback(async (): Promise<HeadersInit> => {
     const token = authenticated ? await getToken() : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, [authenticated, getToken]);
+    const base: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+    return withSeatHeader(base, code);
+  }, [authenticated, getToken, code]);
 
   const absorb = useCallback((view: MatchView) => {
     offset.current = new Date(view.serverNow).getTime() - Date.now();

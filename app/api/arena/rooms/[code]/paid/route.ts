@@ -3,7 +3,7 @@ import { requireIdentity } from "@/lib/http";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { getRoomByCode } from "@/lib/supabase/arena-rooms";
 import { ensureProfile } from "@/lib/supabase/profiles";
-import { escrowEnabled, tableIdFor, verifyJoinTx } from "@/lib/arena-escrow";
+import { escrowConfigured, verifyJoinTx } from "@/lib/arena-escrow";
 import {
   nextFreeSeat,
   recordSeatPayment,
@@ -40,7 +40,7 @@ export async function POST(req: Request, ctx: Ctx) {
   const auth = await requireIdentity(req);
   if ("response" in auth) return auth.response;
 
-  if (!escrowEnabled()) {
+  if (!escrowConfigured()) {
     return NextResponse.json({ error: "escrow_disabled" }, { status: 503 });
   }
 
@@ -66,11 +66,12 @@ export async function POST(req: Request, ctx: Ctx) {
       return NextResponse.json({ error: "room_not_found" }, { status: 404 });
     }
 
-    const tableId = tableIdFor(
-      room.code,
-      BigInt(room.entry_units),
-      room.max_players
-    );
+    // La mesa la dice la SALA, no un cálculo: es lo que fija si esta sala cobra
+    // y cuál es su mesa, y no cambia aunque cambie la configuración.
+    const tableId = room.table_id as `0x${string}` | null;
+    if (!tableId) {
+      return NextResponse.json({ error: "room_is_free" }, { status: 409 });
+    }
 
     // La cadena es la fuente de verdad sobre quién pagó y en qué mesa.
     const check = await verifyJoinTx(txHash, tableId, address);

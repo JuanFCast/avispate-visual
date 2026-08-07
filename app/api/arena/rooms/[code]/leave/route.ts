@@ -29,7 +29,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
   // Irse de una mesa con entrada es regalar el pozo al que se queda: no puede
   // ser un botón al alcance de una sesión. Ausentarse sigue siendo posible.
-  const blocked = forfeitBlocked();
+  const blocked = await forfeitBlocked(code);
   if (blocked) return blocked.response;
 
   try {

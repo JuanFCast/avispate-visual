@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { withSeatHeader } from "./seat-token-client";
 import {
   ROOM_HEARTBEAT_MS,
   roomChannelName,
@@ -54,6 +55,11 @@ export interface ArenaRoomApi extends ArenaRoomState {
   leave: () => Promise<void>;
   /** El anfitrión reparte. Los dos acaban en la partida por `matchStarted`. */
   start: () => Promise<void>;
+  /**
+   * Las cabeceras de esta sala: la sesión y, si la mesa cobra, la ficha de la
+   * silla. Se expone para que el pago las use TAL CUAL en vez de rearmarlas.
+   */
+  authHeaders: () => Promise<HeadersInit>;
 }
 
 export function useArenaRoom(code: string): ArenaRoomApi {
@@ -75,12 +81,22 @@ export function useArenaRoom(code: string): ArenaRoomApi {
   const refreshRef = useRef<() => Promise<void>>(async () => {});
   const inFlight = useRef(false);
 
-  /** Cabeceras con el token de Privy cuando hay sesión; sin él también se lee. */
+  /**
+   * Cabeceras con el token de Privy cuando hay sesión; sin él también se lee.
+   *
+   * En una mesa con entrada va ADEMÁS la ficha de silla, en su propia cabecera.
+   * Son dos cosas distintas: la sesión dice quién eres, la ficha dice qué silla
+   * probaste. Sin la segunda, el servidor rechaza cualquier acción sobre una
+   * mesa pagada, y hace bien.
+   */
   const authHeaders = useCallback(async (): Promise<HeadersInit> => {
-    if (!authenticated) return {};
-    const token = await getToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
-  }, [authenticated, getToken]);
+    const base: HeadersInit = {};
+    if (authenticated) {
+      const token = await getToken();
+      if (token) Object.assign(base, { Authorization: `Bearer ${token}` });
+    }
+    return withSeatHeader(base, code);
+  }, [authenticated, getToken, code]);
 
   const refresh = useCallback(async () => {
     if (stopRef.current) return;
@@ -235,5 +251,8 @@ export function useArenaRoom(code: string): ArenaRoomApi {
     };
   }, [code]);
 
-  return { ...state, refresh, join, setReady, leave, start };
+  // `authHeaders` sale fuera porque el pago de la silla vive en su propio
+  // componente y necesita las MISMAS cabeceras: la sesión y, si la mesa cobra,
+  // la ficha. Duplicarlas allí sería la forma de que un día dejen de coincidir.
+  return { ...state, refresh, join, setReady, leave, start, authHeaders };
 }
