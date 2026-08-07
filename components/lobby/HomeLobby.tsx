@@ -4,6 +4,7 @@ import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
 import { useEmbeddedWalletStatus } from "@/lib/embedded-wallet";
+import { useIsMiniPay } from "@/lib/minipay";
 import { FEE_AMOUNT } from "@/lib/contracts";
 import { fmtUsdt } from "@/lib/round";
 import type { PlayStage } from "@/lib/pay";
@@ -56,6 +57,7 @@ export default function HomeLobby({
   const profile = useProfile();
   const wallet = useActiveWallet();
   const embeddedWallet = useEmbeddedWalletStatus();
+  const inMiniPay = useIsMiniPay();
   const { openConnectModal } = useConnectModal();
   // El precio sale del contrato configurado, no de una frase escrita a mano:
   // el día que la entrada cambie, el botón cambia con ella.
@@ -150,6 +152,25 @@ export default function HomeLobby({
       return playCta();
     }
     if (wallet.isConnected) {
+      /**
+       * Wallet puesta pero sin sesión. FUERA de MiniPay se pide la firma: una
+       * dirección conectada es un dato que dice el navegador, no una cuenta, y
+       * tener dos clases de jugador —unos con sesión y otros solo conectados—
+       * es la raíz de los líos de identidad. Firmar es gratis y no mueve fondos.
+       *
+       * Dentro de MiniPay no se puede firmar (esa wallet no tiene firma de
+       * mensajes), y no hace falta: ahí la sesión la abre la propia jugada, con
+       * el hash de la transacción como prueba. Por eso ese camino se queda como
+       * estaba, pidiendo alias y a jugar.
+       */
+      if (!inMiniPay) {
+        return {
+          support: t("cta.sign.support"),
+          label: t("cta.sign.label"),
+          disabled: false,
+          action: "access",
+        };
+      }
       // Antes de pedir alias hay que saber si la wallet ya tiene uno; si no,
       // a quien vuelve desde otro dispositivo le pediríamos el que ya es suyo.
       if (!walletAliasReady) return checking;

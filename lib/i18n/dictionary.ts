@@ -136,6 +136,10 @@ export const en = {
   "cta.alias.label": "Continue",
   "cta.login.support": "Sign in to check your free game.",
   "cta.login.label": "Start",
+  // Wallet conectada pero sin sesión: falta la firma, que es gratis y no mueve
+  // fondos. Se dice para que nadie crea que le van a cobrar por entrar.
+  "cta.sign.support": "Confirm it's you to finish signing in. It's free.",
+  "cta.sign.label": "Sign in with your wallet",
   "cta.paying.free": "This game is free. Just confirm in your wallet.",
   "cta.paying.paid": "Confirm the {fee} USDT payment in your wallet.",
   // La wallet embebida tarda unos segundos en existir. Contarlo es la
@@ -821,6 +825,8 @@ export const es: Record<MessageKey, string> = {
   "cta.alias.label": "Continuar",
   "cta.login.support": "Inicia sesión para revisar tu jugada gratis.",
   "cta.login.label": "Empezar",
+  "cta.sign.support": "Confirma que eres tú para terminar de entrar. Es gratis.",
+  "cta.sign.label": "Entrar con tu wallet",
   "cta.paying.free": "Esta jugada es gratis. Solo debes confirmar en tu wallet.",
   "cta.paying.paid": "Confirma el pago de {fee} USDT en tu wallet.",
   "cta.wallet.creating.support":

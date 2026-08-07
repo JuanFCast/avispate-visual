@@ -3,7 +3,8 @@
 import { useEffect, useRef } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useProfile } from "@/lib/profile-context";
-import { useActiveWallet } from "@/lib/wallet";
+import { useActiveWallet, shortAddress } from "@/lib/wallet";
+import { useWalletAuth } from "@/lib/wallet-auth";
 import { useIsMiniPay } from "@/lib/minipay";
 import { useT } from "@/lib/i18n/client";
 import AliasGate from "../AliasGate";
@@ -34,6 +35,7 @@ export default function StartAccessModal({
   const profile = useProfile();
   const wallet = useActiveWallet();
   const inMiniPay = useIsMiniPay();
+  const walletAuth = useWalletAuth();
   const panelRef = useRef<HTMLDivElement>(null);
 
   /**
@@ -47,6 +49,14 @@ export default function StartAccessModal({
       wallet.address &&
       profile.walletAddress === wallet.address.toLowerCase()
   );
+
+  /**
+   * Wallet puesta y todavía sin sesión: falta la firma. Fuera de MiniPay es un
+   * paso obligatorio —conectar no es entrar—, dentro no existe como método y la
+   * sesión la abre la propia jugada.
+   */
+  const needsSignIn = !inMiniPay && walletAuth.needsSignature;
+  const signing = walletAuth.stage !== null;
 
   const needsEmailAlias =
     profile.authenticated && !profile.loading && !profile.alias;
@@ -64,16 +74,22 @@ export default function StartAccessModal({
   const checkingWalletAlias =
     wallet.isConnected && !walletAliasReady && !sessionCoversWallet;
 
-  // Identidad completa → volver al lobby (sin countdown ni cobro automático).
-  // "Completa" incluye el nombre de la wallet: cerrar antes devolvía al jugador
-  // a un botón de jugar que iba a rechazarle la partida.
-  const identified =
-    (profile.authenticated && !profile.loading) || wallet.isConnected;
-  const aliasPending =
-    needsEmailAlias || needsWalletAlias || checkingWalletAlias;
+  /**
+   * Identidad completa → volver al lobby (sin countdown ni cobro automático).
+   *
+   * "Completa" incluye el nombre de la wallet: cerrar antes devolvía al jugador
+   * a un botón de jugar que iba a rechazarle la partida. Y fuera de MiniPay
+   * exige SESIÓN, no solo wallet conectada: desde que firmar es obligatorio,
+   * una dirección puesta sin firma todavía no es una cuenta.
+   */
+  const identified = inMiniPay
+    ? profile.authenticated || wallet.isConnected
+    : profile.authenticated && !profile.loading;
+  const pending =
+    needsEmailAlias || needsSignIn || needsWalletAlias || checkingWalletAlias;
   useEffect(() => {
-    if (identified && !aliasPending) onClose();
-  }, [identified, aliasPending, onClose]);
+    if (identified && !pending) onClose();
+  }, [identified, pending, onClose]);
 
   // Foco inicial dentro del diálogo; al cerrar vuelve al CTA del lobby.
   useEffect(() => {
@@ -154,6 +170,56 @@ export default function StartAccessModal({
               {t("access.alias_title")}
             </h2>
             <AliasGate />
+          </>
+        ) : needsSignIn ? (
+          /**
+           * El paso que convierte una wallet conectada en una cuenta. La firma
+           * es gratis y no mueve fondos; el texto lo dice porque la ventana de
+           * la wallet asusta si no se sabe qué se está firmando.
+           */
+          <>
+            <h2 id="access-modal-title" className="lobby-modal-title">
+              {t("access.title")}
+            </h2>
+            <button
+              type="button"
+              className="access-btn access-btn-primary"
+              onClick={walletAuth.continueWithWallet}
+              disabled={signing}
+              aria-busy={signing}
+            >
+              {walletAuth.stage === "signing"
+                ? t("access.wallet_signing")
+                : walletAuth.stage === "verifying"
+                  ? t("access.wallet_verifying")
+                  : t("access.wallet_continue")}
+            </button>
+            {walletAuth.address && (
+              <small className="access-wallet-hint">
+                {t("access.wallet_will_sign", {
+                  address: shortAddress(walletAuth.address),
+                })}
+              </small>
+            )}
+            {walletAuth.error && (
+              <p className="room-error">
+                {t(
+                  walletAuth.error === "rejected"
+                    ? "access.error.rejected"
+                    : walletAuth.error === "not_enabled"
+                      ? "access.error.not_enabled"
+                      : "access.error.failed"
+                )}
+              </p>
+            )}
+            <button
+              type="button"
+              className="lobby-modal-later"
+              onClick={onClose}
+              disabled={signing}
+            >
+              {t("common.close")}
+            </button>
           </>
         ) : needsWalletAlias ? (
           <>
