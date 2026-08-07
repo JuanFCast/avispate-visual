@@ -90,12 +90,26 @@ export const en = {
   "pay.error.not_configured":
     "The game isn't available yet (contract not configured).",
   "pay.error.no_wallet": "Connect a wallet or sign in with your email.",
-  // Se avisan ANTES de cobrar: sin nombre válido el puntaje no se puede
-  // guardar, y enterarse de eso con la entrada ya pagada es perder plata.
-  "pay.error.alias_needed":
-    "Pick a name for this wallet before you play, so your score can be saved.",
-  "pay.error.alias_taken":
-    "That name is already taken by another player. Pick a different one for this wallet and your score will be saved.",
+  /* Situaciones que PARAN el cobro. Todas dicen si hubo cobro o no, porque es
+     lo primero que quiere saber quien las lee. */
+  "pay.block.reconnect":
+    "We need to reconnect your wallet. It may be locked or disconnected. Nothing was charged.",
+  "pay.block.account_changed":
+    "Your wallet switched to a different account ({address}). We'll check your name again before charging anything. Nothing was charged.",
+  "pay.block.needs_name":
+    "Pick a name for this wallet before you play, so your score can be saved. Nothing was charged.",
+  "pay.block.name_taken":
+    "That name is already linked to another wallet ({address}). If it's yours, connect it; otherwise pick a different name. Nothing was charged.",
+  "pay.block.name_taken_unknown":
+    "That name is already linked to another wallet. If it's yours, connect it; otherwise pick a different name. Nothing was charged.",
+  "pay.block.resume":
+    "Your game is already paid for — we just couldn't register it. Do not pay again: finish registering it.",
+  "pay.block.payer_mismatch":
+    "The payment came from {address}, not from the wallet we had. Connect that one to finish. You have not been charged twice.",
+  "pay.action.connect": "Change or connect wallet",
+  "pay.action.retry": "Try again",
+  "pay.action.another_name": "Use a different name",
+  "pay.action.resume": "Finish registering my game",
   "pay.error.generic": "We couldn't register the game. Try again.",
   "pay.error.unavailable":
     "The game isn't available yet (contract not configured, or no wallet connected).",
@@ -140,6 +154,8 @@ export const en = {
   // fondos. Se dice para que nadie crea que le van a cobrar por entrar.
   "cta.sign.support": "Confirm it's you to finish signing in. It's free.",
   "cta.sign.label": "Sign in with your wallet",
+  "cta.resume.support": "Your game is paid. It only needs registering.",
+  "cta.resume.label": "Finish registering",
   "cta.paying.free": "This game is free. Just confirm in your wallet.",
   "cta.paying.paid": "Confirm the {fee} USDT payment in your wallet.",
   // La wallet embebida tarda unos segundos en existir. Contarlo es la
@@ -781,10 +797,24 @@ export const es: Record<MessageKey, string> = {
   "pay.error.not_configured":
     "El juego aún no está disponible (contrato no configurado).",
   "pay.error.no_wallet": "Conecta una wallet o entra con tu correo.",
-  "pay.error.alias_needed":
-    "Elige un nombre para esta wallet antes de jugar, para que tu puntaje se pueda guardar.",
-  "pay.error.alias_taken":
-    "Ese nombre ya lo tiene otro jugador. Elige uno distinto para esta wallet y tu puntaje quedará guardado.",
+  "pay.block.reconnect":
+    "Necesitamos volver a conectar tu billetera. Puede estar bloqueada o haberse desconectado. No te hemos cobrado nada.",
+  "pay.block.account_changed":
+    "Tu billetera cambió a otra cuenta ({address}). Vamos a revisar tu nombre otra vez antes de cobrar nada. No te hemos cobrado nada.",
+  "pay.block.needs_name":
+    "Elige un nombre para esta billetera antes de jugar, para que tu puntaje se pueda guardar. No te hemos cobrado nada.",
+  "pay.block.name_taken":
+    "Ese nombre ya está vinculado a otra billetera ({address}). Si es tuya, conéctala; si no, elige otro nombre. No te hemos cobrado nada.",
+  "pay.block.name_taken_unknown":
+    "Ese nombre ya está vinculado a otra billetera. Si es tuya, conéctala; si no, elige otro nombre. No te hemos cobrado nada.",
+  "pay.block.resume":
+    "Tu jugada ya está pagada, solo faltó registrarla. No vuelvas a pagar: termina de registrarla.",
+  "pay.block.payer_mismatch":
+    "El pago salió de {address}, no de la billetera que teníamos. Conéctala para terminar. No se te ha cobrado dos veces.",
+  "pay.action.connect": "Cambiar o conectar billetera",
+  "pay.action.retry": "Reintentar",
+  "pay.action.another_name": "Usar otro nombre",
+  "pay.action.resume": "Terminar de registrar mi jugada",
   "pay.error.generic": "No se pudo registrar la jugada. Inténtalo de nuevo.",
   "pay.error.unavailable":
     "El juego aún no está disponible (contrato no configurado o wallet sin conectar).",
@@ -827,6 +857,8 @@ export const es: Record<MessageKey, string> = {
   "cta.login.label": "Empezar",
   "cta.sign.support": "Confirma que eres tú para terminar de entrar. Es gratis.",
   "cta.sign.label": "Entrar con tu wallet",
+  "cta.resume.support": "Tu jugada está pagada. Solo falta registrarla.",
+  "cta.resume.label": "Terminar de registrar",
   "cta.paying.free": "Esta jugada es gratis. Solo debes confirmar en tu wallet.",
   "cta.paying.paid": "Confirma el pago de {fee} USDT en tu wallet.",
   "cta.wallet.creating.support":

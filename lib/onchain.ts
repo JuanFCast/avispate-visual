@@ -29,12 +29,16 @@ export async function verifyWalletControl(
   try {
     const receipt = await client.getTransactionReceipt({ hash: txHash as Hash });
     if (receipt.status !== "success") return false;
-    if (receipt.to?.toLowerCase() !== AVISPATE_POT_ADDRESS) return false;
 
+    // Igual que en `verifyPlayTx`: manda quién EMITE el evento, no a quién iba
+    // dirigida la transacción. Sin este filtro, un contrato cualquiera podría
+    // emitir un `Played` con la forma correcta y abrir sesión con él.
     const logs = parseEventLogs({
       abi: AVISPATE_POT_ABI,
       eventName: "Played",
-      logs: receipt.logs,
+      logs: receipt.logs.filter(
+        (l) => l.address.toLowerCase() === AVISPATE_POT_ADDRESS
+      ),
     });
     const signed = logs.some(
       (l) => l.args.player.toLowerCase() === address.toLowerCase()
@@ -51,12 +55,24 @@ export async function verifyWalletControl(
 
 export interface PlayVerification {
   ok: boolean;
-  /** Dirección del jugador (minúsculas) si la verificación pasó. */
+  /**
+   * Quién pagó DE VERDAD, leído del evento del contrato (minúsculas). Es la
+   * dirección que hay que usar: la que manda el cliente solo sirve para saber
+   * si coincide.
+   */
   player?: string;
   /** Mazo jugado si la verificación pasó. */
   deck?: number;
   /** La jugada consumió la gratis del día (según el evento del contrato). */
   wasFree?: boolean;
+  /** Unidades que entraron al pozo + comisión. 0 en las gratis. */
+  paidUnits?: bigint;
+  /**
+   * La cadena dice que pagó otra dirección distinta a la que afirmó el cliente.
+   * `ok` sigue siendo true —la jugada existe y es válida—, pero quien llama NO
+   * debe registrarla a nombre de nadie hasta reconciliar de quién es.
+   */
+  payerMismatch?: boolean;
 }
 
 /**
@@ -76,25 +92,38 @@ export async function verifyPlayTx(
       hash: txHash as Hash,
     });
     if (receipt.status !== "success") return { ok: false };
-    if (receipt.to?.toLowerCase() !== AVISPATE_POT_ADDRESS) return { ok: false };
 
+    /**
+     * Quién emitió el evento importa más que a quién iba dirigida la
+     * transacción. Antes se exigía `receipt.to === contrato`, y eso hacía dos
+     * cosas malas a la vez: dejaba fuera a cualquier wallet de contrato
+     * inteligente (donde quien envía la transacción no es quien paga) y, aun
+     * así, no comprobaba de qué contrato salía el `Played` — cualquiera puede
+     * desplegar uno que emita un evento con la misma forma. Filtrar por la
+     * dirección que EMITE el log es más estricto y además no discrimina cómo
+     * llegó la llamada.
+     */
     const logs = parseEventLogs({
       abi: AVISPATE_POT_ABI,
       eventName: "Played",
-      logs: receipt.logs,
+      logs: receipt.logs.filter(
+        (l) => l.address.toLowerCase() === AVISPATE_POT_ADDRESS
+      ),
     });
-    const match = logs.find(
-      (l) =>
-        l.args.player.toLowerCase() === expectedPlayer.toLowerCase() &&
-        Number(l.args.deck) === expectedDeck
-    );
+
+    // El mazo NO se negocia: una transacción del mazo de 10 no puede registrar
+    // una partida de 20. Pero el jugador se LEE, no se exige.
+    const match = logs.find((l) => Number(l.args.deck) === expectedDeck);
     if (!match) return { ok: false };
 
+    const player = match.args.player.toLowerCase();
     return {
       ok: true,
-      player: expectedPlayer.toLowerCase(),
+      player,
       deck: expectedDeck,
       wasFree: Boolean(match.args.wasFree),
+      paidUnits: BigInt(match.args.toPot) + BigInt(match.args.commission),
+      payerMismatch: player !== expectedPlayer.toLowerCase(),
     };
   } catch {
     return { ok: false };

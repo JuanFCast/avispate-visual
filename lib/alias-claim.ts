@@ -1,7 +1,6 @@
 "use client";
 
 import { validateAlias } from "./alias";
-import type { MessageKey } from "./i18n";
 
 /**
  * ¿Se va a poder guardar el puntaje de esta jugada, ANTES de cobrarla?
@@ -10,47 +9,66 @@ import type { MessageKey } from "./i18n";
  * rechaza la partida de una wallet que no tiene alias si el que se le manda ya
  * es de otra. Hasta el 2026-08-07 eso se descubría al TERMINAR de jugar: se
  * cobraba la entrada y el puntaje se caía después. Le pasó a Juan con su propia
- * cuenta (ver el arreglo de identidad en `supabase/profiles.ts`), pero la
- * trampa es general — le espera a cualquier jugador nuevo cuyo nombre favorito
- * esté ocupado.
+ * cuenta, pero la trampa es general — le espera a cualquier jugador nuevo cuyo
+ * nombre favorito esté ocupado.
  *
- * Lo que se comprueba es la wallet que va a FIRMAR, no la sesión abierta: el
- * puntaje se guarda contra la primera, y confundirlas es justamente lo que dejó
- * pasar el caso de Juan (sesión con alias, wallet sin él).
- *
- * Devuelve el mensaje que hay que mostrar, o `null` si se puede cobrar.
+ * Se comprueba contra la dirección ya CONFIRMADA con la wallet, no contra la
+ * que wagmi tenía guardada ni contra la sesión abierta: el puntaje se guarda
+ * contra quien firma, y confundirlas fue el error original.
  */
-export async function aliasBlocker(
+
+export type AliasVerdict =
+  /** Se puede cobrar. */
+  | { kind: "ok" }
+  /** No hay nombre válido que mandar; sin uno el servidor rechaza la partida. */
+  | { kind: "needs_name" }
+  /**
+   * El nombre ya está vinculado a OTRA dirección. Casi siempre es otra wallet
+   * de la misma persona, así que viaja la dirección para poder mostrarla y que
+   * la reconozca.
+   */
+  | { kind: "name_taken"; owner: string | null };
+
+export async function checkAliasBeforePaying(
   alias: string,
-  wallet: string | null | undefined
-): Promise<MessageKey | null> {
-  if (!wallet) return null;
+  wallet: string
+): Promise<AliasVerdict> {
+  if (!wallet) return { kind: "ok" };
 
   try {
-    // 1. Si la wallet YA tiene alias, el servidor no va a pedir ninguno y el
+    // 1. Si la wallet YA tiene nombre, el servidor no va a pedir ninguno y el
     //    puntaje entra pase lo que pase con el nombre de la sesión.
     const res = await fetch(
       `/api/wallet-alias?address=${encodeURIComponent(wallet)}`
     );
-    if (!res.ok) return null;
+    if (!res.ok) return { kind: "ok" };
     const owned = (await res.json()) as { alias?: string | null };
-    if (owned?.alias) return null;
+    if (owned?.alias) return { kind: "ok" };
 
-    // 2. Wallet estrenando: el alias que viajará con el puntaje tiene que
+    // 2. Wallet estrenando: el nombre que viajará con el puntaje tiene que
     //    servir. Sin uno válido, `/api/scores` responde `alias_required`.
     const check = validateAlias(alias);
-    if (!check.ok || !check.value) return "pay.error.alias_needed";
+    if (!check.ok || !check.value) return { kind: "needs_name" };
 
     const free = await fetch(
       `/api/alias-available?alias=${encodeURIComponent(check.value)}&wallet=${encodeURIComponent(wallet)}`
     );
-    if (!free.ok) return null;
-    const data = (await free.json()) as { available?: boolean };
-    return data?.available ? null : "pay.error.alias_taken";
+    if (!free.ok) return { kind: "ok" };
+    const data = (await free.json()) as {
+      available?: boolean;
+      owner?: string | null;
+    };
+    if (data?.available) return { kind: "ok" };
+    return { kind: "name_taken", owner: data?.owner ?? null };
   } catch {
     // Fallo de red en la comprobación: NO se bloquea el juego por eso. Si el
     // puntaje acaba rechazándose, la bandeja de salida ya no lo tira (ver
-    // `submit.ts`), así que se guarda solo en cuanto haya alias.
-    return null;
+    // `submit.ts`), así que se guarda solo en cuanto haya nombre.
+    //
+    // Ojo con la asimetría, que es deliberada: la wallet falla CERRADO (sin
+    // confirmar la cuenta no se cobra) y esto falla ABIERTO. La diferencia es
+    // qué se arriesga — allí, cobrarle a quien no debe; aquí, un puntaje que se
+    // reintenta solo.
+    return { kind: "ok" };
   }
 }

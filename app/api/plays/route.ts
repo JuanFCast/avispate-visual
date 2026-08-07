@@ -44,7 +44,43 @@ export async function POST(req: Request) {
     if (!check.ok || !check.player)
       return NextResponse.json({ error: "invalid_payment" }, { status: 400 });
 
+    // El perfil se abre SIEMPRE contra quien pagó según la cadena, nunca contra
+    // lo que afirmó el navegador. Así el recibo queda a nombre del dueño real
+    // del dinero aunque el cliente se haya equivocado de dirección.
     const profile = await ensureProfileByWallet(check.player);
+
+    const db = getSupabaseAdmin();
+
+    /**
+     * El pago NO se pierde ni se atribuye a la ligera.
+     *
+     * Si la cadena dice que pagó otra dirección, el recibo se guarda igual —a
+     * nombre de quien pagó de verdad, que para eso existe esta tabla— pero se
+     * corta aquí con 409. El cliente tiene que reconciliar de quién es esa
+     * wallet antes de que la partida se registre a nombre de nadie: corregirlo
+     * en silencio sería inventarle un dueño a una jugada.
+     *
+     * El alias NO se toca en este camino: escribir un nombre pedido por otra
+     * identidad sobre el perfil de quien pagó sería justo el error que este
+     * bloque existe para impedir.
+     */
+    const receipt = {
+      profile_id: profile.id,
+      tx_hash: txHash.toLowerCase(),
+      deck_size: deckSize,
+      is_paid: !check.wasFree,
+    };
+
+    if (check.payerMismatch) {
+      const { error } = await db
+        .from("plays")
+        .upsert(receipt, { onConflict: "tx_hash", ignoreDuplicates: true });
+      if (error && error.code !== "23505") throw error;
+      return NextResponse.json(
+        { error: "payer_mismatch", payer: check.player },
+        { status: 409 }
+      );
+    }
 
     // El alias es "si viene, mejor": el recibo del pago nunca se bloquea por
     // un problema de nombre. Si falta, /api/scores lo exigirá al terminar.
@@ -53,16 +89,9 @@ export async function POST(req: Request) {
       if (valid.ok && valid.value) await setAliasIfEmpty(profile.id, valid.value);
     }
 
-    const db = getSupabaseAdmin();
-    const { error } = await db.from("plays").upsert(
-      {
-        profile_id: profile.id,
-        tx_hash: txHash.toLowerCase(),
-        deck_size: deckSize,
-        is_paid: !check.wasFree,
-      },
-      { onConflict: "tx_hash", ignoreDuplicates: true }
-    );
+    const { error } = await db
+      .from("plays")
+      .upsert(receipt, { onConflict: "tx_hash", ignoreDuplicates: true });
     // 23505 = ya estaba registrada; para nosotros es éxito.
     if (error && error.code !== "23505") throw error;
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { usePrivy, useWallets } from "@privy-io/react-auth";
-import { useAccount } from "wagmi";
+import { useAccount, type Connector } from "wagmi";
 
 export interface EmbeddedWalletState {
   /** Privy terminó de hidratar el estado de sesión. */
@@ -45,6 +45,12 @@ export interface ActiveWalletState {
   reconnecting: boolean;
   /** Nombre del conector activo (p. ej. "MetaMask" o "Avíspate (Privy)"). */
   connectorName: string;
+  /**
+   * El conector en sí. Se expone para poder PREGUNTARLE a la wallet por sus
+   * cuentas antes de mover dinero (`lib/wallet-access.ts`), en vez de fiarse de
+   * la dirección que wagmi tiene en memoria.
+   */
+  connector: Connector | undefined;
   /** Id de la red activa. */
   chainId: number | undefined;
 }
@@ -61,6 +67,7 @@ export function useActiveWallet(): ActiveWalletState {
     isConnected,
     reconnecting: status === "reconnecting" || status === "connecting",
     connectorName: connector?.name ?? "",
+    connector,
     chainId,
   };
 }

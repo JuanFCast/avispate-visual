@@ -41,7 +41,21 @@ export async function GET(req: Request) {
     const mine =
       ADDR_RE.test(wallet) &&
       owner.wallet_address === wallet.toLowerCase();
-    return NextResponse.json({ available: mine, mine });
+    /**
+     * Va también la dirección dueña del nombre. Sin ella lo único que se puede
+     * decir es "ese nombre ya lo tiene otro jugador", y en el caso más común
+     * ese otro jugador es la misma persona con su otra billetera: el mensaje la
+     * mandaba a inventarse un nombre cuando lo que le pasaba era que estaba
+     * entrando con la wallet equivocada.
+     *
+     * No expone nada nuevo: la pareja nombre ↔ dirección ya sale en el ranking,
+     * y por eso este endpoint es público a propósito.
+     */
+    return NextResponse.json({
+      available: mine,
+      mine,
+      owner: owner.wallet_address ?? null,
+    });
   } catch {
     return NextResponse.json(
       { available: false, error: "server_error" },

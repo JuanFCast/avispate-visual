@@ -10,6 +10,7 @@ import { fmtUsdt } from "@/lib/round";
 import type { PlayStage } from "@/lib/pay";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
+import type { PayBlock } from "../GameShell";
 import ArenaCard from "./ArenaCard";
 import DailyChallengeCard, { type CtaState } from "./DailyChallengeCard";
 import LeaderboardPreview from "./LeaderboardPreview";
@@ -26,8 +27,12 @@ interface Props {
   /** Jugada en curso: el lobby no se va, solo cambia el CTA. */
   payStage: PlayStage | null;
   payError: MessageKey | null;
+  payBlock: PayBlock | null;
   onStart: (deck: number) => void;
   onRequestAccess: () => void;
+  onReconnect: () => void;
+  onPickAnotherName: () => void;
+  onResumePending: () => void;
   onShowHowTo: () => void;
 }
 
@@ -49,8 +54,12 @@ export default function HomeLobby({
   walletAliasReady,
   payStage,
   payError,
+  payBlock,
   onStart,
   onRequestAccess,
+  onReconnect,
+  onPickAnotherName,
+  onResumePending,
   onShowHowTo,
 }: Props) {
   const t = useT();
@@ -133,6 +142,20 @@ export default function HomeLobby({
   }
 
   function computeCta(): CtaState {
+    /**
+     * Candado contra el segundo cobro. Va PRIMERO: mientras haya una jugada
+     * pagada sin registrar, el botón no puede ofrecer jugar —llamaría otra vez
+     * al contrato y cobraría de nuevo, y encima como paga, porque la gratis
+     * del día ya se consumió—.
+     */
+    if (payBlock?.kind === "resume_pending" || payBlock?.kind === "payer_mismatch") {
+      return {
+        support: t("cta.resume.support"),
+        label: t("cta.resume.label"),
+        disabled: false,
+        action: "resume",
+      };
+    }
     // Sesión resolviendo: el lobby ya es visible, solo el CTA espera.
     if (!profile.ready || (profile.authenticated && profile.loading)) {
       return checking;
@@ -219,7 +242,12 @@ export default function HomeLobby({
         cta={cta}
         payStage={payStage}
         payError={payError}
+        payBlock={payBlock}
+        onReconnect={onReconnect}
+        onPickAnotherName={onPickAnotherName}
+        onResumePending={onResumePending}
         onPress={() => {
+          if (cta.action === "resume") return onResumePending();
           if (cta.action === "access") return onRequestAccess();
           if (cta.action === "connect") return openConnectModal?.();
           if (cta.action === "retry") return embeddedWallet.retry();

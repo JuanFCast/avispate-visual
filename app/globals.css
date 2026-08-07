@@ -5174,6 +5174,37 @@ body {
   text-decoration: underline;
 }
 
+/* --- Cobro parado: explicación + las salidas, pegadas al botón de jugar ---
+   No es un error que se reintente solo, así que no se pinta como un texto
+   suelto: lleva sus acciones dentro y ocupa el sitio que ocuparía el aviso. */
+
+.lobby-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+  width: 100%;
+}
+
+.lobby-block-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* A partir de dos botones caben en fila sin apretar la línea de texto. */
+@media (min-width: 420px) {
+  .lobby-block-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .lobby-block-actions > .access-btn {
+    flex: 1 1 46%;
+  }
+}
+
 /* --- Captcha del welcome gas (Turnstile) --- */
 
 .turnstile-backdrop {

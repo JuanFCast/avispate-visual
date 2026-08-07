@@ -18,6 +18,8 @@ import {
   CIP64_FEE_ADAPTER,
 } from "./contracts";
 import { isMiniPay } from "./minipay";
+import { confirmBeforeSigning, type PayDecision } from "./pay-guard";
+import { probeWallet } from "./wallet-access";
 import { ensureWalletSession } from "./wallet-session-client";
 import type { MessageKey } from "./i18n";
 
@@ -123,6 +125,19 @@ export class InsufficientFundsError extends Error {
 }
 
 /**
+ * La wallet dejó de ser la que se validó, en mitad del cobro: se bloqueó, dejó
+ * de responder o cambió de cuenta. Lleva la decisión de `pay-guard` para que la
+ * pantalla sepa si toca reconectar o revalidar identidad, sin volver a
+ * interpretar nada.
+ */
+export class WalletChangedError extends Error {
+  constructor(readonly decision: PayDecision) {
+    super(`wallet_${decision.kind}`);
+    this.name = "WalletChangedError";
+  }
+}
+
+/**
  * Qué le falta a la wallet para poder jugar, sabiendo su saldo de USDT y con
  * qué se va a pagar el gas. `null` = puede jugar.
  *
@@ -205,7 +220,7 @@ export interface PlayResult {
  * `onStage` es solo para la UI: avisa en qué paso va sin cambiar el flujo.
  */
 export function usePayToPlay() {
-  const { address, chainId } = useAccount();
+  const { address, chainId, connector } = useAccount();
   const publicClient = usePublicClient({ chainId: celo.id });
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
@@ -213,11 +228,33 @@ export function usePayToPlay() {
   const playForDeck = useCallback(
     async (
       deck: number,
-      onStage: (stage: PlayStage) => void = () => {}
+      onStage: (stage: PlayStage) => void = () => {},
+      /**
+       * Dirección ya confirmada contra la wallet y ya validada como identidad.
+       * Se pasa en vez de leerla de wagmi porque la de wagmi es memoria del
+       * navegador: TODO el cobro (gratis o paga, saldo, permiso y firma) tiene
+       * que construirse sobre la misma dirección que se comprobó.
+       */
+      confirmedAddress?: string
     ): Promise<PlayResult> => {
-      if (!address) throw new Error("no_wallet");
+      const account = (confirmedAddress || address) as `0x${string}` | undefined;
+      if (!account) throw new Error("no_wallet");
       if (!AVISPATE_POT_ADDRESS) throw new Error("pot_not_configured");
       if (!publicClient) throw new Error("no_client");
+
+      /**
+       * Última comprobación, pegada a cada firma.
+       *
+       * Entre validar la identidad y firmar pasan segundos y varias lecturas de
+       * la cadena: tiempo de sobra para cambiar de cuenta en la extensión o
+       * para que se bloquee sola. Si eso ocurre, firmar sería cobrarle a una
+       * dirección y anotarle la partida a otra.
+       */
+      const assertSameAccount = async () => {
+        const probe = await probeWallet(connector);
+        const verdict = confirmBeforeSigning(account, probe);
+        if (!verdict.ok) throw new WalletChangedError(verdict.decision);
+      };
 
       // Asegurar que estamos en Celo antes de firmar.
       if (chainId !== celo.id) {
@@ -238,10 +275,10 @@ export function usePayToPlay() {
         address: pot,
         abi: AVISPATE_POT_ABI,
         functionName: "hasFreePlayToday",
-        args: [deck, address],
+        args: [deck, account],
       })) as boolean;
 
-      const feeCurrency = await resolveFeeCurrency(publicClient, address);
+      const feeCurrency = await resolveFeeCurrency(publicClient, account);
 
       // Saldo antes de la firma: si algo falta, se dice CUÁL falta en vez de
       // mandar al jugador a una transacción que va a revertir. Si el saldo no
@@ -251,7 +288,7 @@ export function usePayToPlay() {
           address: usdt,
           abi: ERC20_ABI,
           functionName: "balanceOf",
-          args: [address],
+          args: [account],
         })) as bigint;
         const missing = missingFundsFor({
           gasInUsdt: Boolean(feeCurrency.feeCurrency),
@@ -269,13 +306,15 @@ export function usePayToPlay() {
           address: usdt,
           abi: ERC20_ABI,
           functionName: "allowance",
-          args: [address, pot],
+          args: [account, pot],
         })) as bigint;
 
         if (allowance < FEE_AMOUNT) {
           // Monto acotado (varias jugadas). "Approve una vez, luego jugar":
           // el patrón que MiniPay exige; se repone cuando baja de una entrada.
+          await assertSameAccount();
           const approveHash = await writeContractAsync({
+            account,
             address: usdt,
             abi: ERC20_ABI,
             functionName: "approve",
@@ -290,7 +329,12 @@ export function usePayToPlay() {
         }
       }
 
+      // La comprobación que de verdad importa: la de la firma que cobra.
+      await assertSameAccount();
       const playHash = await writeContractAsync({
+        // `account` explícito: wagmi firma con ESTA dirección o falla. Sin él
+        // usaría la que tenga guardada, que es justo de la que desconfiamos.
+        account,
         address: pot,
         abi: AVISPATE_POT_ABI,
         functionName: "play",
@@ -320,11 +364,11 @@ export function usePayToPlay() {
       // `resolveFeeCurrency`: es de toda jugada, no de una. No se espera ni se
       // comprueba —quien ya tiene sesión no gasta nada y un fallo no puede
       // tocar el resultado de la partida.
-      void ensureWalletSession(address, playHash);
+      void ensureWalletSession(account, playHash);
 
-      return { txHash: playHash, player: address.toLowerCase(), wasFree };
+      return { txHash: playHash, player: account.toLowerCase(), wasFree };
     },
-    [address, chainId, publicClient, writeContractAsync, switchChainAsync]
+    [address, connector, chainId, publicClient, writeContractAsync, switchChainAsync]
   );
 
   return {

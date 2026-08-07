@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   computeAccuracy,
   generateFirstCard,
@@ -15,14 +16,29 @@ import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
 import {
   InsufficientFundsError,
+  WalletChangedError,
   usePayToPlay,
   type PlayStage,
 } from "@/lib/pay";
 import { fmtUsdt, refreshLeaderboard, useFreePlays } from "@/lib/round";
 import { FEE_AMOUNT } from "@/lib/contracts";
-import { BLOCKING_DELAYS, deliver, enqueue } from "@/lib/outbox";
+import {
+  BLOCKING_DELAYS,
+  deliver,
+  enqueue,
+  pending,
+  pendingPlay,
+  repairPendingPlayer,
+} from "@/lib/outbox";
+import {
+  decidePlayStart,
+  type PayDecision,
+  type PendingPlay,
+} from "@/lib/pay-guard";
+import { probeWallet } from "@/lib/wallet-access";
+import { useIsMiniPay } from "@/lib/minipay";
 import { useActiveWallet } from "@/lib/wallet";
-import { aliasBlocker } from "@/lib/alias-claim";
+import { checkAliasBeforePaying } from "@/lib/alias-claim";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -114,6 +130,25 @@ function describeRegisterError(result: "rejected" | "retry"): MessageKey {
   return result === "retry" ? "pay.register.retry" : "pay.register.rejected";
 }
 
+/**
+ * Por qué el cobro está parado. Ninguno de estos casos se arregla reintentando
+ * solo: los cuatro primeros necesitan que la persona haga algo, y el último es
+ * una jugada YA PAGADA esperando a que el servidor la acepte.
+ */
+export type PayBlock =
+  /** La wallet no confirmó su cuenta (bloqueada, sin permiso, sin responder). */
+  | { kind: "reconnect" }
+  /** La wallet expone otra cuenta distinta a la que la app tenía validada. */
+  | { kind: "account_changed"; actual: string }
+  /** Hace falta un nombre para poder guardar el puntaje. */
+  | { kind: "needs_name" }
+  /** El nombre ya está vinculado a otra dirección (casi siempre, suya). */
+  | { kind: "name_taken"; owner: string | null }
+  /** Jugada pagada sin registrar: se termina esa, JAMÁS se cobra otra. */
+  | { kind: "resume_pending"; pending: PendingPlay }
+  /** La cadena dice que pagó otra dirección. Ni se pierde ni se atribuye sola. */
+  | { kind: "payer_mismatch"; txHash: string; payer?: string };
+
 export default function GameShell() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [playerName, setPlayerName] = useState("");
@@ -135,10 +170,19 @@ export default function GameShell() {
   const [payStage, setPayStage] = useState<PlayStage | null>(null);
   // Modal contextual de acceso (correo/wallet/alias) del lobby.
   const [accessOpen, setAccessOpen] = useState(false);
+  /**
+   * Por qué está parado el cobro. Es distinto de `payError`: aquí no hay un
+   * fallo que reintentar, hay una situación que la persona tiene que resolver
+   * —reconectar, cambiar de wallet, elegir otro nombre o terminar de registrar
+   * una jugada que YA pagó—. Mientras esto no sea `null`, no se cobra nada.
+   */
+  const [payBlock, setPayBlock] = useState<PayBlock | null>(null);
 
   const t = useT();
   const profile = useProfile();
   const activeWallet = useActiveWallet();
+  const inMiniPay = useIsMiniPay();
+  const { openConnectModal } = useConnectModal();
   const queryClient = useQueryClient();
   const { playForDeck, canPlay } = usePayToPlay();
 
@@ -160,7 +204,6 @@ export default function GameShell() {
   // reabrirse desde el botón del inicio. Solo vive en la fase de setup.
   const howTo = useHowToPlay();
 
-  /** Alias efectivo del jugador: Privy o el local de la wallet. */
   /**
    * Alias efectivo del jugador. Manda el de la WALLET, no el de la sesión: el
    * puntaje se guarda contra la wallet que firma, y es su nombre el que sale en
@@ -188,6 +231,14 @@ export default function GameShell() {
 
   useEffect(() => {
     setMutedState(isMuted());
+    /**
+     * Si quedó una jugada pagada sin registrar (se cerró el navegador, se cayó
+     * la red), se anuncia al abrir en vez de esperar a que la persona pulse
+     * jugar. Es dinero suyo esperando, y además así el botón nace con el
+     * candado puesto.
+     */
+    const left = pendingPlay();
+    if (left) setPayBlock({ kind: "resume_pending", pending: left });
   }, []);
 
   function toggleMuted() {
@@ -244,22 +295,53 @@ export default function GameShell() {
       return;
     }
 
-    // El nombre se resuelve ANTES de cobrar. Si el puntaje no va a poder
-    // guardarse, el jugador se entera aquí —con la plata todavía en su
-    // wallet— y no al terminar la partida.
+    /**
+     * El orden de aquí abajo es la regla entera, y no se puede reordenar:
+     *
+     *   wallet accesible → dirección confirmada → identidad validada →
+     *   saldo → transacción
+     *
+     * Cada paso se apoya en el anterior. Validar el nombre contra una dirección
+     * que no se ha confirmado, o cobrar con una dirección que no se validó, es
+     * exactamente cómo se pierde el dinero de alguien.
+     */
     setPayStage("checking");
-    const aliasProblem = await aliasBlocker(alias, activeWallet.address);
-    if (aliasProblem) {
-      setPayError(aliasProblem);
+
+    // 1 y 2. Wallet accesible y dirección confirmada. Falla CERRADO: si la
+    //        wallet no contesta, no se cobra. Y si ya hay una jugada pagada sin
+    //        registrar, esto devuelve `resume_pending` y NUNCA se cobra otra.
+    const decision = decidePlayStart({
+      expected: activeWallet.address,
+      probe: await probeWallet(activeWallet.connector),
+      pending: pendingPlay(),
+    });
+    if (decision.kind !== "proceed") {
       setPayStage(null);
-      setAccessOpen(true);
+      applyBlockedDecision(decision);
+      return;
+    }
+    const confirmed = decision.address;
+
+    // 3. Identidad, contra la dirección CONFIRMADA. Si el puntaje no va a poder
+    //    guardarse, el jugador se entera aquí —con la plata todavía suya— y no
+    //    al terminar la partida.
+    const verdict = await checkAliasBeforePaying(alias, confirmed);
+    if (verdict.kind !== "ok") {
+      setPayStage(null);
+      setPayBlock(
+        verdict.kind === "needs_name"
+          ? { kind: "needs_name" }
+          : { kind: "name_taken", owner: verdict.owner }
+      );
       return;
     }
 
     setDeckSize(deck);
     setPayStage("confirm");
     try {
-      const { txHash, player } = await playForDeck(deck, setPayStage);
+      // 4 y 5. Saldo y firma, siempre con la dirección confirmada. `playForDeck`
+      //        vuelve a comprobarla pegado a cada firma.
+      const { txHash, player } = await playForDeck(deck, setPayStage, confirmed);
       txHashRef.current = txHash;
       playerRef.current = player;
 
@@ -278,9 +360,19 @@ export default function GameShell() {
       // `deliver`.
       setPayStage("registering");
       const sent = await deliver(receipt, BLOCKING_DELAYS);
-      if (sent !== "ok") {
-        setPayError(describeRegisterError(sent));
+      if (sent.result !== "ok") {
         setPayStage(null);
+        /**
+         * A partir de aquí el dinero YA salió. Nada de lo que pase puede
+         * terminar en otro cobro: el envío sigue en la bandeja, así que el
+         * botón de jugar pasa a ser "terminar de registrar" (lo decide
+         * `pendingPlay()` en el siguiente intento).
+         */
+        if (sent.error === "payer_mismatch") {
+          setPayBlock({ kind: "payer_mismatch", txHash, payer: sent.payer });
+        } else {
+          setPayError(describeRegisterError(sent.result));
+        }
         return;
       }
 
@@ -295,9 +387,97 @@ export default function GameShell() {
         startGame(alias, deck);
       }, HANDOFF_MS);
     } catch (err) {
-      setPayError(describePayError(err));
       setPayStage(null);
+      // La wallet dejó de ser la validada a mitad del cobro. No es un error de
+      // pago: es el guardián haciendo su trabajo, y se cuenta como tal.
+      if (err instanceof WalletChangedError) {
+        applyBlockedDecision(err.decision);
+        return;
+      }
+      setPayError(describePayError(err));
     }
+  }
+
+  /**
+   * Volver a conectar, reutilizando el conector de siempre — no hay un flujo
+   * paralelo. Abrir el modal es lo que le da a la extensión la ocasión de pedir
+   * la contraseña; al volver, nada se da por bueno: la persona pulsa jugar y
+   * TODO se revalida desde el primer paso.
+   *
+   * Dentro de MiniPay no se ofrece conectar (su reglamento lo prohíbe y la
+   * wallet ya está puesta): ahí "reintentar" es limpiar el bloqueo y volver a
+   * preguntarle a la wallet.
+   */
+  function reconnectWallet() {
+    setPayBlock(null);
+    setPayError(null);
+    if (!inMiniPay) openConnectModal?.();
+  }
+
+  /** Traduce la decisión del guardián a lo que hay que enseñar en pantalla. */
+  function applyBlockedDecision(decision: PayDecision) {
+    setPayError(null);
+    switch (decision.kind) {
+      case "resume_pending":
+        setPayBlock({ kind: "resume_pending", pending: decision.pending });
+        return;
+      case "reconnect":
+        setPayBlock({ kind: "reconnect" });
+        return;
+      case "account_changed":
+        setPayBlock({ kind: "account_changed", actual: decision.actual });
+        return;
+    }
+  }
+
+  /**
+   * Reconciliación del pagador, y la hace la PERSONA, no la app.
+   *
+   * Cuando la cadena dice que pagó una dirección distinta, el envío se queda
+   * pendiente y en pantalla sale cuál fue. Si acto seguido conecta esa misma
+   * wallet, eso es su confirmación de que es suya: recién ahí se corrige el
+   * envío y se reintenta. Sin ese gesto no se toca nada — corregirlo solos
+   * sería inventarle dueño a una jugada.
+   */
+  useEffect(() => {
+    if (payBlock?.kind !== "payer_mismatch") return;
+    const payer = payBlock.payer?.toLowerCase();
+    if (!payer || !activeWallet.address) return;
+    if (activeWallet.address !== payer) return;
+    repairPendingPlayer(payBlock.txHash, payer);
+    void resumePendingPlay();
+    // `resumePendingPlay` se redefine en cada render; se llama por su efecto,
+    // no se observa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [payBlock, activeWallet.address]);
+
+  /** Reintenta el registro de una jugada ya pagada. NUNCA vuelve a cobrar. */
+  async function resumePendingPlay() {
+    const items = pending().filter((it) => it.id.startsWith("play:"));
+    if (items.length === 0) {
+      setPayBlock(null);
+      return;
+    }
+    setPayStage("registering");
+    for (const item of items) {
+      const outcome = await deliver(item, BLOCKING_DELAYS);
+      if (outcome.result === "ok") continue;
+      setPayStage(null);
+      if (outcome.error === "payer_mismatch") {
+        const body = item.body as { txHash?: string };
+        setPayBlock({
+          kind: "payer_mismatch",
+          txHash: body?.txHash ?? "",
+          payer: outcome.payer,
+        });
+      } else {
+        setPayError(describeRegisterError(outcome.result));
+      }
+      return;
+    }
+    setPayStage(null);
+    setPayBlock(null);
+    refetchFreePlays();
   }
 
   function startGame(name: string, deck: number) {
@@ -356,7 +536,7 @@ export default function GameShell() {
 
     return async () => {
       const sent = await deliver(item, BLOCKING_DELAYS);
-      if (sent !== "ok") return;
+      if (sent.result !== "ok") return;
       // La marca ya está guardada: recarga el ranking de este mazo ANTES de
       // que el jugador vuelva al lobby. Invalidar no basta — el top no está
       // montado durante los resultados, así que quedaría marcado como viejo
@@ -532,6 +712,13 @@ export default function GameShell() {
       {phase === "setup" && howTo.resolved && (
         <>
           <HomeLobby
+            payBlock={payBlock}
+            onReconnect={reconnectWallet}
+            onPickAnotherName={() => {
+              setPayBlock(null);
+              setAccessOpen(true);
+            }}
+            onResumePending={resumePendingPlay}
             deckSize={deckSize}
             onDeckChange={setDeckSize}
             freeByDeck={freeByDeck}

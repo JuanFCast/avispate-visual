@@ -1,6 +1,6 @@
 "use client";
 
-import { postWithRetry, type SendResult } from "./submit";
+import { postWithRetry, type SendOutcome } from "./submit";
 
 /**
  * Bandeja de salida en el dispositivo.
@@ -98,16 +98,72 @@ export function pending(): OutboxItem[] {
 }
 
 /**
+ * La jugada YA PAGADA que todavía no consta en el servidor, si la hay.
+ *
+ * Es el candado contra el segundo cobro: mientras esto devuelva algo, la
+ * pantalla no puede ofrecer "jugar" —volvería a llamar al contrato y cobraría
+ * otra vez, y encima como paga, porque la gratis del día ya se consumió—. Solo
+ * puede ofrecer terminar de registrar la que ya se pagó.
+ *
+ * Ojo con su alcance: esto vive en el `localStorage` de ESTE navegador. Otra
+ * pestaña lo ve porque comparten almacenamiento, pero otro dispositivo no.
+ */
+export function pendingPlay(): {
+  txHash: string;
+  player: string;
+  deckSize: number;
+} | null {
+  for (const item of read()) {
+    if (!item.id.startsWith("play:")) continue;
+    const body = item.body as
+      | { txHash?: unknown; player?: unknown; deckSize?: unknown }
+      | null;
+    if (
+      typeof body?.txHash === "string" &&
+      typeof body?.player === "string" &&
+      typeof body?.deckSize === "number"
+    ) {
+      return {
+        txHash: body.txHash,
+        player: body.player,
+        deckSize: body.deckSize,
+      };
+    }
+  }
+  return null;
+}
+
+/**
  * Intenta entregar un envío. Solo lo borra de la bandeja cuando el servidor
  * responde: si queda en "retry", se queda guardado para el próximo arranque.
  */
 export async function deliver(
   item: OutboxItem,
   delays: readonly number[] = BACKGROUND_DELAYS
-): Promise<SendResult> {
-  const result = await postWithRetry(item.url, item.body, delays);
-  if (result !== "retry") drop(item.id);
-  return result;
+): Promise<SendOutcome> {
+  const outcome = await postWithRetry(item.url, item.body, delays);
+  if (outcome.result !== "retry") drop(item.id);
+  return outcome;
+}
+
+/**
+ * Corrige el pagador de una jugada pendiente y la deja lista para reenviarse.
+ *
+ * Solo se usa cuando la cadena dijo que pagó otra dirección Y la persona ya
+ * conectó esa misma wallet: es ELLA quien reconcilia su identidad, no nosotros
+ * adivinando. Sin esa confirmación el envío se queda pendiente para siempre, y
+ * está bien que así sea: mientras siga pendiente no puede haber un segundo
+ * cobro.
+ */
+export function repairPendingPlayer(txHash: string, payer: string): void {
+  const items = read();
+  const id = `play:${txHash}`;
+  const next = items.map((it) =>
+    it.id === id && it.body && typeof it.body === "object"
+      ? { ...it, body: { ...(it.body as object), player: payer } }
+      : it
+  );
+  write(next);
 }
 
 /** Evita que dos disparos a la vez (montaje + evento `online`) se pisen. */
@@ -126,8 +182,8 @@ export async function flushOutbox(
     let delivered = 0;
     // En orden de llegada: el recibo de una jugada antes que su resultado.
     for (const item of pending()) {
-      const result = await deliver(item, delays);
-      if (result === "ok") delivered++;
+      const outcome = await deliver(item, delays);
+      if (outcome.result === "ok") delivered++;
     }
     return delivered;
   } finally {

@@ -75,6 +75,19 @@ export async function POST(req: Request) {
     if (!check.ok || !check.player)
       return NextResponse.json({ error: "invalid_payment" }, { status: 400 });
 
+    /**
+     * Pagó una dirección distinta a la que dice el cliente. La partida NO se
+     * registra: atribuirla al pagador real por nuestra cuenta sería ponerle
+     * dueño a una marca que nadie ha reclamado. El recibo del pago ya quedó
+     * guardado a nombre de quien pagó en `/api/plays`, así que el dinero no se
+     * pierde; lo que falta es que la persona reconcilie su identidad.
+     */
+    if (check.payerMismatch)
+      return NextResponse.json(
+        { error: "payer_mismatch", payer: check.player },
+        { status: 409 }
+      );
+
     // Los perfiles de correo también se encuentran aquí: su wallet embebida
     // quedó guardada en el perfil al iniciar sesión.
     const profile = await ensureProfileByWallet(check.player);

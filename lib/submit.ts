@@ -37,34 +37,55 @@ const RETRYABLE_ERRORS = new Set([
   "server_error",
   "alias_required",
   "alias_taken",
+  // Pagó una dirección distinta a la que dijo el navegador. Se conserva a
+  // propósito: mientras el envío siga en la bandeja, la pantalla no ofrece
+  // jugar y por tanto NO puede haber un segundo cobro. Se resuelve cuando la
+  // persona conecta la wallet que pagó de verdad.
+  "payer_mismatch",
 ]);
+
+/** Resultado del envío, con el motivo del servidor cuando lo dio. */
+export interface SendOutcome {
+  result: SendResult;
+  /** Código de error del servidor (`payer_mismatch`, `alias_taken`…). */
+  error?: string;
+  /**
+   * Con `payer_mismatch`, la dirección que pagó DE VERDAD según la cadena. Se
+   * enseña para que la persona la reconozca; la reconciliación la hace ella
+   * conectando esa wallet, nunca la app por su cuenta.
+   */
+  payer?: string;
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /** Un intento suelto. */
-async function postOnce(url: string, body: unknown): Promise<SendResult> {
+async function postOnce(url: string, body: unknown): Promise<SendOutcome> {
   try {
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (res.ok) return "ok";
+    if (res.ok) return { result: "ok" };
 
     // 5xx y 429: el servidor está mal o saturado, no la petición.
-    if (res.status >= 500 || res.status === 429) return "retry";
+    if (res.status >= 500 || res.status === 429) return { result: "retry" };
 
     const data = (await res.json().catch(() => null)) as {
       error?: string;
+      payer?: string;
     } | null;
-    if (data?.error && RETRYABLE_ERRORS.has(data.error)) return "retry";
+    if (data?.error && RETRYABLE_ERRORS.has(data.error)) {
+      return { result: "retry", error: data.error, payer: data.payer };
+    }
 
-    return "rejected";
+    return { result: "rejected", error: data?.error, payer: data?.payer };
   } catch {
     // Sin red, petición abortada, pestaña suspendida a mitad del envío.
-    return "retry";
+    return { result: "retry" };
   }
 }
 
@@ -77,11 +98,12 @@ export async function postWithRetry(
   url: string,
   body: unknown,
   delays: readonly number[]
-): Promise<SendResult> {
+): Promise<SendOutcome> {
+  let last: SendOutcome = { result: "retry" };
   for (let attempt = 0; attempt <= delays.length; attempt++) {
     if (attempt > 0) await sleep(delays[attempt - 1]);
-    const result = await postOnce(url, body);
-    if (result !== "retry") return result;
+    last = await postOnce(url, body);
+    if (last.result !== "retry") return last;
   }
-  return "retry";
+  return last;
 }
