@@ -54,7 +54,21 @@ export async function ensureProfile(identity: AppIdentity): Promise<ProfileRow> 
 
   if (byPrivy) {
     const row = byPrivy as ProfileRow;
-    if (!wallet || row.wallet_address === wallet) return row;
+    // La dirección solo se ESCRIBE si el perfil no tenía ninguna. Cambiar una
+    // que ya existía es lo que rompió a PipeRabby el 2026-08-07: entró con la
+    // extensión de Rabby bloqueada, Privy no pudo leer su dirección real y le
+    // creó una wallet embebida nueva, y este update la puso en su perfil. Desde
+    // ese momento sus jugadas —que se identifican por la wallet que firma— ya
+    // no encontraban su perfil y estrenaban uno vacío sin alias, así que se
+    // rechazaban después de haberle cobrado la entrada.
+    //
+    // El daño no se queda en el reto: el premio lo cobra `wallet_address` (ver
+    // `cron/roll-day`), así que un login con la wallet dormida podía mandarle el
+    // pozo a una dirección recién creada en vez de a la de siempre.
+    //
+    // Cambiar de wallet tiene que ser un acto deliberado del jugador, nunca el
+    // efecto secundario de una extensión bloqueada.
+    if (!wallet || row.wallet_address !== null) return row;
     const { data, error } = await db
       .from("profiles")
       .update({ wallet_address: wallet })
