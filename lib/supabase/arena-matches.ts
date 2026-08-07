@@ -35,6 +35,8 @@ import {
 import { initialOf, shortWallet } from "../arena-rooms";
 import { getRoomByCode, roomIsLive } from "./arena-rooms";
 import { getSupabaseAdmin } from "./server";
+import { settleFinishedMatch } from "./arena-settle-hook";
+import { settlementOf } from "./arena-escrow-db";
 
 interface MatchRow {
   id: string;
@@ -260,6 +262,40 @@ async function closeIfAbandoned(
   return (data as MatchRow | null) ?? (await getMatchByCode(match.code)) ?? match;
 }
 
+/**
+ * Dispara la liquidación de una partida que acaba de cerrarse.
+ *
+ * Vive aquí y no en la ruta porque las partidas se cierran desde dos sitios —el
+ * mazo vacío y el abandono— y sería cuestión de tiempo que alguien añadiera un
+ * tercero y se olvidara de pagar. Nunca lanza: un fallo moviendo dinero no
+ * puede tumbar la lectura de la partida, y para eso está el reintento.
+ */
+async function settleClosedMatch(match: MatchRow): Promise<void> {
+  try {
+    const db = getSupabaseAdmin();
+    const { data } = await db
+      .from("arena_rooms")
+      .select("id, table_id, entry_units, max_players")
+      .eq("id", match.room_id)
+      .maybeSingle();
+    if (!data?.table_id) return;
+    // Ya liquidada: la mayoría de las llamadas mueren aquí, que es lo que hace
+    // barato mirarlo en cada lectura de una partida terminada.
+    if (await settlementOf(data.table_id as string)) return;
+
+    await settleFinishedMatch({
+      roomId: data.id as string,
+      tableId: data.table_id as string,
+      entryUnits: BigInt(data.entry_units as string),
+      maxPlayers: Number(data.max_players),
+      winnerProfileId: match.winner_profile_id,
+      reason: match.end_reason,
+    });
+  } catch {
+    // El cron la retoma.
+  }
+}
+
 async function touchMatchPlayer(playerRowId: string): Promise<void> {
   const db = getSupabaseAdmin();
   const { error } = await db
@@ -300,6 +336,17 @@ export async function readMatch(params: {
     match = closed;
     players = await listMatchPlayers(match.id);
   }
+
+  /**
+   * Partida terminada: si la mesa cobraba, hay dinero que mover.
+   *
+   * Se mira aquí y no en cada sitio que cierra una partida —el mazo vacío lo
+   * hace el RPC, el abandono lo hace `closeIfAbandoned`— porque sería cuestión
+   * de tiempo que apareciera un tercer camino y se olvidara de pagar. Sin
+   * esperarlo: la pantalla de resultados no tiene por qué mirar a la cadena, y
+   * lo que falle lo retoma el cron.
+   */
+  if (match.finished_at) void settleClosedMatch(match);
 
   const cards = buildMatchDeck(match.seed);
   const views = players.map((p) => toPlayerView(p, params.viewerProfileId ?? null, now));

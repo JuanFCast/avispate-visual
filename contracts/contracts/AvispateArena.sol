@@ -364,18 +364,31 @@ contract AvispateArena is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Retira tu entrada de una mesa anulada. Íntegra: una partida que
-     *         no se pudo jugar no deja comisión.
+     * @notice Devuelve la entrada de `player` en una mesa anulada. Íntegra: una
+     *         partida que no se pudo jugar no deja comisión.
+     *
+     *         La puede llamar CUALQUIERA, y el dinero va siempre al jugador,
+     *         nunca a quien llama. Las dos cosas a propósito:
+     *
+     *         - Que la pague quien quiera permite que la devolución la empuje
+     *           el operator. Si la mesa se anuló porque algo NUESTRO falló,
+     *           pedirle además al jugador que gaste en una transacción para
+     *           recuperar lo suyo es cobrarle nuestro error.
+     *         - Que el destino sea siempre `player` hace que empujarla no tenga
+     *           premio ni riesgo: un tercero solo puede hacerle un favor.
+     *
+     *         Y sigue sin depender de nosotros: si Avíspate desaparece, el
+     *         propio jugador la llama y cobra igual.
      */
-    function claimRefund(bytes32 tableId) external nonReentrant {
+    function refund(bytes32 tableId, address player) external nonReentrant {
         Table storage t = tables[tableId];
         if (t.status != Status.Voided) revert NotVoided();
-        if (!paid[tableId][msg.sender] || refunded[tableId][msg.sender]) {
+        if (!paid[tableId][player] || refunded[tableId][player]) {
             revert NothingToRefund();
         }
-        refunded[tableId][msg.sender] = true;
-        token.safeTransfer(msg.sender, t.entry);
-        emit Refunded(tableId, msg.sender, t.entry);
+        refunded[tableId][player] = true;
+        token.safeTransfer(player, t.entry);
+        emit Refunded(tableId, player, t.entry);
     }
 
     // ─────────────────────────── Lecturas ────────────────────────────

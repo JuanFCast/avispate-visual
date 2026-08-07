@@ -35,6 +35,15 @@ export const RIVAL_STALE_MS = 8_000;
  */
 export const ABANDON_MS = 45_000;
 
+/**
+ * El mismo margen, pero en una mesa con ENTRADA. Es más largo a propósito.
+ *
+ * Sin dinero, que un túnel te cueste la partida es un fastidio; con dinero te
+ * cuesta la entrada, y noventa segundos siguen sin dejar al rival esperando de
+ * más. El número lo eligió Juan el 2026-08-07 sabiendo que el de gratis son 45.
+ */
+export const PAID_ABANDON_MS = 90_000;
+
 export type MatchPhase = "countdown" | "playing" | "finished";
 
 /** Qué hizo el servidor con tu toque. */

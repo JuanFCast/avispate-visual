@@ -250,7 +250,7 @@ describe("AvispateArena", () => {
       const { arena, operator, alice, bob } = await llena();
       await arena.connect(operator).settle(TABLE, bob.address, ABANDONED);
       await expect(
-        arena.connect(alice).claimRefund(TABLE)
+        arena.connect(alice).refund(TABLE, alice.address)
       ).to.be.revertedWithCustomError(arena, "NotVoided");
     });
 
@@ -274,10 +274,10 @@ describe("AvispateArena", () => {
         .to.emit(arena, "Voided")
         .withArgs(TABLE, operator.address, false);
 
-      await expect(arena.connect(alice).claimRefund(TABLE))
+      await expect(arena.connect(alice).refund(TABLE, alice.address))
         .to.emit(arena, "Refunded")
         .withArgs(TABLE, alice.address, ENTRY);
-      await arena.connect(bob).claimRefund(TABLE);
+      await arena.connect(bob).refund(TABLE, bob.address);
 
       expect(await token.balanceOf(alice.address)).to.equal(antes + ENTRY);
       // Sin comisión: una partida que no se jugó no deja nada a la casa.
@@ -288,9 +288,9 @@ describe("AvispateArena", () => {
     it("nadie cobra su devolución dos veces", async () => {
       const { arena, operator, alice } = await llena();
       await arena.connect(operator).voidTable(TABLE);
-      await arena.connect(alice).claimRefund(TABLE);
+      await arena.connect(alice).refund(TABLE, alice.address);
       await expect(
-        arena.connect(alice).claimRefund(TABLE)
+        arena.connect(alice).refund(TABLE, alice.address)
       ).to.be.revertedWithCustomError(arena, "NothingToRefund");
     });
 
@@ -298,8 +298,26 @@ describe("AvispateArena", () => {
       const { arena, operator, carol } = await llena();
       await arena.connect(operator).voidTable(TABLE);
       await expect(
-        arena.connect(carol).claimRefund(TABLE)
+        arena.connect(carol).refund(TABLE, carol.address)
       ).to.be.revertedWithCustomError(arena, "NothingToRefund");
+    });
+
+    it("la devolución la puede EMPUJAR un tercero, y el dinero va al jugador", async () => {
+      const { arena, token, operator, alice, extraño } = await llena();
+      await arena.connect(operator).voidTable(TABLE);
+
+      const antesAlice = await token.balanceOf(alice.address);
+      const antesExtraño = await token.balanceOf(extraño.address);
+
+      // Lo paga el operator (o cualquiera): si la mesa se anuló por un fallo
+      // nuestro, el jugador no tiene por qué gastar para recuperar lo suyo.
+      await expect(arena.connect(extraño).refund(TABLE, alice.address))
+        .to.emit(arena, "Refunded")
+        .withArgs(TABLE, alice.address, ENTRY);
+
+      expect(await token.balanceOf(alice.address)).to.equal(antesAlice + ENTRY);
+      // Quien empuja no se lleva nada: no hay premio por hacerlo ni riesgo.
+      expect(await token.balanceOf(extraño.address)).to.equal(antesExtraño);
     });
 
     it("una mesa anulada ya no se puede pagar a nadie", async () => {
@@ -322,7 +340,7 @@ describe("AvispateArena", () => {
         .withArgs(TABLE, extraño.address, true);
 
       const antes = await token.balanceOf(alice.address);
-      await arena.connect(alice).claimRefund(TABLE);
+      await arena.connect(alice).refund(TABLE, alice.address);
       expect(await token.balanceOf(alice.address)).to.equal(antes + ENTRY);
     });
 
@@ -346,7 +364,7 @@ describe("AvispateArena", () => {
       await time.increase(120);
       await arena.connect(alice).voidByTimeout(TABLE);
       const antes = await token.balanceOf(alice.address);
-      await arena.connect(alice).claimRefund(TABLE);
+      await arena.connect(alice).refund(TABLE, alice.address);
       expect(await token.balanceOf(alice.address)).to.equal(antes + ENTRY);
     });
 
