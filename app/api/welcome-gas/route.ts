@@ -27,8 +27,28 @@ export const dynamic = "force-dynamic";
  *      si es dirección nueva y hay captcha activo, 401 "captcha-required".
  *   2) el cliente resuelve el captcha y repite con turnstileToken.
  */
-const AIRDROP_AMOUNT_WEI = parseEther("0.1"); // ~$0.03, gas para cientos de txs
-const BALANCE_THRESHOLD_WEI = parseEther("0.005"); // ya tiene gas: no repetir
+/**
+ * Cuánto se regala. Medido con `scripts/gas-cost.mjs` sobre transacciones
+ * reales: a los ~200 gwei que cuesta hoy el gas en Celo, una jugada paga vale
+ * ~0.017 CELO y una gratis ~0.0065, así que 0.1 CELO da para unas 6 jugadas
+ * pagas o unas 15 gratis. (El comentario viejo decía "cientos de txs": era
+ * cierto cuando el gas costaba unos pocos gwei, y dejó de serlo sin que nadie
+ * lo notara.)
+ *
+ * No hace falta más: quien se queda sin CELO sigue jugando pagando la tarifa
+ * de red en USDT (CIP-64), que es como juega MiniPay desde el primer día. El
+ * regalo solo tiene que alcanzar para las primeras partidas de quien llega sin
+ * un peso.
+ */
+const AIRDROP_AMOUNT_WEI = parseEther("0.1");
+/**
+ * Saldo a partir del cual se considera que la wallet ya puede firmar sola.
+ *
+ * Tiene que cubrir varias transacciones, no una: por debajo de eso el jugador
+ * se queda a mitad de camino y encima no vuelve a recibir el regalo, porque
+ * este endpoint solo entrega una vez por dirección.
+ */
+const BALANCE_THRESHOLD_WEI = parseEther("0.05");
 
 const ADDR_RE = /^0x[0-9a-f]{40}$/;
 

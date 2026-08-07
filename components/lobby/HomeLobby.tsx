@@ -1,7 +1,11 @@
 "use client";
 
+import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
+import { useEmbeddedWalletStatus } from "@/lib/embedded-wallet";
+import { FEE_AMOUNT } from "@/lib/contracts";
+import { fmtUsdt } from "@/lib/round";
 import type { PlayStage } from "@/lib/pay";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -51,6 +55,11 @@ export default function HomeLobby({
   const t = useT();
   const profile = useProfile();
   const wallet = useActiveWallet();
+  const embeddedWallet = useEmbeddedWalletStatus();
+  const { openConnectModal } = useConnectModal();
+  // El precio sale del contrato configurado, no de una frase escrita a mano:
+  // el día que la entrada cambie, el botón cambia con ella.
+  const fee = fmtUsdt(FEE_AMOUNT);
 
   const checking: CtaState = {
     support: t("cta.checking.support"),
@@ -58,6 +67,48 @@ export default function HomeLobby({
     disabled: true,
     action: "start",
   };
+
+  /**
+   * Entró con su correo pero todavía no hay wallet con la que firmar.
+   *
+   * Antes esto era el mismo "Preparando…" de siempre, y cuando la creación se
+   * atascaba el jugador se quedaba mirando un botón muerto sin saber si la
+   * culpa era suya, del internet o de la app: la única salida era recargar. Se
+   * cuenta lo que está pasando y, si tarda de más, se le da el botón.
+   */
+  function walletCta(): CtaState {
+    // Sin sesión de Privy no hay wallet que crear: es MiniPay (o una externa)
+    // terminando de conectarse, y ahí el mensaje de siempre es el correcto.
+    if (embeddedWallet.status === "idle") return checking;
+    // Entró firmando con su propia billetera y ahora no está conectada. Esto
+    // no se arregla esperando —la firma la da él—, así que el botón abre el
+    // conector en vez de dejarlo mirando un "Preparando…" eterno.
+    if (embeddedWallet.status === "external") {
+      return {
+        support: t("cta.wallet.external.support"),
+        label: t("cta.wallet.external.label"),
+        disabled: !openConnectModal,
+        action: "connect",
+      };
+    }
+    if (embeddedWallet.status === "stuck") {
+      return {
+        support: t("cta.wallet.stuck.support"),
+        label: t("cta.wallet.stuck.label"),
+        disabled: false,
+        action: "retry",
+      };
+    }
+    return {
+      support:
+        embeddedWallet.status === "connecting"
+          ? t("cta.wallet.connecting.support")
+          : t("cta.wallet.creating.support"),
+      label: t("cta.wallet.creating.label"),
+      disabled: true,
+      action: "start",
+    };
+  }
 
   function playCta(): CtaState {
     // La jugada gratis del día la decide el CONTRATO por wallet y mazo:
@@ -72,8 +123,8 @@ export default function HomeLobby({
       };
     }
     return {
-      support: t("cta.paid.support"),
-      label: t("cta.paid.label"),
+      support: t("cta.paid.support", { fee }),
+      label: t("cta.paid.label", { fee }),
       disabled: false,
       action: "start",
     };
@@ -95,7 +146,7 @@ export default function HomeLobby({
       }
       // La embebida de Privy se conecta sola a wagmi; un instante después
       // de entrar puede no estar lista todavía.
-      if (!wallet.isConnected) return checking;
+      if (!wallet.isConnected) return walletCta();
       return playCta();
     }
     if (wallet.isConnected) {
@@ -127,7 +178,7 @@ export default function HomeLobby({
       ...base,
       support: freeByDeck[deckSize]
         ? t("cta.paying.free")
-        : t("cta.paying.paid"),
+        : t("cta.paying.paid", { fee }),
     };
   }
 
@@ -143,9 +194,12 @@ export default function HomeLobby({
         cta={cta}
         payStage={payStage}
         payError={payError}
-        onPress={() =>
-          cta.action === "access" ? onRequestAccess() : onStart(deckSize)
-        }
+        onPress={() => {
+          if (cta.action === "access") return onRequestAccess();
+          if (cta.action === "connect") return openConnectModal?.();
+          if (cta.action === "retry") return embeddedWallet.retry();
+          onStart(deckSize);
+        }}
         onShowHowTo={onShowHowTo}
       >
         <LeaderboardPreview deck={deckSize} />

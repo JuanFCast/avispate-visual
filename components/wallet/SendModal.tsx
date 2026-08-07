@@ -5,7 +5,7 @@ import { formatUnits, isAddress, parseUnits } from "viem";
 import { celo } from "viem/chains";
 import { usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
 import { ERC20_ABI } from "@/lib/contracts";
-import { resolveFeeCurrency } from "@/lib/pay";
+import { GAS_MARGIN_USDT, resolveFeeCurrency } from "@/lib/pay";
 import { formatBalance, type TokenInfo } from "@/lib/tokens";
 import { useI18n } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -21,13 +21,6 @@ interface Props {
 }
 
 type Phase = "form" | "sending" | "done";
-
-/**
- * Margen que deja el botón "Máximo" cuando el gas se paga en USDT (CIP-64).
- * Sin él, mandar el saldo completo revierte: la red necesita cobrar la tarifa
- * del MISMO token que se está enviando y ya no queda con qué.
- */
-const GAS_MARGIN_USDT = 20_000n; // 0.02 USDT
 
 /** Clasifica un fallo de la wallet o de la red. Devuelve la clave del mensaje. */
 function describeSendError(err: unknown): MessageKey {

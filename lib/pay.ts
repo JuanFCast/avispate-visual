@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback } from "react";
-import { parseEther } from "viem";
 import { celo } from "viem/chains";
 import {
   useAccount,
@@ -22,35 +21,130 @@ import { isMiniPay } from "./minipay";
 import { ensureWalletSession } from "./wallet-session-client";
 import type { MessageKey } from "./i18n";
 
-// Umbral de CELO por debajo del cual pagamos el gas en USDT (CIP-64). Las
-// wallets embebidas de Privy y MiniPay suelen tener 0 CELO.
-const MIN_CELO_FOR_GAS = parseEther("0.01");
+/**
+ * Gas que consume una jugada, con holgura.
+ *
+ * Medido sobre transacciones reales de Celo mainnet (`scripts/gas-cost.mjs`):
+ * pagando en CELO, una `play()` paga gasta ~85.000 y una gratis ~32.000;
+ * pagando la tarifa en USDT sube a ~154.000, porque cobrar en otro token
+ * cuesta gas aparte. Se toma el caso peor.
+ */
+const PLAY_GAS_LIMIT = 150_000n;
+
+/**
+ * Cuánto de más se exige tener por encima del costo de UNA transacción antes
+ * de dar el CELO por suficiente. El precio del gas se mueve entre que se lee y
+ * que se firma; quedarse justo es quedarse corto.
+ */
+const GAS_SAFETY = 5n; // se divide entre 4 → x1.25
+
+/**
+ * Lo que RESERVA el botón "Máximo" al enviar USDT cuando la tarifa de red se
+ * paga en USDT (CIP-64). Va holgado a propósito: mandar el saldo completo
+ * revierte, porque la red cobra su tarifa del mismo token que se está enviando
+ * y ya no queda con qué.
+ */
+export const GAS_MARGIN_USDT = 20_000n; // 0.02 USDT
+
+/**
+ * Lo MÍNIMO que se exige tener en USDT para dar por cubierta la tarifa de red.
+ *
+ * Medido sobre jugadas reales pagadas por CIP-64: ~0.0019 USDT cada una (el
+ * adaptador cobra unos 150.000 de gas, más que en CELO porque el propio cobro
+ * en otro token cuesta). Esto deja un margen de más del doble.
+ *
+ * Es más bajo que el margen de arriba, y a propósito: reservar de más al enviar
+ * no le cuesta nada a nadie, pero exigir de más aquí sería negarle la partida a
+ * quien sí podía pagarla.
+ */
+const MIN_USDT_FOR_FEE = 5_000n; // 0.005 USDT
 
 /** Lo mínimo que necesitamos de un cliente público para decidir el gas. */
 interface BalanceReader {
   getBalance: (args: { address: `0x${string}` }) => Promise<bigint>;
+  getGasPrice: () => Promise<bigint>;
 }
 
 /**
- * Con qué se paga el gas de una transacción firmada por el jugador.
+ * Con qué se paga la tarifa de red de una transacción firmada por el jugador.
  *
- * En MiniPay SIEMPRE en USDT (su CELO es 0 por diseño). Fuera de MiniPay,
- * solo si la wallet casi no tiene CELO. Vive aquí y no repetido en cada
- * pantalla: jugar, enviar y cualquier firma futura deben decidirlo igual, o
- * un día una de ellas se queda sin gas mientras las otras funcionan.
+ * En MiniPay SIEMPRE en USDT (su CELO es 0 por diseño). Fuera de MiniPay, se
+ * paga en CELO mientras alcance, y en USDT (CIP-64) cuando no.
+ *
+ * "Cuando no alcance" se calcula con el precio del gas del momento, y ese es
+ * el punto entero de esta función. Antes había un número fijo —0.01 CELO— que
+ * venía de cuando el gas en Celo costaba unos pocos gwei. Hoy cuesta ~200, y
+ * una jugada vale ~0.017 CELO: el umbral se quedó POR DEBAJO del precio de una
+ * transacción. Eso abría una franja (entre 0.01 y 0.017) donde la app decidía
+ * "tiene CELO de sobra", firmaba en CELO y la red la rechazaba por fondos
+ * insuficientes — y como el saldo baja jugando, TODOS los jugadores de correo
+ * caían en esa franja al gastar el regalo de bienvenida. Ahí nació el
+ * "tenía USDT y me decía que no tenía".
+ *
+ * Vive aquí y no repetido en cada pantalla: jugar, enviar y cualquier firma
+ * futura deben decidirlo igual, o un día una de ellas se queda sin con qué
+ * pagar mientras las otras funcionan.
  */
 export async function resolveFeeCurrency(
   publicClient: BalanceReader,
   address: `0x${string}`
 ): Promise<{ feeCurrency?: `0x${string}` }> {
-  let payGasInUsdt = isMiniPay();
-  if (!payGasInUsdt) {
-    const celoBalance = await publicClient.getBalance({ address });
-    payGasInUsdt = celoBalance < MIN_CELO_FOR_GAS;
+  let payFeeInUsdt = isMiniPay();
+  if (!payFeeInUsdt) {
+    const [celoBalance, gasPrice] = await Promise.all([
+      publicClient.getBalance({ address }),
+      publicClient.getGasPrice(),
+    ]);
+    const needed = (PLAY_GAS_LIMIT * gasPrice * GAS_SAFETY) / 4n;
+    payFeeInUsdt = celoBalance < needed;
   }
-  return payGasInUsdt
+  return payFeeInUsdt
     ? { feeCurrency: CIP64_FEE_ADAPTER as `0x${string}` }
     : {};
+}
+
+/**
+ * Qué le falta a la wallet para poder jugar: la ENTRADA (USDT) o la TARIFA DE
+ * RED (el gas). Son dos cosas distintas y confundirlas manda al jugador a
+ * recargar lo que no era.
+ *
+ * Pasó de verdad: alguien con USDT de sobra veía "saldo insuficiente de USDT"
+ * cuando lo que no tenía era CELO. El mensaje era el mismo para todo fallo que
+ * dijera "insufficient", así que acusaba siempre al mismo token.
+ */
+export type MissingFunds = "entry" | "gas";
+
+/** Error de saldo, con la carencia identificada para poder contarla bien. */
+export class InsufficientFundsError extends Error {
+  constructor(readonly missing: MissingFunds) {
+    super(`insufficient_${missing}`);
+    this.name = "InsufficientFundsError";
+  }
+}
+
+/**
+ * Qué le falta a la wallet para poder jugar, sabiendo su saldo de USDT y con
+ * qué se va a pagar el gas. `null` = puede jugar.
+ *
+ * Comprobarlo ANTES de firmar no es solo cortesía: cuando el fallo llega de la
+ * cadena, lo único que queda es un texto de error del que hay que adivinar qué
+ * faltaba, y adivinar fue exactamente lo que salió mal.
+ */
+export function missingFundsFor(params: {
+  /** El gas se cobra en USDT (CIP-64) porque la wallet no tiene CELO. */
+  gasInUsdt: boolean;
+  usdtBalance: bigint;
+  /** La jugada cobra entrada (no es la gratis del día). */
+  needsEntry: boolean;
+}): MissingFunds | null {
+  // Con CELO suficiente la tarifa está cubierta y solo queda mirar la entrada.
+  const feeReserve = params.gasInUsdt ? MIN_USDT_FOR_FEE : 0n;
+  // La tarifa en USDT sale del MISMO saldo que la entrada, así que se suman.
+  if (params.gasInUsdt && params.usdtBalance < feeReserve) return "gas";
+  if (params.needsEntry && params.usdtBalance < FEE_AMOUNT + feeReserve) {
+    return "entry";
+  }
+  return null;
 }
 
 /**
@@ -145,6 +239,26 @@ export function usePayToPlay() {
       })) as boolean;
 
       const feeCurrency = await resolveFeeCurrency(publicClient, address);
+
+      // Saldo antes de la firma: si algo falta, se dice CUÁL falta en vez de
+      // mandar al jugador a una transacción que va a revertir. Si el saldo no
+      // se puede leer no se bloquea a nadie — que decida la cadena.
+      try {
+        const usdtBalance = (await publicClient.readContract({
+          address: usdt,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [address],
+        })) as bigint;
+        const missing = missingFundsFor({
+          gasInUsdt: Boolean(feeCurrency.feeCurrency),
+          usdtBalance,
+          needsEntry: !wasFree,
+        });
+        if (missing) throw new InsufficientFundsError(missing);
+      } catch (err) {
+        if (err instanceof InsufficientFundsError) throw err;
+      }
 
       // Allowance solo para jugadas pagas: la gratis no mueve USDT.
       if (!wasFree) {

@@ -75,9 +75,18 @@ export const en = {
 
   /* ------------------------- Errores del flujo de pago ------------------- */
   "pay.error.rejected": "You cancelled the signature for this game.",
-  // Sin "gas": MiniPay prohíbe la palabra en texto de cara al jugador, y ya no
-  // hace falta decirla — la tarifa de red se cobra en USDT (CIP-64).
-  "pay.error.insufficient": "Not enough USDT for this game.",
+  // Sin "gas": MiniPay prohíbe la palabra en texto de cara al jugador. Se dice
+  // "network fee" / "tarifa de red", que además se entiende mejor.
+  //
+  // La ENTRADA y la TARIFA DE RED se avisan por separado, y no por gusto: a un
+  // jugador con USDT de sobra le decíamos "no tienes USDT" cuando lo que le
+  // faltaba era CELO. Mandarlo a recargar el token equivocado es peor que no
+  // decirle nada.
+  "pay.error.insufficient": "Not enough USDT for the entry ({fee} USDT).",
+  "pay.error.fee_usdt":
+    "You don't have enough USDT left to cover the network fee. Top up a little and try again.",
+  "pay.error.fee_celo":
+    "The network charges its fee in CELO and your wallet has none. Top up a little CELO and try again.",
   "pay.error.not_configured":
     "The game isn't available yet (contract not configured).",
   "pay.error.no_wallet": "Connect a wallet or sign in with your email.",
@@ -106,6 +115,7 @@ export const en = {
   "lobby.prize.label": "Today's prize",
   "lobby.prize.preparing": "Prize on the way",
   "lobby.addcash": "Top up USDT",
+  "lobby.addfunds": "Add funds",
   "lobby.howto": "See how to play",
   "deck.label": "Cards in the deck",
 
@@ -113,14 +123,26 @@ export const en = {
   "cta.checking.label": "Getting ready…",
   "cta.free.support": "Your free game on this deck is ready today.",
   "cta.free.label": "Play free",
-  "cta.paid.support": "Entry 0.10 USDT · 80% goes to the prize.",
-  "cta.paid.label": "Play for 0.10 USDT",
+  "cta.paid.support": "Entry {fee} USDT · 80% goes to the prize.",
+  "cta.paid.label": "Play for {fee} USDT",
   "cta.alias.support": "Pick your alias to save your score.",
   "cta.alias.label": "Continue",
   "cta.login.support": "Sign in to check your free game.",
   "cta.login.label": "Start",
   "cta.paying.free": "This game is free. Just confirm in your wallet.",
-  "cta.paying.paid": "Confirm the 0.10 USDT payment in your wallet.",
+  "cta.paying.paid": "Confirm the {fee} USDT payment in your wallet.",
+  // La wallet embebida tarda unos segundos en existir. Contarlo es la
+  // diferencia entre esperar tranquilo y recargar la página a ver si arranca.
+  "cta.wallet.creating.support":
+    "We're setting up your wallet. It only takes a few seconds.",
+  "cta.wallet.creating.label": "Setting up your wallet…",
+  "cta.wallet.connecting.support": "Connecting your wallet…",
+  "cta.wallet.stuck.support":
+    "Your wallet is taking longer than usual. No need to reload the page.",
+  "cta.wallet.stuck.label": "Try again",
+  "cta.wallet.external.support":
+    "You signed in with your own wallet and it isn't connected right now.",
+  "cta.wallet.external.label": "Connect your wallet",
 
   /* --------------------------- Arena multijugador ------------------------ */
   "arena.aria": "Multiplayer arena",
@@ -354,8 +376,13 @@ export const en = {
   "alias.error.too_long": "That alias is too long (maximum {max}).",
   "alias.error.charset":
     "Only letters, numbers, spaces, hyphens and underscores.",
-  "alias.error.taken_try": "That alias is taken, try another one.",
-  "alias.error.taken_pick": "That alias is taken, pick another one.",
+  // Casi siempre el dueño del alias es quien lo está escribiendo: lo eligió en
+  // otra sesión —con su correo o con su wallet— y volvió por la otra puerta.
+  // Decirle solo "está tomado" lo deja pensando que se lo robaron.
+  "alias.error.taken_try":
+    "That alias is taken. If it's yours, sign in with the account you used before; otherwise pick another one.",
+  "alias.error.taken_pick":
+    "That alias is taken. If it's yours, sign in with the account you used before; otherwise pick another one.",
   "alias.error.save_failed": "We couldn't save your alias.",
   "alias.error.save_failed_short": "We couldn't save it.",
 
@@ -367,7 +394,10 @@ export const en = {
   "results.errors": "Misses",
   "results.accuracy": "Accuracy",
   "results.best_avg": "Best avg.",
-  "results.play_again": "Play again",
+  // El precio va en el botón: la partida gratis se gasta al jugarla y la
+  // revancha se cobra, así que hay que decirlo ANTES de que firme.
+  "results.play_again_free": "Play again for free",
+  "results.play_again_paid": "Play again for {fee} USDT",
   "results.back": "Back to menu",
 
   /* ------------------------------ Cómo se juega -------------------------- */
@@ -732,7 +762,11 @@ export const es: Record<MessageKey, string> = {
 
   /* ------------------------- Errores del flujo de pago ------------------- */
   "pay.error.rejected": "Cancelaste la firma de la jugada.",
-  "pay.error.insufficient": "Saldo insuficiente de USDT para esta jugada.",
+  "pay.error.insufficient": "Te falta USDT para la entrada ({fee} USDT).",
+  "pay.error.fee_usdt":
+    "No te queda USDT para la tarifa de red. Recarga un poco y vuelve a intentar.",
+  "pay.error.fee_celo":
+    "La red cobra su tarifa en CELO y tu billetera no tiene. Recarga un poco de CELO y vuelve a intentar.",
   "pay.error.not_configured":
     "El juego aún no está disponible (contrato no configurado).",
   "pay.error.no_wallet": "Conecta una wallet o entra con tu correo.",
@@ -761,6 +795,7 @@ export const es: Record<MessageKey, string> = {
   "lobby.prize.label": "Premio de hoy",
   "lobby.prize.preparing": "Premio en preparación",
   "lobby.addcash": "Recargar USDT",
+  "lobby.addfunds": "Agregar dinero",
   "lobby.howto": "Ver cómo se juega",
   "deck.label": "Cartas del mazo",
 
@@ -768,14 +803,24 @@ export const es: Record<MessageKey, string> = {
   "cta.checking.label": "Preparando…",
   "cta.free.support": "Tu partida gratis de hoy en este mazo está lista.",
   "cta.free.label": "Jugar gratis",
-  "cta.paid.support": "Entrada 0.10 USDT · 80% va al premio.",
-  "cta.paid.label": "Jugar por 0.10 USDT",
+  "cta.paid.support": "Entrada {fee} USDT · 80% va al premio.",
+  "cta.paid.label": "Jugar por {fee} USDT",
   "cta.alias.support": "Elige tu alias para guardar tu marca.",
   "cta.alias.label": "Continuar",
   "cta.login.support": "Inicia sesión para revisar tu jugada gratis.",
   "cta.login.label": "Empezar",
   "cta.paying.free": "Esta jugada es gratis. Solo debes confirmar en tu wallet.",
-  "cta.paying.paid": "Confirma el pago de 0,10 USDT en tu wallet.",
+  "cta.paying.paid": "Confirma el pago de {fee} USDT en tu wallet.",
+  "cta.wallet.creating.support":
+    "Estamos creando tu billetera. Son unos segundos.",
+  "cta.wallet.creating.label": "Creando tu billetera…",
+  "cta.wallet.connecting.support": "Conectando tu billetera…",
+  "cta.wallet.stuck.support":
+    "Tu billetera está tardando más de lo normal. No hace falta recargar la página.",
+  "cta.wallet.stuck.label": "Reintentar",
+  "cta.wallet.external.support":
+    "Entraste con tu propia billetera y ahora no está conectada.",
+  "cta.wallet.external.label": "Conectar mi billetera",
 
   /* --------------------------- Arena multijugador ------------------------ */
   "arena.aria": "Arena multijugador",
@@ -1006,8 +1051,10 @@ export const es: Record<MessageKey, string> = {
   "alias.error.too_long": "El alias es muy largo (máximo {max}).",
   "alias.error.charset":
     "Solo letras, números, espacio, guion y guion bajo.",
-  "alias.error.taken_try": "Ese alias ya está tomado, prueba otro.",
-  "alias.error.taken_pick": "Ese alias ya está tomado, elige otro.",
+  "alias.error.taken_try":
+    "Ese alias ya está tomado. Si es tuyo, entra con la cuenta que usaste antes; si no, elige otro.",
+  "alias.error.taken_pick":
+    "Ese alias ya está tomado. Si es tuyo, entra con la cuenta que usaste antes; si no, elige otro.",
   "alias.error.save_failed": "No se pudo guardar el alias.",
   "alias.error.save_failed_short": "No se pudo guardar.",
 
@@ -1019,7 +1066,8 @@ export const es: Record<MessageKey, string> = {
   "results.errors": "Errores",
   "results.accuracy": "Precisión",
   "results.best_avg": "Mejor prom.",
-  "results.play_again": "Jugar otra vez",
+  "results.play_again_free": "Jugar otra vez gratis",
+  "results.play_again_paid": "Jugar otra vez por {fee} USDT",
   "results.back": "Volver al menú",
 
   /* ------------------------------ Cómo se juega -------------------------- */

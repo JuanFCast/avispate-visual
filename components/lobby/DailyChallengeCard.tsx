@@ -1,8 +1,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { fmtUsdt, roundCopy, useDeckPot, useRoundClock } from "@/lib/round";
 import { useIsMiniPay } from "@/lib/minipay";
+import { FEE_AMOUNT } from "@/lib/contracts";
 import type { PlayStage } from "@/lib/pay";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -12,14 +14,25 @@ import DeckSelector from "./DeckSelector";
 /** Deeplink oficial de MiniPay para recargar USDT sin salir de la app. */
 const MINIPAY_ADD_CASH = "https://link.minipay.xyz/add_cash?tokens=USDT";
 
+/** Errores que se arreglan recargando: los únicos que ofrecen el enlace. */
+const FUNDS_ERRORS: MessageKey[] = [
+  "pay.error.insufficient",
+  "pay.error.fee_usdt",
+  "pay.error.fee_celo",
+];
+
 /** Estado calculado del CTA según la matriz de elegibilidad del lobby. */
 export interface CtaState {
   /** Mensaje de apoyo sobre la entrada (gratis, pagada o comprobando). */
   support: string;
   label: string;
   disabled: boolean;
-  /** "start" arranca el flujo actual; "access" abre el modal contextual. */
-  action: "start" | "access";
+  /**
+   * "start" arranca el flujo actual, "access" abre el modal contextual,
+   * "connect" abre el conector de wallets y "retry" vuelve a intentar crear o
+   * conectar la wallet embebida.
+   */
+  action: "start" | "access" | "connect" | "retry";
 }
 
 interface Props {
@@ -119,13 +132,22 @@ export default function DailyChallengeCard({
 
         {payError && (
           <p className="alias-error" aria-live="polite">
-            {t(payError)}
-            {inMiniPay && payError === "pay.error.insufficient" && (
+            {t(payError, { fee: fmtUsdt(FEE_AMOUNT) })}
+            {/* Faltó plata: el camino de recarga va pegado al aviso. Dentro de
+                MiniPay es su pantalla nativa; fuera, la cartera del perfil,
+                que es donde están el CELO y el USDT con sus enlaces. */}
+            {FUNDS_ERRORS.includes(payError) && (
               <>
                 {" "}
-                <a className="lobby-addcash" href={MINIPAY_ADD_CASH}>
-                  {t("lobby.addcash")}
-                </a>
+                {inMiniPay ? (
+                  <a className="lobby-addcash" href={MINIPAY_ADD_CASH}>
+                    {t("lobby.addcash")}
+                  </a>
+                ) : (
+                  <Link className="lobby-addcash" href="/perfil">
+                    {t("lobby.addfunds")}
+                  </Link>
+                )}
               </>
             )}
           </p>

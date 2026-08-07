@@ -2,6 +2,8 @@
 
 import { formatMs, type GameResult } from "@/lib/game";
 import type { PlayStage } from "@/lib/pay";
+import { FEE_AMOUNT } from "@/lib/contracts";
+import { fmtUsdt } from "@/lib/round";
 import { useT } from "@/lib/i18n/client";
 import PlayButton from "./PlayButton";
 
@@ -11,6 +13,8 @@ interface Props {
   isNewRecord: boolean;
   /** Revancha en curso: los resultados siguen a la vista. */
   payStage: PlayStage | null;
+  /** A la revancha de este mazo le queda la jugada gratis del día. */
+  nextFree: boolean;
   onPlayAgain: () => void;
   onChangePlayer: () => void;
 }
@@ -20,6 +24,7 @@ export default function ResultsPanel({
   bestAverageMs,
   isNewRecord,
   payStage,
+  nextFree,
   onPlayAgain,
   onChangePlayer,
 }: Props) {
@@ -60,8 +65,15 @@ export default function ResultsPanel({
         </div>
       </div>
 
+      {/* El precio va EN el botón. La partida gratis del día se gasta al
+          jugarla, así que la revancha casi siempre se cobra — y enterarse
+          después de firmar no es enterarse. */}
       <PlayButton
-        label={t("results.play_again")}
+        label={
+          nextFree
+            ? t("results.play_again_free")
+            : t("results.play_again_paid", { fee: fmtUsdt(FEE_AMOUNT) })
+        }
         stage={payStage}
         onClick={onPlayAgain}
       />

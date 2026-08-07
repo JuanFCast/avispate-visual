@@ -13,8 +13,13 @@ import {
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
-import { usePayToPlay, type PlayStage } from "@/lib/pay";
-import { refreshLeaderboard, useFreePlays } from "@/lib/round";
+import {
+  InsufficientFundsError,
+  usePayToPlay,
+  type PlayStage,
+} from "@/lib/pay";
+import { fmtUsdt, refreshLeaderboard, useFreePlays } from "@/lib/round";
+import { FEE_AMOUNT } from "@/lib/contracts";
 import { BLOCKING_DELAYS, deliver, enqueue } from "@/lib/outbox";
 import { useActiveWallet } from "@/lib/wallet";
 import { useWalletAlias } from "@/lib/wallet-alias";
@@ -67,10 +72,31 @@ function vibrate(pattern: number | number[]) {
  * Clasifica un error del flujo de jugada. Devuelve la CLAVE del mensaje, no la
  * frase: el idioma se resuelve al pintar, y así el lobby puede reconocer el
  * caso de saldo insuficiente para ofrecer la recarga.
+ *
+ * La entrada (USDT) y la tarifa de red (el gas) se cuentan por separado. Antes
+ * no: cualquier error que dijera "insufficient" se traducía como "te falta
+ * USDT", y a un jugador con USDT de sobra le decía que no tenía cuando lo que
+ * le faltaba era CELO para el gas.
  */
 function describePayError(err: unknown): MessageKey {
+  if (err instanceof InsufficientFundsError) {
+    // Aquí el saldo se leyó antes de firmar: si no alcanza para la tarifa es
+    // porque tampoco hay USDT (con CELO se habría pagado con CELO).
+    return err.missing === "gas"
+      ? "pay.error.fee_usdt"
+      : "pay.error.insufficient";
+  }
   const msg = err instanceof Error ? err.message : String(err);
   if (/rejected|denied|User rejected/i.test(msg)) return "pay.error.rejected";
+  // "insufficient funds for gas * price + value" y compañía: la red pidió su
+  // tarifa en moneda nativa y la wallet no tiene CELO. Va antes del caso
+  // general porque ese texto también dice "insufficient" y se lo llevaba todo.
+  if (
+    /insufficient funds|gas required exceeds|intrinsic transaction cost|max fee per gas/i.test(
+      msg
+    )
+  )
+    return "pay.error.fee_celo";
   if (/insufficient|exceeds balance|transfer amount/i.test(msg))
     return "pay.error.insufficient";
   if (/pot_not_configured/.test(msg)) return "pay.error.not_configured";
@@ -236,6 +262,11 @@ export default function GameShell() {
         setPayStage(null);
         return;
       }
+
+      // La jugada gratis de este mazo acaba de gastarse (o ya estaba gastada y
+      // esta se cobró). Se vuelve a preguntar YA, no al terminar la partida:
+      // así el botón de los resultados sabe decir cuánto cuesta la revancha.
+      refetchFreePlays();
 
       setPayStage("starting");
       setTimeout(() => {
@@ -578,10 +609,15 @@ export default function GameShell() {
             bestAverageMs={bestAverageMs}
             isNewRecord={isNewRecord}
             payStage={payStage}
+            nextFree={entitlementReady && freeByDeck[deckSize]}
             onPlayAgain={() => handleStart(deckSize)}
             onChangePlayer={() => setPhase("setup")}
           />
-          {payError && <p className="alias-error">{t(payError)}</p>}
+          {payError && (
+            <p className="alias-error">
+              {t(payError, { fee: fmtUsdt(FEE_AMOUNT) })}
+            </p>
+          )}
           <ProfileBottomNav active="inicio" />
         </>
       )}
