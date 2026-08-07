@@ -104,10 +104,13 @@ export default function AccessCard() {
         <span>{t("access.or")}</span>
       </div>
 
+      {/* Solo correo: la puerta de wallet es el botón de arriba, y repetirla
+          dentro de la ventana de Privy confunde. El método sigue habilitado en
+          la configuración porque es lo que permite la firma SIWE. */}
       <button
         type="button"
         className="access-btn access-btn-secondary"
-        onClick={() => login()}
+        onClick={() => login({ loginMethods: ["email"] })}
         disabled={busy}
       >
         {t("access.email")}

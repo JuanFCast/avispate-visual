@@ -268,10 +268,15 @@ export default function StartAccessModal({
               {t("access.title")}
             </h2>
             <p className="lobby-modal-text">{t("access.text")}</p>
+            {/* Solo correo dentro de la ventana de Privy. El método "wallet"
+                sigue habilitado en la configuración —es el motor de la firma
+                SIWE y sin él no se puede entrar con wallet—, pero enseñarlo
+                también aquí ponía dos veces la misma puerta en la misma
+                pantalla. La de wallet es el botón de abajo. */}
             <button
               type="button"
               className="access-btn access-btn-primary"
-              onClick={() => login()}
+              onClick={() => login({ loginMethods: ["email"] })}
             >
               {t("access.email")}
             </button>
