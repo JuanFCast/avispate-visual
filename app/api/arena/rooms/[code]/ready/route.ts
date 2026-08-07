@@ -33,7 +33,7 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   // Actuar sobre una silla de una mesa con entrada exige haberla pagado.
-  const seat = await guardRoomSeat(auth.identity, code, "act");
+  const seat = await guardRoomSeat(req, code, "act");
   if ("response" in seat) return seat.response;
 
   const body = await req.json().catch(() => null);

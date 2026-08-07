@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   }
 
   // La silla de una mesa con entrada la da el contrato, no esta sesión.
-  const seat = await guardRoomSeat(auth.identity, code, "join");
+  const seat = await guardRoomSeat(req, code, "join");
   if ("response" in seat) return seat.response;
 
   try {

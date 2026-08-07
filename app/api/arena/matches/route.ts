@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   }
 
   // Empezar la partida es una acción de silla: solo desde una pagada.
-  const seat = await guardRoomSeat(auth.identity, code, "act");
+  const seat = await guardRoomSeat(req, code, "act");
   if ("response" in seat) return seat.response;
 
   try {

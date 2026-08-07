@@ -1,6 +1,6 @@
-// Verifica la regla obligatoria del escrow de Arena: una sesión abierta con un
-// txHash NUNCA autoriza acciones en una mesa con entrada, y la silla la da el
-// contrato, no la base de datos.
+// Verifica el acceso a una silla de la Arena: que en una mesa con entrada haga
+// falta la FICHA de esa silla —no una sesión, sea del tipo que sea—, que la
+// ficha no sirva en otra mesa, y que además la cadena confirme el pago.
 //
 // Correr: node scripts/verify-arena-seat.ts
 //
@@ -10,7 +10,6 @@ import {
   isForfeitAction,
   type SeatAction,
 } from "../lib/arena-seat.ts";
-import type { AppIdentity } from "../lib/identity.ts";
 
 let failed = 0;
 
@@ -30,95 +29,90 @@ const ALICE = "0x46d5f9fe98461928dbad7a22b95bade5fa178c18";
 const BOB = "0xfd43f6003484579ca068313736632eea8c651477";
 const CAROL = "0x1246294f454710670deccf9ec6545c4241d40202";
 
-/** Sesión de Privy: correo o firma SIWE. Sirve para mesas con dinero. */
-const privy = (wallet: string): AppIdentity => ({
-  privyId: "did:privy:cms9t2e75090f0bjsvaqrv89c",
-  walletAddress: wallet,
-});
+const MESA = "0xaaa1";
+const OTRA_MESA = "0xbbb2";
 
-/** Sesión de MiniPay: canjeada por el hash de una jugada. No sirve. */
-const porTxHash = (wallet: string): AppIdentity => ({
-  privyId: null,
-  walletAddress: wallet,
-});
+/** Lo que devuelve `verifySeatToken` cuando la firma cuadra. */
+const ficha = (address: string, tableId = MESA) => ({ tableId, address });
 
 const mesa = (o: {
   escrowed?: boolean;
-  identity: AppIdentity;
+  seat?: { tableId: string; address: string } | null;
   players?: readonly string[];
   action?: SeatAction;
 }) =>
   decideSeatAccess({
     escrowed: o.escrowed ?? true,
-    identity: o.identity,
+    tableId: MESA,
+    seat: o.seat ?? null,
     onchainPlayers: o.players ?? [ALICE, BOB],
     action: o.action ?? "act",
   });
 
 console.log("\n— Mesas GRATIS: nada cambia —");
 
+check("sin ficha en mesa gratis → adelante", mesa({ escrowed: false }), {
+  ok: true,
+});
+
+console.log("\n— En una mesa con entrada, la sesión no basta —");
+
 check(
-  "sesión de MiniPay en mesa gratis → puede jugar como siempre",
-  mesa({ escrowed: false, identity: porTxHash(CAROL) }),
+  "sin ficha de silla → rechazado, da igual qué sesión traiga",
+  mesa({ seat: null }),
+  { ok: false, error: "seat_token_required" }
+);
+
+check(
+  "…también para sentarse",
+  mesa({ seat: null, action: "join" }),
+  { ok: false, error: "seat_token_required" }
+);
+
+check(
+  "con la ficha de su silla → adelante (esto es lo que devuelve MiniPay al juego)",
+  mesa({ seat: ficha(ALICE) }),
   { ok: true }
 );
 
+console.log("\n— La ficha vale solo para SU mesa —");
+
 check(
-  "sin wallet en mesa gratis → sigue pudiendo",
-  mesa({ escrowed: false, identity: { privyId: "did:privy:x", walletAddress: null } }),
+  "ficha de otra mesa → rechazada aunque el jugador haya pagado aquí",
+  mesa({ seat: ficha(ALICE, OTRA_MESA) }),
+  { ok: false, error: "seat_token_wrong_table" }
+);
+
+check(
+  "mayúsculas y minúsculas no cambian de mesa",
+  mesa({ seat: ficha(ALICE, MESA.toUpperCase()) }),
   { ok: true }
 );
 
-console.log("\n— La regla: sesión por txHash NO autoriza dinero —");
+console.log("\n— Y la cadena tiene que confirmar el pago —");
 
 check(
-  "sesión de MiniPay en mesa con entrada → RECHAZADA, aunque haya pagado",
-  mesa({ identity: porTxHash(ALICE) }),
-  { ok: false, error: "session_not_allowed_on_paid_table" }
-);
-
-check(
-  "…también para sentarse, no solo para jugar",
-  mesa({ identity: porTxHash(ALICE), action: "join" }),
-  { ok: false, error: "session_not_allowed_on_paid_table" }
-);
-
-check(
-  "sesión de Privy de un pagador → adelante",
-  mesa({ identity: privy(ALICE) }),
-  { ok: true }
-);
-
-console.log("\n— La silla la da la cadena, no la base de datos —");
-
-check(
-  "sesión buena pero esa dirección no pagó → sin silla",
-  mesa({ identity: privy(CAROL) }),
+  "ficha válida de quien NO pagó esta mesa → sin silla",
+  mesa({ seat: ficha(CAROL) }),
   { ok: false, error: "seat_not_paid" }
 );
 
 check(
-  "sesión buena sin wallet asociada → no puede estar en una mesa pagada",
-  mesa({ identity: { privyId: "did:privy:x", walletAddress: null } }),
-  { ok: false, error: "wallet_required" }
+  "la lista de pagadores viene de otra mesa → sin silla",
+  mesa({ seat: ficha(ALICE), players: [CAROL] }),
+  { ok: false, error: "seat_not_paid" }
 );
 
 check(
-  "mayúsculas y minúsculas no cambian de quién es la silla",
-  mesa({ identity: privy(ALICE.toUpperCase()), players: [ALICE, BOB] }),
+  "mesa anulada o devuelta (lista vacía) → la ficha ya no sirve sola",
+  mesa({ seat: ficha(ALICE), players: [] }),
+  { ok: false, error: "seat_not_paid" }
+);
+
+check(
+  "la dirección de la ficha no distingue mayúsculas",
+  mesa({ seat: ficha(ALICE.toUpperCase()) }),
   { ok: true }
-);
-
-check(
-  "la lista viene de OTRA mesa → no la sienta aquí",
-  mesa({ identity: privy(ALICE), players: [CAROL] }),
-  { ok: false, error: "seat_not_paid" }
-);
-
-check(
-  "mesa con escrow y todavía sin nadie pagando → nadie tiene silla",
-  mesa({ identity: privy(ALICE), players: [] }),
-  { ok: false, error: "seat_not_paid" }
 );
 
 console.log("\n— Levantarse no puede ser un botón en una mesa pagada —");

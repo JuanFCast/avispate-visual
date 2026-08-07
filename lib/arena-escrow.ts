@@ -37,6 +37,16 @@ const ARENA_ABI = [
     inputs: [{ name: "tableId", type: "bytes32" }],
     outputs: [{ name: "", type: "address[]" }],
   },
+  {
+    type: "function",
+    name: "seatCommitment",
+    stateMutability: "view",
+    inputs: [
+      { name: "tableId", type: "bytes32" },
+      { name: "player", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bytes32" }],
+  },
 ] as const;
 
 const client = createPublicClient({ chain: celo, transport: CELO_TRANSPORT });
@@ -70,6 +80,32 @@ export function tableIdFor(
  * el RPC iba lento sería exactamente la puerta que este cheque existe para
  * cerrar.
  */
+/**
+ * La huella que esa dirección dejó al pagar su silla, o `null`.
+ *
+ * Es contra esto que se comprueba el secreto que enseña el jugador. Falla
+ * cerrado por la misma razón que la lista de pagadores: si la cadena no
+ * responde, no se emite ficha. Un "no lo sé" no puede abrir una silla.
+ */
+export async function seatCommitmentOf(
+  tableId: Hash,
+  player: string
+): Promise<`0x${string}` | null> {
+  if (!escrowEnabled()) return null;
+  try {
+    const commitment = (await client.readContract({
+      address: ARENA_ESCROW_ADDRESS as `0x${string}`,
+      abi: ARENA_ABI,
+      functionName: "seatCommitment",
+      args: [tableId, player as `0x${string}`],
+    })) as `0x${string}`;
+    // Todo ceros = esa dirección no pagó esta mesa.
+    return /^0x0{64}$/i.test(commitment) ? null : commitment;
+  } catch {
+    return null;
+  }
+}
+
 export async function paidPlayersOf(tableId: Hash): Promise<string[]> {
   if (!escrowEnabled()) return [];
   try {

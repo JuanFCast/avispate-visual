@@ -1,8 +1,18 @@
 import { NextResponse } from "next/server";
-import type { AppIdentity } from "./identity";
 import { escrowEnabled, paidPlayersOf, tableIdFor } from "./arena-escrow";
 import { decideSeatAccess, type SeatAction } from "./arena-seat";
 import { getRoomByCode } from "./supabase/arena-rooms";
+import { verifySeatToken } from "./seat-token";
+
+/**
+ * La ficha de silla viaja en su propia cabecera, NO en `Authorization`.
+ *
+ * Separarlas es a propósito: `Authorization` lleva la sesión (quién eres) y
+ * esto lleva el permiso de una mesa (qué silla probaste). Mezclarlas invitaría
+ * a que un día alguien acepte una donde va la otra, que es exactamente el
+ * error que este mecanismo existe para no cometer.
+ */
+const SEAT_HEADER = "x-avispate-seat";
 
 /**
  * El guardia de las sillas, para las rutas de `/api/arena/*`.
@@ -18,8 +28,8 @@ import { getRoomByCode } from "./supabase/arena-rooms";
  */
 
 const STATUS: Record<string, number> = {
-  session_not_allowed_on_paid_table: 403,
-  wallet_required: 403,
+  seat_token_required: 403,
+  seat_token_wrong_table: 403,
   seat_not_paid: 403,
 };
 
@@ -37,19 +47,22 @@ export interface RoomTerms {
  * alguien con una foto vieja de quién había pagado.
  */
 export async function requireSeat(
-  identity: AppIdentity,
+  req: Request,
   room: RoomTerms,
   action: SeatAction
 ): Promise<{ ok: true } | { response: NextResponse }> {
   const escrowed = escrowEnabled();
-  const onchainPlayers = escrowed
-    ? await paidPlayersOf(tableIdFor(room.code, room.entryUnits, room.maxPlayers))
-    : [];
+  if (!escrowed) return { ok: true };
+
+  const tableId = tableIdFor(room.code, room.entryUnits, room.maxPlayers);
+  const raw = req.headers.get(SEAT_HEADER);
+  const seat = raw ? verifySeatToken(raw.trim()) : null;
 
   const verdict = decideSeatAccess({
     escrowed,
-    identity,
-    onchainPlayers,
+    tableId,
+    seat,
+    onchainPlayers: await paidPlayersOf(tableId),
     action,
   });
   if (verdict.ok) return { ok: true };
@@ -70,7 +83,7 @@ export async function requireSeat(
  * es más confuso y encima filtra menos información útil.
  */
 export async function guardRoomSeat(
-  identity: AppIdentity,
+  req: Request,
   code: string,
   action: SeatAction
 ): Promise<{ ok: true } | { response: NextResponse }> {
@@ -80,7 +93,7 @@ export async function guardRoomSeat(
   if (!room) return { ok: true };
 
   return await requireSeat(
-    identity,
+    req,
     {
       code: room.code,
       entryUnits: BigInt(room.entry_units),

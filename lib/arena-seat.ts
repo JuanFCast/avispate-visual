@@ -19,28 +19,30 @@
  * con la sesión ajena juega desde la silla que pagó la víctima, y jugar mal a
  * propósito es hacerle perder el pozo. La justificación entera se cae.
  *
- * Por eso aquí hay dos puertas y solo una sirve para las mesas con dinero:
+ * ── La salida: la ficha de silla, no el tipo de sesión ────────────────────
  *
- *   - **Sesión de Privy** (`privyId` presente) — viene de un correo verificado
- *     o de una firma SIWE. Detrás hay una credencial que no se puede leer de la
- *     cadena. Sirve.
- *   - **Sesión de wallet** (`privyId` nulo) — la de MiniPay, canjeada por el
- *     hash de una jugada. NO sirve en mesas con entrada.
+ * La primera versión de esto miraba QUÉ sesión traías y rechazaba las de
+ * MiniPay en mesas con entrada. Era seguro y dejaba a MiniPay fuera del
+ * producto con dinero, que no es aceptable.
  *
- * La consecuencia hay que decirla sin adornos: **dentro de MiniPay no se puede
- * jugar una mesa con entrada**, porque ahí no existe forma de firmar un mensaje
- * y por tanto no hay sesión de Privy posible. Las mesas gratis siguen abiertas
- * para todo el mundo. Es una pérdida real de alcance, y es preferible a cobrar
- * una entrada que no podemos proteger.
+ * Ahora no se mira la sesión: se mira si traes la **ficha de la silla**. Esa
+ * ficha solo se consigue enseñando el secreto que el jugador guardó en su
+ * dispositivo ANTES de pagar, y cuya huella quedó dentro de la transacción
+ * (`seat-secret.ts`, `seat-token.ts`, `/api/arena/seat`). Un mirón de la cadena
+ * ve la huella y no puede darle la vuelta, así que no puede conseguir la ficha
+ * por mucho que le robe la sesión a alguien.
+ *
+ * Con eso la regla se cumple mejor que antes y en las dos plataformas: quien
+ * autoriza la acción de dinero ya no es la sesión —da igual de qué tipo sea—
+ * sino la prueba de la silla. Web y MiniPay comparten un solo modelo.
  *
  * ── Y la silla la da la cadena ────────────────────────────────────────────
  *
- * En una mesa con escrow, quién está sentado NO lo dice una fila creada por una
- * sesión: lo dice el contrato, que solo conoce a quien pagó. El servidor lee esa
- * lista y no se cree ninguna otra.
+ * La ficha dice "probé el secreto de esta silla"; la cadena dice quién pagó. Se
+ * exigen las dos: sin la lista de pagadores no hay silla, y sin ficha no hay
+ * permiso para usarla. La lista viene del contrato, nunca de una fila creada
+ * por una sesión.
  */
-
-import type { AppIdentity } from "./identity";
 
 /** Qué se quiere hacer con la silla. */
 export type SeatAction =
@@ -51,13 +53,10 @@ export type SeatAction =
 
 export type SeatVerdict =
   | { ok: true }
-  /**
-   * La mesa cobra entrada y la sesión no puede autorizar dinero. 403: no es que
-   * falte identificarse, es que ESA identidad no vale aquí.
-   */
-  | { ok: false; error: "session_not_allowed_on_paid_table" }
-  /** La sesión no tiene wallet con la que poder estar en una mesa pagada. */
-  | { ok: false; error: "wallet_required" }
+  /** La mesa cobra entrada y no se trajo ficha de silla. */
+  | { ok: false; error: "seat_token_required" }
+  /** La ficha es de OTRA mesa. Una silla no se presta entre mesas. */
+  | { ok: false; error: "seat_token_wrong_table" }
   /** Esa dirección no pagó esta mesa: la cadena no la conoce. */
   | { ok: false; error: "seat_not_paid" };
 
@@ -68,7 +67,10 @@ export interface SeatCheck {
    * que el contrato sin romperle la partida a nadie.
    */
   escrowed: boolean;
-  identity: AppIdentity;
+  /** La mesa sobre la que se quiere actuar. */
+  tableId: string;
+  /** Lo que dice la ficha traída, ya verificada su firma. `null` si no vino. */
+  seat: { tableId: string; address: string } | null;
   /** Direcciones que pagaron esta mesa, leídas del contrato. En minúsculas. */
   onchainPlayers: readonly string[];
   action: SeatAction;
@@ -80,22 +82,24 @@ export function decideSeatAccess(check: SeatCheck): SeatVerdict {
   // Mesa gratis: nada que proteger, todo sigue como estaba.
   if (!check.escrowed) return { ok: true };
 
-  // Puerta 1: la sesión. Una abierta con un txHash no vale en mesas con dinero.
-  if (!check.identity.privyId) {
-    return { ok: false, error: "session_not_allowed_on_paid_table" };
+  // Puerta 1: la ficha. Sin ella no hay nada que mirar — y da igual qué sesión
+  // se traiga, porque ninguna sesión sustituye a la prueba de la silla.
+  if (!check.seat) return { ok: false, error: "seat_token_required" };
+
+  // Una ficha vale para SU mesa. Sin este cheque, la de una mesa barata
+  // abriría una cara, que es la forma tonta de perder todo lo anterior.
+  if (norm(check.seat.tableId) !== norm(check.tableId)) {
+    return { ok: false, error: "seat_token_wrong_table" };
   }
 
-  const wallet = norm(check.identity.walletAddress);
-  if (!wallet) return { ok: false, error: "wallet_required" };
-
-  // Puerta 2: la silla. La da el contrato, no la base de datos.
-  //
-  // Vale igual para sentarse y para actuar: si la dirección no está en la lista
-  // de pagadores, no hay silla que ocupar ni desde la que jugar. Al sentarse la
-  // transacción de `join` ya está minada —es lo que crea la silla—, así que la
-  // lista tiene que incluirla; si no la incluye, esa persona no pagó.
+  // Puerta 2: la silla la da el contrato, no la ficha. Se comprueban las dos
+  // porque responden preguntas distintas: la ficha, que quien pide conoce el
+  // secreto; la cadena, que esa dirección pagó de verdad. Una mesa anulada o
+  // una devolución dejan la lista vacía, y ahí la ficha deja de servir sola.
   const players = check.onchainPlayers.map(norm);
-  if (!players.includes(wallet)) return { ok: false, error: "seat_not_paid" };
+  if (!players.includes(norm(check.seat.address))) {
+    return { ok: false, error: "seat_not_paid" };
+  }
 
   return { ok: true };
 }
