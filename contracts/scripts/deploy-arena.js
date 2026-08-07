@@ -144,13 +144,38 @@ async function main() {
     openTimeout,
     owner
   );
+  const tx = arena.deploymentTransaction();
+  const receipt = await tx.wait();
   await arena.waitForDeployment();
   const address = await arena.getAddress();
 
-  // Releer del contrato lo que acabamos de escribir. Si algo no cuadra hay que
-  // saberlo AHORA, no el día que alguien pague una entrada.
-  const [onToken, onCommission, onOperator, onBps, onSettle, onOpen, onOwner] =
-    await Promise.all([
+  // El recibo del despliegue: hash, gas y lo que costó. Queda impreso porque es
+  // lo que se pega en un registro cuando alguien pregunta, meses después, qué
+  // se desplegó exactamente y cuándo.
+  const gasUsed = receipt.gasUsed;
+  const gasPrice = receipt.gasPrice ?? tx.gasPrice ?? 0n;
+  console.log("\n📄 Transacción del despliegue");
+  console.log("   txHash:  ", tx.hash);
+  console.log("   bloque:  ", receipt.blockNumber);
+  console.log("   gas:     ", gasUsed.toString());
+  console.log(
+    "   costo:   ",
+    ethers.formatEther(gasUsed * gasPrice),
+    "CELO"
+  );
+
+  /**
+   * Releer del contrato lo que acabamos de escribir. Si algo no cuadra hay que
+   * saberlo AHORA, no el día que alguien pague una entrada.
+   *
+   * Con reintentos porque forno responde `0x` a las lecturas de un contrato
+   * recién desplegado durante unos segundos: la transacción ya está minada pero
+   * el nodo que atiende la lectura todavía no lo sabe. Pasó en el despliegue
+   * real del 2026-08-07 y el script se cayó DESPUÉS de haber desplegado bien,
+   * que es la peor forma de fallar — parece que algo salió mal y no es verdad.
+   */
+  const readAll = () =>
+    Promise.all([
       arena.token(),
       arena.commissionWallet(),
       arena.operator(),
@@ -159,6 +184,26 @@ async function main() {
       arena.openTimeout(),
       arena.owner(),
     ]);
+
+  let leido;
+  for (let intento = 1; intento <= 10; intento++) {
+    try {
+      leido = await readAll();
+      break;
+    } catch (e) {
+      if (intento === 10) {
+        console.error(
+          `\n⚠️  El contrato QUEDÓ DESPLEGADO en ${address} (tx ${tx.hash}),\n` +
+            "   pero el nodo aún no deja leerlo. NO vuelvas a desplegar:\n" +
+            "   espera un minuto y verifica los parámetros a mano."
+        );
+        throw e;
+      }
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  const [onToken, onCommission, onOperator, onBps, onSettle, onOpen, onOwner] =
+    leido;
 
   const checks = [
     ["token", onToken, usdt],
