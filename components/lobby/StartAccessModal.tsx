@@ -34,14 +34,44 @@ export default function StartAccessModal({
   const wallet = useActiveWallet();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * ¿El alias de la sesión ya nombra a la wallet conectada? Solo si es SU
+   * dirección. Con una wallet externa distinta no la nombra, y el ranking
+   * mostraría a un jugador sin nombre.
+   */
+  const sessionCoversWallet = Boolean(
+    profile.alias &&
+      profile.walletAddress &&
+      wallet.address &&
+      profile.walletAddress === wallet.address.toLowerCase()
+  );
+
+  const needsEmailAlias =
+    profile.authenticated && !profile.loading && !profile.alias;
+  /**
+   * Se pide alias para la wallet cuando ya se confirmó que no tiene ninguno.
+   *
+   * Sin mirar si hay sesión de correo, a propósito: el puntaje se guarda contra
+   * la wallet que FIRMA, así que una wallet externa sin nombre necesita elegir
+   * uno aunque su dueño tenga la sesión abierta con otro. Mirar solo la sesión
+   * es lo que dejó a Juan pagando una partida que no se podía guardar
+   * (2026-08-07).
+   */
+  const needsWalletAlias =
+    wallet.isConnected && walletAliasReady && !walletAlias && !sessionCoversWallet;
+  const checkingWalletAlias =
+    wallet.isConnected && !walletAliasReady && !sessionCoversWallet;
+
   // Identidad completa → volver al lobby (sin countdown ni cobro automático).
-  const emailDone =
-    profile.authenticated && !profile.loading && Boolean(profile.alias);
-  const walletDone =
-    !profile.authenticated && wallet.isConnected && Boolean(walletAlias);
+  // "Completa" incluye el nombre de la wallet: cerrar antes devolvía al jugador
+  // a un botón de jugar que iba a rechazarle la partida.
+  const identified =
+    (profile.authenticated && !profile.loading) || wallet.isConnected;
+  const aliasPending =
+    needsEmailAlias || needsWalletAlias || checkingWalletAlias;
   useEffect(() => {
-    if (emailDone || walletDone) onClose();
-  }, [emailDone, walletDone, onClose]);
+    if (identified && !aliasPending) onClose();
+  }, [identified, aliasPending, onClose]);
 
   // Foco inicial dentro del diálogo; al cerrar vuelve al CTA del lobby.
   useEffect(() => {
@@ -92,17 +122,6 @@ export default function StartAccessModal({
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [onClose]);
-
-  const needsEmailAlias =
-    profile.authenticated && !profile.loading && !profile.alias;
-  // Solo se pide alias cuando ya se confirmó que la wallet no tiene ninguno.
-  const needsWalletAlias =
-    !profile.authenticated &&
-    wallet.isConnected &&
-    walletAliasReady &&
-    !walletAlias;
-  const checkingWalletAlias =
-    !profile.authenticated && wallet.isConnected && !walletAliasReady;
 
   return (
     <div

@@ -90,6 +90,12 @@ export const en = {
   "pay.error.not_configured":
     "The game isn't available yet (contract not configured).",
   "pay.error.no_wallet": "Connect a wallet or sign in with your email.",
+  // Se avisan ANTES de cobrar: sin nombre válido el puntaje no se puede
+  // guardar, y enterarse de eso con la entrada ya pagada es perder plata.
+  "pay.error.alias_needed":
+    "Pick a name for this wallet before you play, so your score can be saved.",
+  "pay.error.alias_taken":
+    "That name is already taken by another player. Pick a different one for this wallet and your score will be saved.",
   "pay.error.generic": "We couldn't register the game. Try again.",
   "pay.error.unavailable":
     "The game isn't available yet (contract not configured, or no wallet connected).",
@@ -99,6 +105,7 @@ export const en = {
     "The server didn't accept this game. Write to soporte@avispate.fun with the time and your wallet and we'll look into it.",
 
   /* ----------------------- Pasos del botón de jugar ---------------------- */
+  "stage.checking": "Checking your name…",
   "stage.switching": "Switching to Celo…",
   "stage.confirm": "Confirm in your wallet…",
   "stage.approving": "Approving USDT…",
@@ -770,6 +777,10 @@ export const es: Record<MessageKey, string> = {
   "pay.error.not_configured":
     "El juego aún no está disponible (contrato no configurado).",
   "pay.error.no_wallet": "Conecta una wallet o entra con tu correo.",
+  "pay.error.alias_needed":
+    "Elige un nombre para esta wallet antes de jugar, para que tu puntaje se pueda guardar.",
+  "pay.error.alias_taken":
+    "Ese nombre ya lo tiene otro jugador. Elige uno distinto para esta wallet y tu puntaje quedará guardado.",
   "pay.error.generic": "No se pudo registrar la jugada. Inténtalo de nuevo.",
   "pay.error.unavailable":
     "El juego aún no está disponible (contrato no configurado o wallet sin conectar).",
@@ -779,6 +790,7 @@ export const es: Record<MessageKey, string> = {
     "El servidor no aceptó esta jugada. Escríbenos a soporte@avispate.fun con la hora y tu wallet y lo revisamos.",
 
   /* ----------------------- Pasos del botón de jugar ---------------------- */
+  "stage.checking": "Comprobando tu nombre…",
   "stage.switching": "Cambiando a Celo…",
   "stage.confirm": "Confirma en tu wallet…",
   "stage.approving": "Autorizando USDT…",

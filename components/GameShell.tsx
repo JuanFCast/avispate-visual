@@ -22,6 +22,7 @@ import { fmtUsdt, refreshLeaderboard, useFreePlays } from "@/lib/round";
 import { FEE_AMOUNT } from "@/lib/contracts";
 import { BLOCKING_DELAYS, deliver, enqueue } from "@/lib/outbox";
 import { useActiveWallet } from "@/lib/wallet";
+import { aliasBlocker } from "@/lib/alias-claim";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -160,7 +161,14 @@ export default function GameShell() {
   const howTo = useHowToPlay();
 
   /** Alias efectivo del jugador: Privy o el local de la wallet. */
-  const currentAlias = profile.alias ?? walletAlias ?? "";
+  /**
+   * Alias efectivo del jugador. Manda el de la WALLET, no el de la sesión: el
+   * puntaje se guarda contra la wallet que firma, y es su nombre el que sale en
+   * el ranking. Cuando ambas identidades son la misma persona con una sola
+   * dirección —el caso normal— los dos valores coinciden y el orden da igual;
+   * importa cuando no: sesión de correo con una wallet externa distinta.
+   */
+  const currentAlias = walletAlias ?? profile.alias ?? "";
 
   // Info on-chain de la partida en curso: toda jugada tiene su transacción.
   // Refs porque se leen dentro de timeouts.
@@ -235,6 +243,19 @@ export default function GameShell() {
       setPayError("pay.error.unavailable");
       return;
     }
+
+    // El nombre se resuelve ANTES de cobrar. Si el puntaje no va a poder
+    // guardarse, el jugador se entera aquí —con la plata todavía en su
+    // wallet— y no al terminar la partida.
+    setPayStage("checking");
+    const aliasProblem = await aliasBlocker(alias, activeWallet.address);
+    if (aliasProblem) {
+      setPayError(aliasProblem);
+      setPayStage(null);
+      setAccessOpen(true);
+      return;
+    }
+
     setDeckSize(deck);
     setPayStage("confirm");
     try {

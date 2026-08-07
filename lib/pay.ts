@@ -154,6 +154,7 @@ export function missingFundsFor(params: {
  * cuando la transacción ya está confirmada y solo falta repartir.
  */
 export type PlayStage =
+  | "checking"
   | "switching"
   | "confirm"
   | "approving"
@@ -162,6 +163,8 @@ export type PlayStage =
   | "starting";
 
 export const PLAY_STAGE_KEY: Record<PlayStage, MessageKey> = {
+  // Antes de firmar nada: comprobar que el puntaje se va a poder guardar.
+  checking: "stage.checking",
   switching: "stage.switching",
   confirm: "stage.confirm",
   approving: "stage.approving",

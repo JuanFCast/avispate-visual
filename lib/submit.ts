@@ -25,8 +25,19 @@ export type SendResult =
  * propósito: casi siempre significa "todavía no veo esa transacción", no
  * "esa transacción no existe" — el nodo de Celo del servidor va unos segundos
  * detrás del que confirmó la transacción en el teléfono.
+ *
+ * Los dos de alias también, y por una razón concreta: `/api/scores` los devuelve
+ * cuando la wallet aún no tiene nombre, pero deja de pedirlo en cuanto lo tenga.
+ * Tratarlos como rechazo definitivo BORRABA una partida ya pagada — así se
+ * perdieron las dos de Juan el 2026-08-07. Guardado, el envío se reintenta al
+ * abrir la app y entra solo apenas el jugador elige un alias válido.
  */
-const RETRYABLE_ERRORS = new Set(["invalid_payment", "server_error"]);
+const RETRYABLE_ERRORS = new Set([
+  "invalid_payment",
+  "server_error",
+  "alias_required",
+  "alias_taken",
+]);
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
