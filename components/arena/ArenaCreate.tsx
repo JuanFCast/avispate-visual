@@ -16,6 +16,8 @@ import { clampCards, defaultCardsPerPlayer } from "@/lib/arena-deck";
 import { roomErrorText } from "@/lib/arena-room-errors";
 import type { RoomError } from "@/lib/arena-rooms";
 import { useProfile } from "@/lib/profile-context";
+import { useActiveWallet } from "@/lib/wallet";
+import { ARENA_ESCROW_ADDRESS } from "@/lib/arena-join";
 import { useT } from "@/lib/i18n/client";
 import ArenaCards from "./ArenaCards";
 import ArenaHeader from "./ArenaHeader";
@@ -57,6 +59,16 @@ export default function ArenaCreate() {
   const t = useT();
   const router = useRouter();
   const { ready, authenticated, getToken } = useProfile();
+  const wallet = useActiveWallet();
+
+  /**
+   * Se puede montar la mesa sin sesión cuando va a cobrar entrada y hay una
+   * wallet puesta. Es el caso del usuario nuevo de MiniPay: allí no se puede
+   * firmar un mensaje, así que su sesión nace del pago — y para pagar hace
+   * falta la sala. Crear no le da nada; la silla se la dará la transacción.
+   */
+  const puedePagarDespues =
+    Boolean(ARENA_ESCROW_ADDRESS) && wallet.isConnected && Boolean(wallet.address);
 
   const [entryUnits, setEntryUnits] = useState<bigint>(DEFAULT_ENTRY_UNITS);
   const [players, setPlayers] = useState<number>(DEFAULT_PLAYERS);
@@ -83,8 +95,8 @@ export default function ArenaCreate() {
   async function create() {
     setError(null);
     setBusy(true);
-    const token = await getToken();
-    if (!token) {
+    const token = authenticated ? await getToken() : null;
+    if (!token && !puedePagarDespues) {
       setError("unauthorized");
       setBusy(false);
       return;
@@ -94,12 +106,15 @@ export default function ArenaCreate() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           entry: entryUnits.toString(),
           players,
           cards,
+          // Sin sesión: a qué wallet se le atribuye la sala. No prueba nada y no
+          // hace falta que lo pruebe — quien acabe sentado será quien pague.
+          ...(token ? {} : { address: wallet.address }),
         }),
       });
       const data = await res.json().catch(() => null);
@@ -123,7 +138,7 @@ export default function ArenaCreate() {
         lead={t("create.lead")}
       />
 
-      {ready && !authenticated ? (
+      {ready && !authenticated && !puedePagarDespues ? (
         <section className="arena-card room-login">
           <h2 className="arena-hero-title">{t("room.login.title")}</h2>
           <p className="arena-hero-text">{t("room.login.text")}</p>

@@ -155,6 +155,12 @@ export async function createRoom(params: {
   entryUnits: bigint;
   maxPlayers: number;
   cardsPerPlayer: number;
+  /**
+   * Sacar al anfitrión de las salas donde estuviera. Solo cuando su identidad
+   * está PROBADA: hacerlo por una dirección que alguien dice tener permitiría
+   * echar a otro de su partida creando una sala a su nombre.
+   */
+  leaveOthers?: boolean;
 }): Promise<RoomResult<RoomRow>> {
   const db = getSupabaseAdmin();
 
@@ -165,7 +171,7 @@ export async function createRoom(params: {
     return fail("invalid_setup");
   }
 
-  await leaveAllRooms(params.profileId);
+  if (params.leaveOthers !== false) await leaveAllRooms(params.profileId);
 
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = generateRoomCode();

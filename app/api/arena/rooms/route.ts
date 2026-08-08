@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { requireIdentity } from "@/lib/http";
+import { optionalIdentity } from "@/lib/http";
+import { decideRoomCreation, mayLeaveOtherRooms } from "@/lib/arena-create";
+import { escrowConfigured } from "@/lib/arena-escrow";
+import { ensureProfileByWallet } from "@/lib/supabase/profiles";
 import { ARENA_ENTRY_UNITS, ARENA_PLAYER_OPTIONS } from "@/lib/arena";
 import { parseCardsPerPlayer } from "@/lib/arena-deck";
 import { createRoom } from "@/lib/supabase/arena-rooms";
@@ -25,10 +28,32 @@ export const dynamic = "force-dynamic";
  * No cobra nada. Crear la sala no mueve USDT ni bloquea fondos.
  */
 export async function POST(req: Request) {
-  const auth = await requireIdentity(req);
-  if ("response" in auth) return auth.response;
-
   const body = await req.json().catch(() => null);
+
+  /**
+   * Crear una sala NO exige sesión cuando la mesa va a cobrar entrada.
+   *
+   * Porque crear no otorga nada: ni silla, ni permiso para jugar, ni un
+   * centavo. La silla la crea el pago on-chain y las acciones las gobierna la
+   * ficha. Exigir identidad aquí solo servía para obligar a jugar una partida
+   * del reto antes de montar una mesa dentro de MiniPay, que es donde no se
+   * puede firmar un mensaje.
+   *
+   * En las salas gratis la sesión sigue siendo obligatoria: allí sentarse no
+   * cuesta nada y sin identidad cualquiera ocuparía cualquier mesa.
+   */
+  const identity = await optionalIdentity(req);
+  const verdict = decideRoomCreation({
+    identity,
+    escrowed: escrowConfigured(),
+    claimedAddress: typeof body?.address === "string" ? body.address : null,
+  });
+  if (verdict.kind === "denied") {
+    return NextResponse.json(
+      { error: verdict.error },
+      { status: verdict.error === "unauthorized" ? 401 : 400 }
+    );
+  }
 
   const entryUnits = ARENA_ENTRY_UNITS.find(
     (u) => u.toString() === String(body?.entry ?? "")
@@ -51,9 +76,21 @@ export async function POST(req: Request) {
   }
 
   try {
-    const profile = await ensureProfile(auth.identity);
+    /**
+     * A quién se le atribuye la sala. Con sesión, a quien la abrió. Sin ella,
+     * al perfil de la dirección que dijo traer — un dato SIN PROBAR, y da
+     * igual: la sala no otorga nada y quien acabe sentado será quien pague.
+     */
+    const profile =
+      verdict.kind === "session"
+        ? await ensureProfile(identity!)
+        : await ensureProfileByWallet(verdict.address);
+
     const result = await createRoom({
       profileId: profile.id,
+      // Sacar a alguien de sus otras salas por una dirección que nadie probó
+      // sería regalar una forma de echar a otro de su partida.
+      leaveOthers: mayLeaveOtherRooms(verdict),
       entryUnits,
       maxPlayers,
       cardsPerPlayer,
