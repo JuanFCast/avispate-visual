@@ -138,10 +138,13 @@ export interface RoomView {
 export function generateRoomCode(): string {
   const buf = new Uint8Array(ROOM_CODE_LENGTH);
   let out = "";
-  // Rechazo por módulo: 256 no es múltiplo de 32, así que los bytes altos
-  // sesgarían hacia el principio del alfabeto. Con 32 símbolos el corte cae en
-  // 256 justo, pero se deja explícito para que cambiar el alfabeto no
-  // introduzca el sesgo en silencio.
+  // Rechazo por módulo: hoy no descarta nada, y está por si el alfabeto cambia.
+  //
+  // `b % n` reparte disparejo cuando 256 NO es múltiplo de `n`: los primeros
+  // símbolos del alfabeto salen más que los últimos. Con estos 32 símbolos sí
+  // lo es —256 = 32 × 8—, así que `limit` vale 256 exactos y ningún byte llega
+  // a descartarse. La línea no cuesta nada y evita que el día que alguien quite
+  // una letra del alfabeto el sesgo aparezca solo y sin que nadie lo note.
   const limit = Math.floor(256 / ALPHABET.length) * ALPHABET.length;
   while (out.length < ROOM_CODE_LENGTH) {
     crypto.getRandomValues(buf);
