@@ -8,7 +8,12 @@ import { arenaPrize, fmtEntry, fmtUsdt } from "@/lib/arena";
 import { dealSummary } from "@/lib/arena-deck";
 import { useArenaRoom } from "@/lib/arena-room";
 import { roomErrorText } from "@/lib/arena-room-errors";
-import { roomCanStart, roomIsFull, type RoomPlayerView } from "@/lib/arena-rooms";
+import {
+  roomActionsFor,
+  roomCanStart,
+  roomIsFull,
+  type RoomPlayerView,
+} from "@/lib/arena-rooms";
 import { useProfile } from "@/lib/profile-context";
 import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n";
@@ -171,6 +176,7 @@ export default function ArenaRoom({ code }: { code: string }) {
   const runtime = dealSummary(room.cardsPerPlayer, room.maxPlayers);
   const full = roomIsFull(room);
   const canStart = roomCanStart(room);
+  const actions = roomActionsFor(room);
   const emptySeats = Math.max(0, room.maxPlayers - room.players.length);
   const you = room.you;
   const youOffline = failures >= OFFLINE_AFTER;
@@ -311,40 +317,53 @@ export default function ArenaRoom({ code }: { code: string }) {
                   : t("room.join_this.cta")}
             </button>
           )
-        ) : you.isHost ? (
-          <>
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={start}
-              disabled={!canStart || busy}
-            >
-              {busy ? t("room.start.dealing") : t("room.start.cta")}
-            </button>
-            <p className="arena-prize-note" aria-live="polite">
-              {!full
-                ? t("room.start.need_players")
-                : !canStart
-                  ? t("room.start.need_ready")
-                  : t("room.start.ready")}
-            </p>
-          </>
         ) : (
           <>
-            <button
-              type="button"
-              className={`btn-primary${you.isReady ? " room-ready-on" : ""}`}
-              onClick={() => setReady(!you.isReady)}
-              disabled={busy}
-              aria-busy={busy}
-            >
-              {busy
-                ? t("room.ready.saving")
-                : you.isReady
-                  ? t("room.ready.off")
-                  : t("room.ready.on")}
-            </button>
-            <p className="arena-prize-note">{t("room.guest.hint")}</p>
+            {/* Confirmar es de TODOS, también de quien montó la mesa. Nadie
+                queda listo por crear la sala ni por pagar: pagar da la silla,
+                no la voluntad de empezar. Es un estado en nuestra base — sin
+                firma, sin transacción y sin tarifa de red. */}
+            {actions.canReady && (
+              <button
+                type="button"
+                className={`btn-primary${you.isReady ? " room-ready-on" : ""}`}
+                onClick={() => setReady(!you.isReady)}
+                disabled={busy}
+                aria-busy={busy}
+              >
+                {busy
+                  ? t("room.ready.saving")
+                  : you.isReady
+                    ? t("room.ready.off")
+                    : t("room.ready.on")}
+              </button>
+            )}
+
+            {you.isHost ? (
+              <>
+                <button
+                  type="button"
+                  className="arena-cta room-start"
+                  onClick={start}
+                  disabled={!actions.canStart || busy}
+                >
+                  {busy ? t("room.start.dealing") : t("room.start.cta")}
+                </button>
+                <p className="arena-prize-note" aria-live="polite">
+                  {!full
+                    ? t("room.start.need_players")
+                    : !canStart
+                      ? t("room.start.need_ready")
+                      : t("room.start.ready")}
+                </p>
+              </>
+            ) : (
+              <p className="arena-prize-note" aria-live="polite">
+                {actions.waitingForHost
+                  ? t("room.guest.waiting_host")
+                  : t("room.guest.hint")}
+              </p>
+            )}
           </>
         )}
 

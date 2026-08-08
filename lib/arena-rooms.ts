@@ -89,6 +89,11 @@ export type RoomError =
   | "unauthorized"
   /** Entrada, jugadores o cartas que no son una combinación real. */
   | "invalid_setup"
+  /** Falta la ficha de la silla: se paga y se reclama, no se firma. */
+  | "seat_token_required"
+  | "seat_token_wrong_table"
+  /** La cadena no confirma que esa dirección pagó esta mesa. */
+  | "seat_not_paid"
   | "server_error";
 
 export interface RoomPlayerView {
@@ -270,6 +275,42 @@ export function roomCanStart(room: RoomView): boolean {
     roomIsFull(room) &&
     room.players.every((p) => p.isReady)
   );
+}
+
+/**
+ * Qué puede hacer quien está mirando la sala.
+ *
+ * Se decide aquí, en una función pura, y no dentro del JSX, porque este reparto
+ * ya se equivocó una vez: el botón de "Estoy listo" vivía en la rama del
+ * invitado y el anfitrión solo veía el de empezar. Mientras crear la sala te
+ * dejaba listo automáticamente eso no se notaba; en cuanto el anfitrión pasó a
+ * sentarse pagando como todos, se quedó en "Sin confirmar" sin ninguna forma de
+ * confirmar, y la partida no arrancaba nunca.
+ *
+ * La regla, dicha entera: **todos confirman, incluido quien montó la mesa.**
+ * Nadie queda listo por crear la sala ni por pagar — pagar te da la silla, no
+ * la voluntad de empezar.
+ */
+export interface RoomActions {
+  /** Puede pulsar "Estoy listo" (o quitarlo). Todos los sentados. */
+  canReady: boolean;
+  /** Puede repartir. Solo el anfitrión, y solo con todos listos. */
+  canStart: boolean;
+  /** Está listo y espera a que el anfitrión reparta. */
+  waitingForHost: boolean;
+}
+
+export function roomActionsFor(room: RoomView): RoomActions {
+  const you = room.you;
+  if (!you) return { canReady: false, canStart: false, waitingForHost: false };
+
+  const todosListos = roomCanStart(room);
+  return {
+    // Confirmar es siempre suyo: es un estado, no un permiso.
+    canReady: room.status === "open",
+    canStart: you.isHost && todosListos,
+    waitingForHost: !you.isHost && todosListos,
+  };
 }
 
 /** Nombre del canal de Realtime de una sala. Mismo en los dos lados. */

@@ -297,6 +297,11 @@ export const en = {
   "room.ready.on": "I'm ready",
   "room.ready.off": "I'm not ready",
   "room.ready.saving": "Saving…",
+  "room.error.seat_token":
+    "We couldn't confirm your seat on this table. Reload the room; if it persists, your entry is paid and safe.",
+  "room.error.seat_not_paid":
+    "The chain doesn't show this wallet paying this table. Check you're on the wallet you paid with.",
+  "room.guest.waiting_host": "Everyone is ready. Waiting for the host to deal…",
   "room.guest.hint": "The host starts the match once everyone is ready.",
   "room.start.cta": "Start the match",
   "room.start.need_players": "Waiting for the room to fill up.",
@@ -1019,6 +1024,12 @@ export const es: Record<MessageKey, string> = {
   "room.ready.on": "Estoy listo",
   "room.ready.off": "Ya no estoy listo",
   "room.ready.saving": "Guardando…",
+  "room.error.seat_token":
+    "No pudimos confirmar tu silla en esta mesa. Recarga la sala; si sigue, tu entrada está pagada y a salvo.",
+  "room.error.seat_not_paid":
+    "La cadena no muestra que esta billetera haya pagado esta mesa. Revisa que estés con la que pagaste.",
+  "room.guest.waiting_host":
+    "Ya están todos listos. Esperando a que el anfitrión reparta…",
   "room.guest.hint": "El anfitrión inicia la partida cuando todos estén listos.",
   "room.start.cta": "Iniciar partida",
   "room.start.need_players": "Falta que se llene la sala.",

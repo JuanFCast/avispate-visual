@@ -9,6 +9,14 @@ import type { MessageKey, Translate } from "./i18n";
  * no ayuda a nadie a decidir qué hacer.
  */
 const TEXTS: Record<string, MessageKey> = {
+  /**
+   * Los rechazos del guardia de sillas. Merecen texto propio: en una mesa con
+   * entrada son los MÁS probables, y con el mensaje genérico la pantalla parecía
+   * congelada — tocabas y no pasaba nada, sin decir por qué.
+   */
+  seat_token_required: "room.error.seat_token",
+  seat_token_wrong_table: "room.error.seat_token",
+  seat_not_paid: "room.error.seat_not_paid",
   invalid_code: "room.error.invalid_code",
   room_not_found: "room.error.not_found",
   room_closed: "room.error.closed",
