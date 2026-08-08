@@ -8,6 +8,7 @@ import {
   generateRoomCode,
   isRoomCode,
   normalizeRoomCode,
+  roomCodeBody,
 } from "../lib/arena-rooms.ts";
 
 let failed = 0;
@@ -102,6 +103,19 @@ check("no deja pasar de la cuenta", formatRoomCodeInput("h7k2mpqrs"), "AVP-H7K2M
 check("corrige al vuelo", formatRoomCodeInput("hok"), "AVP-H0K");
 check("vacío se queda vacío", formatRoomCodeInput(""), "");
 check("si vuelve a escribir el prefijo, no se duplica", formatRoomCodeInput("AVPH7K"), "AVP-H7K");
+
+console.log("\n— El campo de unirse (solo el cuerpo, sin prefijo) —");
+
+// El campo pinta `AVP-` aparte, así que este devuelve lo de después. Antes solo
+// admitía 4 dígitos y los códigos nuevos NO se podían teclear: la primera
+// invitada a una mesa paga se quedó fuera por esto (2026-08-08).
+check("letras y dígitos", roomCodeBody("h7k2mp"), "H7K2MP");
+check("con el prefijo pegado", roomCodeBody("AVP-H7K2MP"), "H7K2MP");
+check("con prefijo y espacio", roomCodeBody("avp h7k2mp"), "H7K2MP");
+check("corrige la O al vuelo", roomCodeBody("h7k2mo"), "H7K2M0");
+check("no pasa de seis", roomCodeBody("h7k2mpqrst"), "H7K2MP");
+check("un código viejo cabe entero", roomCodeBody("4821"), "4821");
+check("vacío se queda vacío", roomCodeBody(""), "");
 
 console.log(
   failed === 0 ? "\nTodo bien.\n" : `\n${failed} comprobación(es) fallaron.\n`

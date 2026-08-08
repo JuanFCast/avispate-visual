@@ -4,8 +4,10 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ROOM_CODE_DIGITS,
+  ROOM_CODE_LENGTH,
   ROOM_CODE_PREFIX,
+  normalizeRoomCode,
+  roomCodeBody,
   roomIsFull,
   type RoomError,
   type RoomView,
@@ -46,11 +48,18 @@ export default function ArenaJoin() {
   const t = useT();
   const router = useRouter();
 
-  const [digits, setDigits] = useState("");
+  const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<JoinProblem | null>(null);
 
-  const complete = digits.length === ROOM_CODE_DIGITS;
+  /**
+   * Completo = lo que se escribió forma un código válido. Se pregunta a la
+   * misma función que valida en el servidor, en vez de contar caracteres aquí:
+   * los códigos nuevos tienen seis y los viejos cuatro, y esta pantalla no
+   * tiene por qué saberse esa historia.
+   */
+  const code = normalizeRoomCode(body);
+  const complete = Boolean(code);
 
   async function lookup(e: React.FormEvent) {
     e.preventDefault();
@@ -58,7 +67,6 @@ export default function ArenaJoin() {
     setProblem(null);
     setBusy(true);
 
-    const code = `${ROOM_CODE_PREFIX}-${digits}`;
     try {
       // Sin token: leer una sala no la toca ni ocupa nada en ella.
       const res = await fetch(`/api/arena/rooms/${code}`, { cache: "no-store" });
@@ -121,19 +129,25 @@ export default function ArenaJoin() {
             <input
               id="room-code"
               className="room-code-input"
-              value={digits}
+              value={body}
               onChange={(e) => {
-                // Acepta lo que la gente pega de verdad: `AVP-4821`, `4821`,
-                // `avp 4821`. De todo eso solo nos quedamos los dígitos.
-                setDigits(e.target.value.replace(/\D/g, "").slice(0, ROOM_CODE_DIGITS));
+                // Acepta lo que la gente pega de verdad: `AVP-H7K2MP`,
+                // `h7k2mp`, `avp h7k2mp`, y también los códigos viejos de
+                // cuatro dígitos. Y corrige al vuelo las confusiones de
+                // siempre: la O que era un cero, la I o la ele que eran un uno.
+                setBody(roomCodeBody(e.target.value));
                 setProblem(null);
               }}
-              inputMode="numeric"
+              // `text`, no `numeric`: los códigos llevan letras desde que
+              // adivinarlos dejó de ser una travesura y pasó a costar dinero.
+              inputMode="text"
+              autoCapitalize="characters"
+              autoCorrect="off"
               autoComplete="off"
               autoFocus
               spellCheck={false}
-              maxLength={ROOM_CODE_DIGITS}
-              placeholder="0000"
+              maxLength={ROOM_CODE_LENGTH}
+              placeholder="H7K2MP"
               aria-describedby="room-code-hint"
             />
           </div>

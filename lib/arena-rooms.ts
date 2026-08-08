@@ -205,6 +205,22 @@ export function isRoomCode(value: string): boolean {
 }
 
 /**
+ * El CUERPO del código tal y como debe quedar en el campo mientras se escribe:
+ * sin el prefijo (que lo pinta la pantalla aparte), en mayúsculas, solo con
+ * símbolos del alfabeto y con las confusiones ya traducidas.
+ *
+ * Existe porque el campo enseña `AVP-` como decorado fijo y el jugador solo
+ * aporta lo de después; `formatRoomCodeInput` devuelve el código entero, que
+ * ahí dentro se vería duplicado.
+ */
+export function roomCodeBody(raw: string): string {
+  return formatRoomCodeInput(raw).replace(
+    new RegExp(`^${ROOM_CODE_PREFIX}-?`),
+    ""
+  );
+}
+
+/**
  * Formato mientras se escribe: mayúsculas, el prefijo puesto por nosotros y el
  * guion donde va. El jugador solo aporta el cuerpo.
  *
