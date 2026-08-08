@@ -266,6 +266,11 @@ export const en = {
   "room.resume.title": "You still have a room open",
   "room.resume.text": "You're sitting in room {code}.",
   "room.resume.cta": "Back to my room",
+  // Una partida ya empezada no es una sala esperando: hay alguien al otro lado
+  // esperando tu carta, y se entra derecho a ella.
+  "room.resume.match.title": "You have a match in progress",
+  "room.resume.match.text": "Room {code} is already playing.",
+  "room.resume.match.cta": "Back to the match",
   "room.login.title": "Get in to open a room",
   "room.login.text":
     "With your wallet or with email — either works. A private room needs to know who's who: your friends see your alias, and the room remembers your seat if you reload.",
@@ -275,6 +280,7 @@ export const en = {
   "room.subtitle.host": "Share the code and start when everyone's ready.",
   "room.subtitle.guest": "This is the host's room. Say you're ready when you are.",
   "room.loading": "Opening the room…",
+  "room.going_to_match": "Taking you to the match…",
   "room.code.label": "Room code",
   "room.code.copy": "Copy code",
   "room.code.copied": "Copied ✓",
@@ -366,13 +372,27 @@ export const en = {
   "match.over.everyone_left": "Everyone else left the match, so it's yours.",
   "match.over.you_left": "You left the match.",
   "match.over.time": "Match time",
+  // Cuántas veces se puso una carta sobre la base, entre todos. Es la medida de
+  // cuánto se jugó: las cartas que quedan dicen dónde terminaste, esto dice
+  // cuánto costó llegar ahí.
+  "match.over.taken": "Hands taken",
   "match.over.no_prize":
     "Nothing was charged and nothing was paid out: this match was for testing the game, not the pot.",
+  /* --- La plata, en cifras --- */
+  "match.over.prize.won": "You won",
+  "match.over.prize.sending": "The payout is on its way to your wallet.",
+  "match.over.prize.sent": "Paid into your wallet.",
+  "match.over.prize.tx": "View the transaction",
+  "match.over.prize.lost": "You lost your {amount} USDT entry.",
+  "match.over.prize.to_winner": "{name} takes {amount} USDT.",
   "match.over.again": "Another room",
   "match.table.player": "Player",
+  "match.table.taken": "Hands",
   "match.table.left": "Cards left",
   "match.table.errors": "Errors",
-  "match.table.penalties": "Penalty cards",
+  // Cabecera de una tabla de cinco columnas en un teléfono: "Penalty cards" no
+  // cabe sin partirse en dos líneas y empujar a las demás.
+  "match.table.penalties": "Penalties",
   "match.table.winner": "Winner",
 
   /* ------------------------------ Top 3 lobby ---------------------------- */
@@ -993,6 +1013,9 @@ export const es: Record<MessageKey, string> = {
   "room.resume.title": "Todavía tienes una sala abierta",
   "room.resume.text": "Estás en la sala {code}.",
   "room.resume.cta": "Volver a mi sala",
+  "room.resume.match.title": "Tienes una partida en curso",
+  "room.resume.match.text": "La sala {code} ya está jugando.",
+  "room.resume.match.cta": "Volver a la partida",
   "room.login.title": "Entra para abrir una sala",
   "room.login.text":
     "Con tu wallet o con correo, como prefieras. Una sala privada necesita saber quién es quién: tus amigos ven tu alias, y la sala se acuerda de tu silla si recargas.",
@@ -1002,6 +1025,7 @@ export const es: Record<MessageKey, string> = {
   "room.subtitle.host": "Comparte el código e inicia cuando todos estén listos.",
   "room.subtitle.guest": "Esta sala la puso el anfitrión. Avisa cuando estés listo.",
   "room.loading": "Abriendo la sala…",
+  "room.going_to_match": "Te llevamos a la partida…",
   "room.code.label": "Código de la sala",
   "room.code.copy": "Copiar código",
   "room.code.copied": "Copiado ✓",
@@ -1093,13 +1117,21 @@ export const es: Record<MessageKey, string> = {
   "match.over.everyone_left": "Los demás abandonaron la partida, así que es tuya.",
   "match.over.you_left": "Abandonaste la partida.",
   "match.over.time": "Tiempo de la partida",
+  "match.over.taken": "Manos tomadas",
   "match.over.no_prize":
     "No se cobró ni se pagó nada: esta partida era para probar el juego, no el pozo.",
+  "match.over.prize.won": "Ganaste",
+  "match.over.prize.sending": "El pago va en camino a tu wallet.",
+  "match.over.prize.sent": "Pagado a tu wallet.",
+  "match.over.prize.tx": "Ver la transacción",
+  "match.over.prize.lost": "Perdiste tu entrada de {amount} USDT.",
+  "match.over.prize.to_winner": "{name} se lleva {amount} USDT.",
   "match.over.again": "Otra sala",
   "match.table.player": "Jugador",
+  "match.table.taken": "Tomadas",
   "match.table.left": "Cartas",
   "match.table.errors": "Errores",
-  "match.table.penalties": "Cartas de castigo",
+  "match.table.penalties": "Castigos",
   "match.table.winner": "Ganador",
 
   /* ------------------------------ Top 3 lobby ---------------------------- */

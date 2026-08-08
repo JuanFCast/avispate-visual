@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { placeMatchCard, sharedSymbol } from "@/lib/arena-deck";
 import { useArenaMatch } from "@/lib/arena-match-client";
-import { countdownNumber } from "@/lib/arena-match";
+import { countdownNumber, matchShellClass, type MatchPhase } from "@/lib/arena-match";
 import { useT } from "@/lib/i18n/client";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import CardView from "../CardView";
@@ -52,6 +52,22 @@ function vibrate(pattern: number | number[]) {
   if (typeof navigator !== "undefined" && "vibrate" in navigator) {
     navigator.vibrate(pattern);
   }
+}
+
+/**
+ * El contenedor de la pantalla. Existe para que TODAS las salidas de este
+ * componente pasen por el mismo sitio y ninguna se quede con las clases de otra
+ * fase: el candado de scroll del tablero puesto en los resultados fue
+ * exactamente ese error. Ver `matchShellClass`.
+ */
+function MatchShell({
+  phase,
+  children,
+}: {
+  phase: MatchPhase | null;
+  children: React.ReactNode;
+}) {
+  return <main className={matchShellClass(phase)}>{children}</main>;
 }
 
 /**
@@ -281,23 +297,29 @@ export default function ArenaMatch({ code }: { code: string }) {
 
   if (loading && !view) {
     return (
-      <section className="arena-card room-state" aria-busy="true">
-        <p className="arena-hero-text">{t("match.loading")}</p>
-      </section>
+      <MatchShell phase={null}>
+        <section className="arena-card room-state" aria-busy="true">
+          <p className="arena-hero-text">{t("match.loading")}</p>
+        </section>
+      </MatchShell>
     );
   }
 
   if (!view) {
     return (
-      <section className="arena-card arena-hero room-state">
-        <h1 className="arena-hero-title">{t("match.gone.title")}</h1>
-        <p className="arena-hero-text">
-          {error === "not_playing" ? t("match.gone.not_yours") : t("match.gone.text")}
-        </p>
-        <Link className="arena-cta" href="/arena">
-          {t("room.error.cta")}
-        </Link>
-      </section>
+      <MatchShell phase={null}>
+        <section className="arena-card arena-hero room-state">
+          <h1 className="arena-hero-title">{t("match.gone.title")}</h1>
+          <p className="arena-hero-text">
+            {error === "not_playing"
+              ? t("match.gone.not_yours")
+              : t("match.gone.text")}
+          </p>
+          <Link className="arena-cta" href="/arena">
+            {t("room.error.cta")}
+          </Link>
+        </section>
+      </MatchShell>
     );
   }
 
@@ -308,12 +330,16 @@ export default function ArenaMatch({ code }: { code: string }) {
   );
 
   if (phase === "finished") {
-    return <ArenaMatchOver view={view} elapsedMs={elapsedMs} />;
+    return (
+      <MatchShell phase="finished">
+        <ArenaMatchOver view={view} elapsedMs={elapsedMs} />
+      </MatchShell>
+    );
   }
 
   if (phase === "countdown") {
     return (
-      <>
+      <MatchShell phase="countdown">
         <ArenaMatchPlayers you={view.you} rivals={view.rivals} />
         <div className="countdown">
           <div className="countdown-badge" key={count}>
@@ -321,7 +347,7 @@ export default function ArenaMatch({ code }: { code: string }) {
           </div>
         </div>
         <p className="arena-prize-note">{t("match.countdown.hint")}</p>
-      </>
+      </MatchShell>
     );
   }
 
@@ -329,7 +355,7 @@ export default function ArenaMatch({ code }: { code: string }) {
   const rails = railsOf(view.you, view.rivals);
 
   return (
-    <>
+    <MatchShell phase="playing">
       {failures >= OFFLINE_AFTER && (
         <p className="room-warn" role="status">
           {t("match.you_offline")}
@@ -432,6 +458,6 @@ export default function ArenaMatch({ code }: { code: string }) {
       <button type="button" className="match-quit" onClick={leave}>
         {t("match.quit")}
       </button>
-    </>
+    </MatchShell>
   );
 }

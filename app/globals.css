@@ -4761,11 +4761,46 @@ body {
 
 /* --- Final de la partida --- */
 
+/*
+ * Al terminar, el candado se suelta.
+ *
+ * `.shell.playing` clava el alto a `100dvh` y esconde el desbordamiento porque
+ * el tablero tiene que caber entero en una pantalla: durante la partida, un
+ * scroll a mitad de carrera es una forma de perder. La de resultados es lo
+ * contrario —crece con la gente que había en la mesa y con lo que hay que
+ * contarle a cada uno— y hasta ahora heredaba el candado, así que quedaba
+ * recortada al alto del viewport y no había manera de bajar hasta "Otra sala".
+ *
+ * En un navegador de escritorio no se veía porque cabía. En un teléfono dentro
+ * de MiniPay, con el WebView comiéndose alto arriba y abajo, no cabía; y le
+ * pasaba a UNO de los dos porque el que pierde tiene una línea más de texto.
+ *
+ * `min-height` y no `height`: la pantalla llena el viewport cuando el contenido
+ * es corto y lo desborda cuando es largo, que es exactamente lo que hace falta.
+ */
+.shell.match-shell-done {
+  height: auto;
+  min-height: 100dvh;
+  overflow: visible;
+  /* Nada de repartir el sobrante desde el contenedor: cuando no hay sobrante,
+     ese reparto empuja el borde de arriba fuera del área desplazable. */
+  justify-content: flex-start;
+  /* Por encima de la barra de gestos: el último botón tiene que ser tocable. */
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  /* Un dedo arrastra la página aunque empiece sobre la tabla. */
+  touch-action: pan-y;
+}
+
 .match-over {
   align-items: center;
   text-align: center;
   width: 100%;
   max-width: 460px;
+  /*
+   * Centrado vertical por margen automático y no por `justify-content`: el
+   * margen automático se calcula sobre el sobrante REAL, así que cuando la
+   * tarjeta es más alta que el viewport vale cero y no esconde el principio.
+   */
   margin: auto;
 }
 
@@ -4800,37 +4835,138 @@ body {
   line-height: 1.45;
 }
 
-.match-over-time {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 10px;
+/*
+ * Las dos medidas de la partida entera: cuánto duró y cuántas manos se tomaron.
+ *
+ * Van en la misma tira y con el mismo peso porque contestan la misma pregunta
+ * desde dos lados —qué tan rápido y qué tan disputada— y separarlas convertiría
+ * la segunda en una nota al pie.
+ */
+.match-over-figures {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
   width: 100%;
   padding: 10px 14px;
   border-radius: 16px;
   background: var(--yellow-faint);
   border: 2px solid var(--yellow-line);
-  font-weight: 700;
 }
 
-.match-over-time strong {
+.match-over-figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.match-over-figure dt {
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray);
+}
+
+.match-over-figure dd {
   font-family: var(--font-title);
   font-size: 1.4rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- La plata --- */
+
+/*
+ * El premio no es una nota al pie de los resultados: en una mesa con entrada es
+ * lo primero que se busca. Va justo debajo del titular, en bloque y con la
+ * cifra en grande, para que se lea de reojo antes que la tabla.
+ */
+.match-prize {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 2px solid var(--good);
+  background: #e8f8ef;
+}
+
+/* Perder cuesta plata y la pantalla no lo maquilla, pero tampoco lo grita: gris
+   sobrio, sin el rojo de error — no te equivocaste, te ganaron. */
+.match-prize.lost {
+  border-color: var(--gray-soft);
+  background: var(--bg);
+}
+
+.match-prize-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #12894f;
+}
+
+.match-prize-amount {
+  font-family: var(--font-title);
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.05;
+  color: #12894f;
+}
+
+.match-prize-lead {
+  font-family: var(--font-title);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.match-prize-note {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: 0.7;
+  line-height: 1.4;
+}
+
+.match-prize-tx {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #12894f;
+  text-decoration: underline;
 }
 
 /* Las cifras de los dos, lado a lado: perder sin saber por qué es una pared. */
+/* Cinco columnas en un teléfono de 320 px: la tabla se aprieta en vez de
+   desbordarse de lado, que en una pantalla que ya hay que desplazar hacia abajo
+   sería el segundo eje de scroll y el peor. */
 .match-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
-  font-size: 0.86rem;
+  font-size: 0.82rem;
 }
 
 .match-table th,
 .match-table td {
-  padding: 8px 6px;
+  padding: 8px 3px;
   border-bottom: 2px solid var(--gray-soft);
   text-align: center;
+}
+
+/* El nombre se lleva el ancho que sobra; las cuatro cifras caben en lo mismo. */
+.match-table tbody th,
+.match-table thead th:first-child {
+  width: auto;
+}
+
+.match-table thead th:not(:first-child) {
+  width: 3.6rem;
 }
 
 .match-table thead th {
@@ -4850,7 +4986,7 @@ body {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
-  max-width: 9rem;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

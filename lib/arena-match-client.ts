@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { withSeatHeader } from "./seat-token-client";
 import {
-  MATCH_POLL_MS,
+  matchPollMs,
   type MatchError,
   type MatchView,
   type MoveOutcome,
@@ -121,9 +121,17 @@ export function useArenaMatch(code: string): ArenaMatchApi {
     refreshRef.current = refresh;
   }, [refresh]);
 
+  /*
+   * `stopRef` solo frena lo que ya no tiene respuesta posible. La partida
+   * terminada NO entra aquí, aunque antes sí: el ritmo del latido lo decide
+   * `matchPollMs`, que en esa fase baja a seis segundos mientras falte
+   * confirmar el pago del premio y luego para. Frenarlo aquí además dejaba el
+   * `refresh` manual muerto, y con él la única forma de que el ganador viera
+   * "pagado" sin recargar la página.
+   */
   useEffect(() => {
-    stopRef.current = state.error === "no_match" || state.view?.phase === "finished";
-  }, [state.error, state.view?.phase]);
+    stopRef.current = state.error === "no_match";
+  }, [state.error]);
 
   /** Empuja a la otra pantalla. Solo dice "mira otra vez"; no lleva estado. */
   const notify = useCallback(() => {
@@ -199,13 +207,16 @@ export function useArenaMatch(code: string): ArenaMatchApi {
   }, [code, authHeaders, absorb, notify]);
 
   // Latido. Espera a que Privy hidrate: sin token, el servidor no sabe cuál de
-  // las dos manos es la tuya.
+  // las dos manos es la tuya. El ritmo cambia con la fase y puede apagarse del
+  // todo: ver `matchPollMs`.
+  const pollMs = matchPollMs(state.view, state.error, Date.now());
+
   useEffect(() => {
-    if (!ready || !authenticated) return;
+    if (!ready || !authenticated || pollMs === null) return;
     refreshRef.current();
-    const id = setInterval(() => refreshRef.current(), MATCH_POLL_MS);
+    const id = setInterval(() => refreshRef.current(), pollMs);
     return () => clearInterval(id);
-  }, [ready, authenticated, code]);
+  }, [ready, authenticated, code, pollMs]);
 
   useEffect(() => {
     const onVisible = () => {

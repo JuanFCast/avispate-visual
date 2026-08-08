@@ -30,9 +30,11 @@ import {
   RIVAL_STALE_MS,
   type MatchError,
   type MatchPlayerView,
+  type MatchStakes,
   type MatchView,
   type MoveOutcome,
 } from "../arena-match";
+import { arenaPrize } from "../arena";
 import { initialOf, shortWallet } from "../arena-rooms";
 import { getRoomByCode, roomIsLive } from "./arena-rooms";
 import { getSupabaseAdmin } from "./server";
@@ -304,21 +306,125 @@ async function settleClosedMatch(match: MatchRow): Promise<void> {
   }
 }
 
-/** ¿La mesa de esta partida cobra entrada? Decide el margen del abandono. */
-async function roomChargesEntry(roomId: string): Promise<boolean> {
+interface RoomTerms {
+  id: string;
+  tableId: string | null;
+  entryUnits: bigint;
+  maxPlayers: number;
+}
+
+/**
+ * Las condiciones de la mesa donde se juega esta partida.
+ *
+ * Una sola lectura para dos preguntas que antes se hacían por separado: cuánto
+ * se espera antes de dar a alguien por ido (más en una mesa con entrada) y qué
+ * hay en juego, que es lo que la pantalla de resultados necesita para decir una
+ * cifra en vez de un "sin premio" genérico.
+ *
+ * Devuelve `null` si no se pudo leer. Quien llama decide qué hacer con eso; el
+ * margen de abandono, por ejemplo, elige el LARGO: equivocarse esperando de más
+ * solo retrasa un final, y esperando de menos le quita la entrada a alguien que
+ * sí estaba.
+ */
+async function roomTermsOf(roomId: string): Promise<RoomTerms | null> {
   try {
     const db = getSupabaseAdmin();
     const { data } = await db
       .from("arena_rooms")
-      .select("table_id")
+      .select("id, table_id, entry_units, max_players")
       .eq("id", roomId)
       .maybeSingle();
-    return Boolean(data?.table_id);
+    if (!data) return null;
+    return {
+      id: data.id as string,
+      tableId: (data.table_id as string | null) ?? null,
+      entryUnits: BigInt(data.entry_units as string),
+      maxPlayers: Number(data.max_players),
+    };
   } catch {
-    // Si no se sabe, se usa el margen LARGO: equivocarse esperando de más solo
-    // retrasa un final, y equivocarse esperando de menos le quita la entrada a
-    // alguien que sí estaba.
-    return true;
+    return null;
+  }
+}
+
+/**
+ * Terminada la partida, la sala se cierra.
+ *
+ * Sin esto la mesa se quedaba `open` para siempre, y `findActiveRoom` seguía
+ * encontrándola: al volver a la Arena, el jugador veía "Todavía tienes una sala
+ * abierta" y "Volver a mi sala" lo devolvía a la partida que acababa de
+ * terminar. El aviso decía la verdad de la base de datos y una mentira sobre el
+ * juego —esa mesa ya no admite a nadie ni se puede volver a jugar—, y era la
+ * pared con la que se topaba el que solo quería otra partida.
+ *
+ * Las sillas NO se borran: `arena_room_players` es de donde sale la dirección a
+ * la que el contrato le paga el premio al ganador (ver `settleFinishedMatch`).
+ * Cerrar la sala basta para que deje de contar como abierta, y borrarla
+ * costaría el premio.
+ *
+ * Idempotente por el `.eq("status", "open")`: la segunda lectura no escribe.
+ */
+async function retireRoomOfMatch(match: MatchRow): Promise<void> {
+  try {
+    const db = getSupabaseAdmin();
+    await db
+      .from("arena_rooms")
+      .update({ status: "closed", closed_at: new Date().toISOString() })
+      .eq("id", match.room_id)
+      .eq("status", "open");
+  } catch {
+    // La sala caduca sola por `ROOM_TTL_MS`. Un fallo aquí retrasa el aviso,
+    // no rompe nada, y desde luego no puede tumbar la pantalla de resultados.
+  }
+}
+
+/**
+ * Lo que había en juego, tal como se lo tiene que poder leer el jugador.
+ *
+ * Va calculado en el servidor y no en la pantalla por una razón concreta: la
+ * cifra del premio es una promesa de pago, y una promesa la hace quien puede
+ * cumplirla. El navegador tiene la entrada y el número de sillas, sí, pero
+ * dejarle la multiplicación significaría que el día que cambie la comisión haya
+ * dos verdades sobre cuánto se ganó.
+ *
+ * El estado del pago solo se consulta con la partida terminada: durante el
+ * juego nadie lo mira y sería una consulta por segundo a cambio de nada.
+ */
+async function stakesOf(
+  match: MatchRow,
+  terms: RoomTerms | null
+): Promise<MatchStakes> {
+  // Mesa gratis (o sala ilegible): las cifras van en cero y `paid` en false,
+  // que es lo que hace que la pantalla lo diga con letras en vez de enseñar un
+  // premio de 0.00 USDT, que se lee como un error.
+  if (!terms?.tableId) {
+    return {
+      entryUnits: terms ? terms.entryUnits.toString() : "0",
+      prizeUnits: "0",
+      paid: false,
+      payout: null,
+    };
+  }
+
+  const prize = arenaPrize(terms.entryUnits, terms.maxPlayers);
+  return {
+    entryUnits: terms.entryUnits.toString(),
+    prizeUnits: prize.winnerUnits.toString(),
+    paid: true,
+    payout: match.finished_at ? await payoutOf(terms.tableId) : null,
+  };
+}
+
+/** El pago del premio: si ya se reclamó y si la cadena lo confirmó. */
+async function payoutOf(
+  tableId: string
+): Promise<{ txHash: string | null } | null> {
+  try {
+    const row = await settlementOf(tableId);
+    return row ? { txHash: row.tx_hash } : null;
+  } catch {
+    // Sin respuesta se dice "en camino", que es lo cierto, en vez de fingir que
+    // no hay premio.
+    return null;
   }
 }
 
@@ -357,7 +463,9 @@ export async function readMatch(params: {
     mine.last_seen_at = new Date().toISOString();
   }
 
-  const paid = await roomChargesEntry(match.room_id);
+  const terms = await roomTermsOf(match.room_id);
+  // Sin poder leer la sala se asume mesa con entrada: el margen largo.
+  const paid = terms ? Boolean(terms.tableId) : true;
   const closed = await closeIfAbandoned(
     match,
     players,
@@ -378,8 +486,14 @@ export async function readMatch(params: {
    * esperarlo: la pantalla de resultados no tiene por qué mirar a la cadena, y
    * lo que falle lo retoma el cron.
    */
-  if (match.finished_at) void settleClosedMatch(match);
+  if (match.finished_at) {
+    void settleClosedMatch(match);
+    // Y la mesa deja de estar abierta, que es lo que hacía que la Arena
+    // siguiera ofreciendo "Volver a mi sala" a una partida ya jugada.
+    void retireRoomOfMatch(match);
+  }
 
+  const stakes = await stakesOf(match, terms);
   const cards = buildMatchDeck(match.seed);
   const views = players.map((p) => toPlayerView(p, params.viewerProfileId ?? null, now));
   const you = views.find((v) => v.isYou) ?? null;
@@ -408,6 +522,7 @@ export async function readMatch(params: {
       winnerProfileId: match.winner_profile_id,
       endReason: match.end_reason,
       cardsPerPlayer: match.cards_per_player,
+      stakes,
       you,
       rivals,
     },

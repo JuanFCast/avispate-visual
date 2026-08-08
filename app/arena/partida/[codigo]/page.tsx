@@ -24,17 +24,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
  * "Perfil" al lado de la carta es una forma de perder. Se sale por el enlace de
  * abandonar, que además le da la victoria al otro en vez de dejarlo esperando.
  *
- * `shell playing` es la misma clase del reto diario, y por eso el tablero se ve
- * igual: mismos tamaños de carta, mismo aire y la misma reordenación en
- * horizontal.
+ * El `<main>` lo pinta `ArenaMatch` y no esta página, aunque sea un envoltorio
+ * y los envoltorios suelan vivir aquí. El motivo es que sus clases dependen de
+ * la fase —jugando el alto se clava al viewport y no hay scroll; al terminar
+ * tiene que haberlo— y la fase solo la conoce el cliente. Con el `<main>` aquí,
+ * el candado del tablero seguía puesto en la pantalla de resultados y no se
+ * podía bajar a leerlos. Ver `matchShellClass`.
  */
 export default async function ArenaMatchPage({ params }: Props) {
   const { codigo } = await params;
   const raw = decodeURIComponent(codigo);
 
-  return (
-    <main className="shell playing match-shell">
-      <ArenaMatch code={normalizeRoomCode(raw) ?? raw} />
-    </main>
-  );
+  return <ArenaMatch code={normalizeRoomCode(raw) ?? raw} />;
 }

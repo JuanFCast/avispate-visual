@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { fmtUsdt } from "@/lib/arena";
 import { formatMs } from "@/lib/game";
-import type { MatchPlayerView, MatchView } from "@/lib/arena-match";
+import type { MatchPlayerView, MatchStakes, MatchView } from "@/lib/arena-match";
 import { matchResultFor, standingsOf } from "@/lib/arena-match";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey, Translate } from "@/lib/i18n";
@@ -14,16 +15,23 @@ function ordinal(place: number, t: Translate): string {
 }
 
 /**
- * Final de la partida: en qué puesto quedaste y por qué.
+ * Final de la partida: en qué puesto quedaste, por qué, y qué pasó con la plata.
  *
- * Enseña las cuatro cifras de TODOS en la misma tabla, ordenada por puesto.
- * Perder sabiendo que fue por dos cartas de castigo es información; perder
- * viendo solo "perdiste" es una pared. Con tres o cuatro en la mesa hace falta
- * además el puesto: quedar segundo de cuatro y quedar último son dos partidas
- * distintas y "Perdiste" las cuenta igual.
+ * Enseña las cifras de TODOS en la misma tabla, ordenada por puesto. Perder
+ * sabiendo que fue por dos cartas de castigo es información; perder viendo solo
+ * "perdiste" es una pared. Con tres o cuatro en la mesa hace falta además el
+ * puesto: quedar segundo de cuatro y quedar último son dos partidas distintas y
+ * "Perdiste" las cuenta igual.
  *
- * Y como no hay dinero en juego todavía, la pantalla lo dice en vez de dejar
- * que alguien lo suponga.
+ * Las manos tomadas —cuántas veces cada uno puso su carta sobre la base— son la
+ * cifra que faltaba y la que de verdad cuenta la partida: las cartas que quedan
+ * dicen dónde terminaste, las tomadas dicen cuánto jugaste para llegar ahí. Van
+ * dos veces a propósito: el total arriba, junto al tiempo, porque es la medida
+ * de la partida entera; y por jugador en la tabla, porque es la de cada uno.
+ *
+ * Y el dinero se dice en cifras. Si la mesa cobraba, aquí aparece cuánto se
+ * ganó y si el pago ya salió; si no cobraba, se dice eso, que también es una
+ * respuesta.
  */
 export default function ArenaMatchOver({
   view,
@@ -41,6 +49,7 @@ export default function ArenaMatchOver({
   const many = standings.length > 2;
   const place = standings.findIndex((p) => p.isYou) + 1;
   const winner = standings.find((p) => p.profileId === view.winnerProfileId);
+  const taken = standings.reduce((sum, p) => sum + p.correct, 0);
 
   /**
    * Con un rival, "tu rival" señala a alguien. Con tres deja de señalar, así
@@ -78,15 +87,25 @@ export default function ArenaMatchOver({
       )}
       <p className="match-over-lead">{lead}</p>
 
-      <p className="match-over-time">
-        <span>{t("match.over.time")}</span>
-        <strong>{formatMs(elapsedMs)}</strong>
-      </p>
+      <Prize stakes={view.stakes} won={won} winner={winner ?? null} t={t} />
+
+      {/* Las dos medidas de la partida entera, una al lado de la otra. */}
+      <dl className="match-over-figures">
+        <div className="match-over-figure">
+          <dt>{t("match.over.time")}</dt>
+          <dd>{formatMs(elapsedMs)}</dd>
+        </div>
+        <div className="match-over-figure">
+          <dt>{t("match.over.taken")}</dt>
+          <dd>{taken}</dd>
+        </div>
+      </dl>
 
       <table className="match-table">
         <thead>
           <tr>
             <th scope="col">{t("match.table.player")}</th>
+            <th scope="col">{t("match.table.taken")}</th>
             <th scope="col">{t("match.table.left")}</th>
             <th scope="col">{t("match.table.errors")}</th>
             <th scope="col">{t("match.table.penalties")}</th>
@@ -99,8 +118,6 @@ export default function ArenaMatchOver({
         </tbody>
       </table>
 
-      <p className="arena-prize-note">{t("match.over.no_prize")}</p>
-
       {/* Los dos enlaces no van al mismo sitio: la revancha es armar otra sala,
           y volver a la Arena es lo otro que se puede querer hacer. */}
       <Link className="arena-cta" href="/arena/crear">
@@ -110,6 +127,75 @@ export default function ArenaMatchOver({
         {t("join.exit.arena")}
       </Link>
     </section>
+  );
+}
+
+/**
+ * Qué pasó con el dinero.
+ *
+ * Tres pantallas distintas y no una con condicionales dentro del texto: el que
+ * ganó una mesa con entrada quiere ver la cifra y saber si ya salió el pago; el
+ * que perdió quiere saber cuánto le costó y a quién se lo llevó; y en una mesa
+ * gratis lo único honesto es decir que no había nada en juego.
+ *
+ * El estado del pago no se esconde mientras se confirma. "Va en camino" es la
+ * verdad durante los segundos que tarda la cadena, y callarlo dejaría al ganador
+ * mirando una pantalla que le prometió plata sin decirle dónde está.
+ */
+function Prize({
+  stakes,
+  won,
+  winner,
+  t,
+}: {
+  stakes: MatchStakes;
+  won: boolean;
+  winner: MatchPlayerView | null;
+  t: Translate;
+}) {
+  if (!stakes.paid) {
+    return <p className="arena-prize-note">{t("match.over.no_prize")}</p>;
+  }
+
+  const prize = fmtUsdt(BigInt(stakes.prizeUnits));
+  const entry = fmtUsdt(BigInt(stakes.entryUnits));
+
+  if (!won) {
+    return (
+      <div className="match-prize lost">
+        <p className="match-prize-lead">
+          {t("match.over.prize.lost", { amount: entry })}
+        </p>
+        <p className="match-prize-note">
+          {t("match.over.prize.to_winner", {
+            name: winner?.name || t("room.players.anon"),
+            amount: prize,
+          })}
+        </p>
+      </div>
+    );
+  }
+
+  const hash = stakes.payout?.txHash ?? null;
+
+  return (
+    <div className="match-prize won">
+      <span className="match-prize-label">{t("match.over.prize.won")}</span>
+      <strong className="match-prize-amount">{prize} USDT</strong>
+      <p className="match-prize-note" aria-live="polite">
+        {hash ? t("match.over.prize.sent") : t("match.over.prize.sending")}
+      </p>
+      {hash && (
+        <a
+          className="match-prize-tx"
+          href={`https://celoscan.io/tx/${hash}`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {t("match.over.prize.tx")}
+        </a>
+      )}
+    </div>
   );
 }
 
@@ -137,6 +223,7 @@ function Row({
           </span>
         )}
       </th>
+      <td>{player.correct}</td>
       <td>{player.cardsLeft}</td>
       <td>{player.errors}</td>
       <td>{player.penalties}</td>

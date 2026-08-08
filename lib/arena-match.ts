@@ -26,6 +26,23 @@ export const COUNTDOWN_MS = 4_500;
  */
 export const MATCH_POLL_MS = 1_000;
 
+/**
+ * Cada cuánto pregunta la pantalla de resultados mientras espera el premio.
+ *
+ * Terminada la partida no hay nada que refrescar salvo una cosa: si el pago del
+ * ganador ya salió a la cadena. Un segundo sería absurdo para eso; seis dan la
+ * confirmación en la misma pantalla, sin que nadie tenga que recargar para
+ * saber si le pagaron.
+ */
+export const SETTLED_POLL_MS = 6_000;
+
+/**
+ * Y no para siempre. Pasado este rato desde el final, la pantalla deja de
+ * preguntar: si la liquidación no salió en cinco minutos, no va a salir por
+ * insistir —la retoma el cron— y el ganador tiene el premio en su perfil.
+ */
+export const SETTLE_WATCH_MS = 5 * 60_000;
+
 /** Sin latido durante este rato, al rival se le pinta "Desconectado". */
 export const RIVAL_STALE_MS = 8_000;
 
@@ -88,6 +105,36 @@ export interface MatchPlayerView {
   isYou: boolean;
 }
 
+/**
+ * Cuánto había en juego en esta mesa, y qué pasó con el dinero.
+ *
+ * Viaja con la partida —y no se recalcula en el navegador— porque la pantalla
+ * de resultados tiene que poder decir una cifra exacta: "ganaste 0.16 USDT" es
+ * una promesa, y una promesa la hace el servidor o no la hace nadie.
+ *
+ * En una mesa gratis `paid` es `false` y las cifras van en cero: la pantalla lo
+ * dice con todas las letras en vez de enseñar un premio de 0.00.
+ */
+export interface MatchStakes {
+  /** Lo que costó la silla, en unidades de USDT. "0" en las mesas gratis. */
+  entryUnits: string;
+  /**
+   * Lo que se lleva quien gana, ya descontada la comisión. Va calculado y no
+   * en piezas (entrada × sillas − comisión) para que la pantalla no pueda
+   * llegar a un número distinto del que se paga.
+   */
+  prizeUnits: string;
+  /** `true` solo si la mesa cobra de verdad: tiene mesa en el contrato. */
+  paid: boolean;
+  /**
+   * El pago del premio. `null` mientras no se haya reclamado; con `txHash` en
+   * `null`, reclamado pero todavía sin confirmar en la cadena. Los dos primeros
+   * estados se le cuentan igual al ganador —"va en camino"—, pero se distinguen
+   * aquí porque significan cosas distintas para quien tenga que ir a mirar.
+   */
+  payout: { txHash: string | null } | null;
+}
+
 export interface MatchView {
   code: string;
   phase: MatchPhase;
@@ -113,9 +160,36 @@ export interface MatchView {
   endReason: "cleared" | "abandoned" | null;
   /** Cuántas cartas recibió cada uno al repartir. La misma cifra para todos. */
   cardsPerPlayer: number;
+  /** La apuesta de la mesa y el destino del premio. */
+  stakes: MatchStakes;
   you: MatchPlayerView | null;
   /** Los demás, en orden de silla. Pueden ser uno, dos o tres. */
   rivals: MatchPlayerView[];
+}
+
+/**
+ * Las clases del contenedor de la partida, según en qué va.
+ *
+ * ── Por qué esto es una función y no una cadena escrita en la página ────────
+ *
+ * `playing` es un CANDADO: fija el alto a `100dvh` y esconde el desbordamiento
+ * para que el tablero quepa entero en una pantalla, sin scroll que estorbe a
+ * mitad de una carrera. Mientras se juega es lo correcto.
+ *
+ * La página la ponía como texto fijo, así que el candado seguía puesto al
+ * terminar: la pantalla de resultados quedaba recortada al alto del viewport y
+ * no había forma de bajar hasta "Otra sala". En un navegador de escritorio no
+ * se notaba —cabía— y en un teléfono dentro de MiniPay, con la barra del
+ * WebView comiéndose alto, no cabía. Le pasó al que perdió y no al que ganó,
+ * porque el perdedor tiene una línea más ("Quedaste 2º de 3").
+ *
+ * Ahora el candado depende de la fase, y depende de ella AQUÍ, en una función
+ * pura que `scripts/verify-match-over-scroll.ts` puede interrogar. Si alguien
+ * vuelve a fijarlo, la verificación falla antes que el jugador.
+ */
+export function matchShellClass(phase: MatchPhase | null): string {
+  const locked = phase === "countdown" || phase === "playing";
+  return `shell match-shell ${locked ? "playing" : "match-shell-done"}`;
 }
 
 /** ¿Ya se puede tocar? */
@@ -136,6 +210,31 @@ export function countdownNumber(startsAt: string, now: number): number {
   const left = new Date(startsAt).getTime() - now;
   if (left <= 0) return 0;
   return Math.min(3, Math.ceil(left / 1000));
+}
+
+/**
+ * Cada cuánto volver a preguntar por la partida, o `null` para dejar de hacerlo.
+ *
+ * Tres ritmos y no uno: jugando, cada segundo, porque un retraso en la base
+ * compartida se siente como un juego roto. Terminada y con premio pendiente,
+ * cada seis, solo para poder decir "pagado" sin recargar. Terminada y sin nada
+ * que esperar, nunca — un latido contra una partida que ya no cambia es gasto
+ * de batería y de servidor.
+ */
+export function matchPollMs(
+  view: MatchView | null,
+  error: MatchError | null,
+  now: number
+): number | null {
+  // La partida no existe: preguntar otra vez daría el mismo 404.
+  if (error === "no_match") return null;
+  if (!view || view.phase !== "finished") return MATCH_POLL_MS;
+
+  const settled = view.stakes.payout?.txHash;
+  if (!view.stakes.paid || settled) return null;
+
+  const since = view.finishedAt ? now - new Date(view.finishedAt).getTime() : 0;
+  return since < SETTLE_WATCH_MS ? SETTLED_POLL_MS : null;
 }
 
 /** Ganó, perdió, o todavía nada. */
