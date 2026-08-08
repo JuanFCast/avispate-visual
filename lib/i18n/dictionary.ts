@@ -301,17 +301,23 @@ export const en = {
   "room.players.you": "you",
   "room.players.anon": "Player",
   "room.ready.on": "I'm ready",
-  "room.ready.off": "I'm not ready",
+  // Deshacer la confirmación. Deliberadamente neutro y no "I'm not ready":
+  // es una acción secundaria y discreta, no el reverso de un botón principal.
+  "room.ready.undo": "Change my status",
   "room.ready.saving": "Saving…",
   "room.error.seat_token":
     "We couldn't confirm your seat on this table. Reload the room; if it persists, your entry is paid and safe.",
   "room.error.seat_not_paid":
     "The chain doesn't show this wallet paying this table. Check you're on the wallet you paid with.",
   "room.guest.waiting_host": "Everyone is ready. Waiting for the host to deal…",
-  "room.guest.hint": "The host starts the match once everyone is ready.",
   "room.start.cta": "Start the match",
-  "room.start.need_players": "Waiting for the room to fill up.",
-  "room.start.need_ready": "Waiting for everyone to say they're ready.",
+  // Qué falta, con cifras: "Waiting for 1 player…" se entiende sin contar
+  // sillas, y "Waiting for the room to fill up" no.
+  "room.start.waiting_one": "Waiting for 1 player…",
+  "room.start.waiting_many": "Waiting for {n} players…",
+  "room.start.need_you": "You still have to confirm.",
+  "room.start.need_confirm_one": "1 player still has to confirm.",
+  "room.start.need_confirm_many": "{n} players still have to confirm.",
   "room.start.ready": "Everyone's in. You can start.",
   "room.start.dealing": "Dealing…",
   "room.join_this.cta": "Join this room",
@@ -1046,7 +1052,7 @@ export const es: Record<MessageKey, string> = {
   "room.players.you": "tú",
   "room.players.anon": "Jugador",
   "room.ready.on": "Estoy listo",
-  "room.ready.off": "Ya no estoy listo",
+  "room.ready.undo": "Cambiar estado",
   "room.ready.saving": "Guardando…",
   "room.error.seat_token":
     "No pudimos confirmar tu silla en esta mesa. Recarga la sala; si sigue, tu entrada está pagada y a salvo.",
@@ -1054,10 +1060,12 @@ export const es: Record<MessageKey, string> = {
     "La cadena no muestra que esta billetera haya pagado esta mesa. Revisa que estés con la que pagaste.",
   "room.guest.waiting_host":
     "Ya están todos listos. Esperando a que el anfitrión reparta…",
-  "room.guest.hint": "El anfitrión inicia la partida cuando todos estén listos.",
   "room.start.cta": "Iniciar partida",
-  "room.start.need_players": "Falta que se llene la sala.",
-  "room.start.need_ready": "Falta que todos digan que están listos.",
+  "room.start.waiting_one": "Esperando 1 jugador…",
+  "room.start.waiting_many": "Esperando {n} jugadores…",
+  "room.start.need_you": "Falta que confirmes tú.",
+  "room.start.need_confirm_one": "Falta 1 jugador por confirmar.",
+  "room.start.need_confirm_many": "Faltan {n} jugadores por confirmar.",
   "room.start.ready": "Están todos. Ya puedes iniciar.",
   "room.start.dealing": "Repartiendo…",
   "room.join_this.cta": "Unirme a esta sala",

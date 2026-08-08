@@ -4371,8 +4371,27 @@ body {
   text-align: right;
 }
 
+/*
+ * "✓ Listo" en verde y en píldora, no en texto suelto.
+ *
+ * Desde que confirmar dejó de ser un conmutador, esta es la ÚNICA respuesta a
+ * "¿ya dije que estoy listo?" — antes la daba el propio botón, que se quedaba
+ * hundido en verde. Si va a cargar con esa pregunta tiene que contestarla de
+ * reojo, y un texto gris verdoso del mismo tamaño que "Sin confirmar" no lo
+ * hace.
+ */
 .room-seat-state.ready {
   color: #12894f;
+  background: #e6f7ee;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+/* Tu silla, resaltada: en una mesa de cuatro es la que se busca primero. */
+.room-seat-mine {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 2px var(--cyan-soft);
 }
 
 /* --- Botonera de la sala --- */
@@ -4381,14 +4400,39 @@ body {
   gap: 12px;
 }
 
-/* Ya dijo que sí: el botón deja de invitar y pasa a confirmar. */
-.room-ready-on {
-  background: var(--good);
-  box-shadow: 0 5px 0 #218c52;
+/*
+ * Deshacer la confirmación: presente, y pequeño.
+ *
+ * Era un `btn-primary` a pantalla completa que decía "Ya no estoy listo", y
+ * caía justo al lado de "Iniciar partida": dos botones del mismo tamaño, uno
+ * para empezar la partida y otro para deshacer algo que acabas de hacer. El
+ * segundo ganaba por posición y el primero, que es el que importa, parecía
+ * opcional.
+ *
+ * Aquí es una píldora de contorno, centrada y del ancho de su texto. Sigue
+ * teniendo los 44 px de alto que necesita un dedo — discreto no es diminuto.
+ */
+.room-undo-ready {
+  align-self: center;
+  min-height: 44px;
+  padding: 8px 18px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 999px;
+  background: var(--white);
+  font-family: var(--font-title);
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--gray);
+  cursor: pointer;
 }
 
-.room-ready-on:active {
-  box-shadow: 0 1px 0 #218c52;
+.room-undo-ready:active {
+  transform: translateY(1px);
+}
+
+.room-undo-ready:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .room-leave {

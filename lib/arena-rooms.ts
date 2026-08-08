@@ -1,3 +1,5 @@
+import type { MessageKey, Vars } from "./i18n";
+
 /**
  * Salas privadas de la Arena: el código, la forma del estado y las reglas que
  * el navegador y el servidor tienen que leer IGUAL.
@@ -252,8 +254,19 @@ export function roomCanStart(room: RoomView): boolean {
  * la voluntad de empezar.
  */
 export interface RoomActions {
-  /** Puede pulsar "Estoy listo" (o quitarlo). Todos los sentados. */
-  canReady: boolean;
+  /**
+   * Todavía no ha confirmado: le toca el botón principal "Estoy listo".
+   *
+   * Confirmar y deshacer son dos cosas distintas y por eso son dos campos, no
+   * un `canReady` con un interruptor detrás. Con un solo booleano el botón era
+   * un conmutador —"Estoy listo" que al pulsarlo se volvía "Ya no estoy
+   * listo"— y esa segunda versión salía tan grande como la primera, compitiendo
+   * con "Iniciar partida" justo en el momento en que la única acción que
+   * importa es repartir. Deshacer existe, pero no es un CTA.
+   */
+  canConfirm: boolean;
+  /** Ya confirmó: puede cambiar de opinión, en una acción discreta. */
+  canUndo: boolean;
   /** Puede repartir. Solo el anfitrión, y solo con todos listos. */
   canStart: boolean;
   /** Está listo y espera a que el anfitrión reparta. */
@@ -262,15 +275,84 @@ export interface RoomActions {
 
 export function roomActionsFor(room: RoomView): RoomActions {
   const you = room.you;
-  if (!you) return { canReady: false, canStart: false, waitingForHost: false };
+  const ninguna: RoomActions = {
+    canConfirm: false,
+    canUndo: false,
+    canStart: false,
+    waitingForHost: false,
+  };
+  // Quien mira sin silla no actúa, y en una sala cerrada ya no hay nada que
+  // confirmar ni que repartir.
+  if (!you || room.status !== "open") return ninguna;
 
   const todosListos = roomCanStart(room);
   return {
     // Confirmar es siempre suyo: es un estado, no un permiso.
-    canReady: room.status === "open",
+    canConfirm: !you.isReady,
+    canUndo: you.isReady,
     canStart: you.isHost && todosListos,
     waitingForHost: !you.isHost && todosListos,
   };
+}
+
+/**
+ * Por qué todavía no se puede repartir.
+ *
+ * El botón deshabilitado dice que no se puede; esto dice qué falta, que es lo
+ * único que le sirve a quien lo está mirando. Con cifras: "Esperando 1
+ * jugador…" se entiende sin contar sillas, y "Falta que se llene la sala" no.
+ *
+ * El orden de los casos es el orden en que hay que resolverlos, y por eso
+ * `need_you` va antes que `need_ready`: mientras el freno sea tuyo, señalar a
+ * los demás sería mandar a esperar a quien tiene la solución en el dedo.
+ */
+export type StartHint =
+  /** Faltan sillas por ocupar. */
+  | { kind: "need_players"; missing: number }
+  /** La mesa está llena y quien mira todavía no ha confirmado. */
+  | { kind: "need_you" }
+  /** Faltan otros por confirmar. */
+  | { kind: "need_ready"; missing: number }
+  /** Ya está: solo falta que el anfitrión reparta. */
+  | { kind: "ready" };
+
+export function startHintFor(room: RoomView): StartHint {
+  const missing = Math.max(0, room.maxPlayers - room.players.length);
+  if (missing > 0) return { kind: "need_players", missing };
+  if (room.you && !room.you.isReady) return { kind: "need_you" };
+
+  const pendientes = room.players.filter((p) => !p.isReady).length;
+  if (pendientes > 0) return { kind: "need_ready", missing: pendientes };
+  return { kind: "ready" };
+}
+
+/**
+ * El aviso, ya en forma de texto traducible.
+ *
+ * Singular y plural son claves distintas porque el diccionario interpola y no
+ * conjuga: "Esperando 1 jugadores" es el precio de resolverlo con un solo
+ * mensaje, y se paga en la pantalla que más gente nueva va a ver.
+ */
+export function startHintMessage(
+  hint: StartHint,
+  isHost: boolean
+): { key: MessageKey; vars?: Vars } {
+  switch (hint.kind) {
+    case "need_players":
+      return hint.missing === 1
+        ? { key: "room.start.waiting_one" }
+        : { key: "room.start.waiting_many", vars: { n: hint.missing } };
+    case "need_you":
+      return { key: "room.start.need_you" };
+    case "need_ready":
+      return hint.missing === 1
+        ? { key: "room.start.need_confirm_one" }
+        : { key: "room.start.need_confirm_many", vars: { n: hint.missing } };
+    case "ready":
+      // Lo mismo visto desde los dos lados: el anfitrión puede repartir y el
+      // invitado está esperando a que lo haga.
+      return { key: isHost ? "room.start.ready" : "room.guest.waiting_host" };
+  }
 }
 
 /** Nombre del canal de Realtime de una sala. Mismo en los dos lados. */

@@ -10,8 +10,9 @@ import { useArenaRoom } from "@/lib/arena-room";
 import { roomErrorText } from "@/lib/arena-room-errors";
 import {
   roomActionsFor,
-  roomCanStart,
   roomIsFull,
+  startHintFor,
+  startHintMessage,
   type RoomPlayerView,
 } from "@/lib/arena-rooms";
 import { useProfile } from "@/lib/profile-context";
@@ -194,11 +195,13 @@ export default function ArenaRoom({ code }: { code: string }) {
   const prize = arenaPrize(entryUnits, room.maxPlayers);
   const runtime = dealSummary(room.cardsPerPlayer, room.maxPlayers);
   const full = roomIsFull(room);
-  const canStart = roomCanStart(room);
   const actions = roomActionsFor(room);
   const emptySeats = Math.max(0, room.maxPlayers - room.players.length);
   const you = room.you;
   const youOffline = failures >= OFFLINE_AFTER;
+  // Qué falta para poder repartir. Se decide fuera del JSX, en una función pura
+  // que `scripts/verify-arena-ready.ts` recorre entera.
+  const hintText = startHintMessage(startHintFor(room), Boolean(you?.isHost));
 
   return (
     <>
@@ -341,47 +344,52 @@ export default function ArenaRoom({ code }: { code: string }) {
             {/* Confirmar es de TODOS, también de quien montó la mesa. Nadie
                 queda listo por crear la sala ni por pagar: pagar da la silla,
                 no la voluntad de empezar. Es un estado en nuestra base — sin
-                firma, sin transacción y sin tarifa de red. */}
-            {actions.canReady && (
+                firma, sin transacción y sin tarifa de red.
+
+                Y aparece SOLO mientras falte confirmar. Ya confirmado, este
+                botón desaparece: lo que dice que estás listo es tu tarjeta de
+                la lista de arriba, y el sitio del botón grande queda libre para
+                lo único que importa entonces, que es repartir. */}
+            {actions.canConfirm && (
               <button
                 type="button"
-                className={`btn-primary${you.isReady ? " room-ready-on" : ""}`}
-                onClick={() => setReady(!you.isReady)}
+                className="btn-primary"
+                onClick={() => setReady(true)}
                 disabled={busy}
                 aria-busy={busy}
               >
-                {busy
-                  ? t("room.ready.saving")
-                  : you.isReady
-                    ? t("room.ready.off")
-                    : t("room.ready.on")}
+                {busy ? t("room.ready.saving") : t("room.ready.on")}
               </button>
             )}
 
-            {you.isHost ? (
-              <>
-                <button
-                  type="button"
-                  className="arena-cta room-start"
-                  onClick={start}
-                  disabled={!actions.canStart || busy}
-                >
-                  {busy ? t("room.start.dealing") : t("room.start.cta")}
-                </button>
-                <p className="arena-prize-note" aria-live="polite">
-                  {!full
-                    ? t("room.start.need_players")
-                    : !canStart
-                      ? t("room.start.need_ready")
-                      : t("room.start.ready")}
-                </p>
-              </>
-            ) : (
-              <p className="arena-prize-note" aria-live="polite">
-                {actions.waitingForHost
-                  ? t("room.guest.waiting_host")
-                  : t("room.guest.hint")}
-              </p>
+            {you.isHost && (
+              <button
+                type="button"
+                className="arena-cta room-start"
+                onClick={start}
+                disabled={!actions.canStart || busy}
+              >
+                {busy ? t("room.start.dealing") : t("room.start.cta")}
+              </button>
+            )}
+
+            {/* Qué falta, con cifras. El botón apagado dice que no se puede;
+                esto dice por qué, que es lo único accionable. */}
+            <p className="arena-prize-note" aria-live="polite">
+              {t(hintText.key, hintText.vars)}
+            </p>
+
+            {/* Deshacer existe, pero no compite: una píldora pequeña debajo del
+                protagonista, no un segundo botón del mismo tamaño. */}
+            {actions.canUndo && (
+              <button
+                type="button"
+                className="room-undo-ready"
+                onClick={() => setReady(false)}
+                disabled={busy}
+              >
+                {busy ? t("room.ready.saving") : t("room.ready.undo")}
+              </button>
             )}
           </>
         )}
@@ -403,11 +411,25 @@ export default function ArenaRoom({ code }: { code: string }) {
   );
 }
 
-/** Una silla ocupada: quién es, si manda, si está listo y si sigue ahí. */
+/**
+ * Una silla ocupada: quién es, si manda, si está listo y si sigue ahí.
+ *
+ * El estado se ve AQUÍ y no en un botón. Desde que confirmar dejó de ser un
+ * conmutador, esta píldora es la única respuesta a "¿ya dije que estoy listo?",
+ * así que tiene que contestarla de un vistazo: verde con su palomita, y con la
+ * fila resaltada cuando la silla es la tuya, que es la que vas a buscar.
+ */
 function SeatFilled({ player, t }: { player: RoomPlayerView; t: Translate }) {
   const name = player.name || t("room.players.anon");
+  // Desconectado manda sobre "listo": de nada sirve que dijera que sí si ya no
+  // está mirando la pantalla.
+  const listo = player.online && player.isReady;
   return (
-    <li className={`room-seat${player.online ? "" : " room-seat-offline"}`}>
+    <li
+      className={`room-seat${player.isYou ? " room-seat-mine" : ""}${
+        player.online ? "" : " room-seat-offline"
+      }`}
+    >
       <span className="room-seat-avatar" aria-hidden="true">
         {player.initial}
       </span>
@@ -420,11 +442,10 @@ function SeatFilled({ player, t }: { player: RoomPlayerView; t: Translate }) {
           <small className="room-seat-host">{t("room.players.host")}</small>
         )}
       </span>
-      {/* Desconectado manda sobre "listo": de nada sirve que dijera que sí si
-          ya no está mirando la pantalla. */}
-      <span
-        className={`room-seat-state${player.online && player.isReady ? " ready" : ""}`}
-      >
+      <span className={`room-seat-state${listo ? " ready" : ""}`}>
+        {/* La palomita va aparte y oculta a los lectores de pantalla: el estado
+            ya se dice con palabras y "marca de verificación Listo" sobra. */}
+        {listo && <span aria-hidden="true">✓ </span>}
         {!player.online
           ? t("room.players.offline")
           : player.isReady
