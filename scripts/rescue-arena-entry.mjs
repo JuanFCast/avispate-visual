@@ -68,16 +68,47 @@ const FULL = 2;
 const SETTLED = 3;
 const VOIDED = 4;
 
-const pub = createPublicClient({ chain: celo, transport: http() });
+const RPC = env("contracts/.env", "CELO_RPC_URL");
+const pub = createPublicClient({ chain: celo, transport: http(RPC ?? undefined) });
 const usdt = (units) => (Number(units) / 1e6).toFixed(2);
 
-const logs = await pub.getLogs({
-  address: ARENA,
-  event: abi.find((a) => a.type === "event" && a.name === "Joined"),
-  args: { player: WALLET },
-  fromBlock: 0n,
-  toBlock: "latest",
-});
+/**
+ * Desde qué bloque buscar. No se puede pedir "desde el principio": los nodos
+ * públicos de Celo cortan `eth_getLogs` en 5.000 bloques y con la cadena en 74
+ * millones la petición se rechaza entera. Así que primero se busca dónde nació
+ * el contrato —búsqueda binaria sobre `getCode`, una treintena de lecturas— y
+ * de ahí en adelante se barre por tramos.
+ */
+async function deploymentBlock() {
+  let lo = 0n;
+  let hi = await pub.getBlockNumber();
+  while (lo < hi) {
+    const mid = (lo + hi) / 2n;
+    const code = await pub.getCode({ address: ARENA, blockNumber: mid });
+    if (code && code !== "0x") hi = mid;
+    else lo = mid + 1n;
+  }
+  return lo;
+}
+
+const CHUNK = 5000n;
+const desde = await deploymentBlock();
+const hasta = await pub.getBlockNumber();
+const joined = abi.find((a) => a.type === "event" && a.name === "Joined");
+
+const logs = [];
+for (let b = desde; b <= hasta; b += CHUNK) {
+  const to = b + CHUNK - 1n > hasta ? hasta : b + CHUNK - 1n;
+  logs.push(
+    ...(await pub.getLogs({
+      address: ARENA,
+      event: joined,
+      args: { player: WALLET },
+      fromBlock: b,
+      toBlock: to,
+    }))
+  );
+}
 
 if (logs.length === 0) {
   console.log(`\nNo hay ninguna entrada pagada desde ${WALLET}.\n`);
