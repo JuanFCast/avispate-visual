@@ -2,6 +2,21 @@ import { createPublicClient, parseEventLogs, type Hash } from "viem";
 import { celo } from "viem/chains";
 import { CELO_TRANSPORT } from "./chain";
 import { AVISPATE_POT_ADDRESS, AVISPATE_POT_ABI } from "./contracts";
+import { ARENA_ESCROW_ADDRESS } from "./arena-escrow";
+
+/** Lo justo para reconocer el pago de una silla como prueba de identidad. */
+const ARENA_JOINED_ABI = [
+  {
+    type: "event",
+    name: "Joined",
+    inputs: [
+      { name: "tableId", type: "bytes32", indexed: true },
+      { name: "player", type: "address", indexed: true },
+      { name: "seats", type: "uint8", indexed: false },
+      { name: "seatCommitment", type: "bytes32", indexed: false },
+    ],
+  },
+] as const;
 
 // Cliente de solo lectura de Celo (reusa el transporte con failover).
 const client = createPublicClient({ chain: celo, transport: CELO_TRANSPORT });
@@ -33,16 +48,45 @@ export async function verifyWalletControl(
     // Igual que en `verifyPlayTx`: manda quién EMITE el evento, no a quién iba
     // dirigida la transacción. Sin este filtro, un contrato cualquiera podría
     // emitir un `Played` con la forma correcta y abrir sesión con él.
-    const logs = parseEventLogs({
+    const jugadas = parseEventLogs({
       abi: AVISPATE_POT_ABI,
       eventName: "Played",
       logs: receipt.logs.filter(
         (l) => l.address.toLowerCase() === AVISPATE_POT_ADDRESS
       ),
     });
-    const signed = logs.some(
-      (l) => l.args.player.toLowerCase() === address.toLowerCase()
-    );
+
+    /**
+     * Pagar la entrada de una mesa TAMBIÉN prueba quién eres.
+     *
+     * Antes solo valía una jugada del reto diario, y eso obligaba a lo absurdo:
+     * dentro de MiniPay había que jugar una partida individual antes de poder
+     * entrar a una sala de la Arena. Lo dijo Juan probando: "voy a crear una
+     * sala y tengo que jugar el reto individual".
+     *
+     * Y no hay ninguna razón para esa distinción. Lo que prueba el control de
+     * una wallet es que firmó una transacción nuestra; que fuera una jugada o
+     * una entrada da igual. La regla del escrow tampoco se toca: una sesión
+     * abierta así sigue sin poder mover dinero — eso lo gobierna la ficha de la
+     * silla, no la sesión.
+     */
+    const entradas = ARENA_ESCROW_ADDRESS
+      ? parseEventLogs({
+          abi: ARENA_JOINED_ABI,
+          eventName: "Joined",
+          logs: receipt.logs.filter(
+            (l) => l.address.toLowerCase() === ARENA_ESCROW_ADDRESS
+          ),
+        })
+      : [];
+
+    const signed =
+      jugadas.some(
+        (l) => l.args.player.toLowerCase() === address.toLowerCase()
+      ) ||
+      entradas.some(
+        (l) => (l.args.player as string).toLowerCase() === address.toLowerCase()
+      );
     if (!signed) return false;
 
     const block = await client.getBlock({ blockNumber: receipt.blockNumber });

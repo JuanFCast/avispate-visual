@@ -7,6 +7,7 @@ import { ERC20_ABI, USDT_CELO_ADDRESS } from "./contracts";
 import { decidePlayStart, confirmBeforeSigning } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
 import { prepareSeat } from "./seat-secret";
+import { ensureWalletSession } from "./wallet-session-client";
 import {
   forgetSeatPayment,
   rememberSeatPayment,
@@ -241,6 +242,19 @@ export function useArenaJoin(): ArenaJoinApi {
         // por lo mismo que la bandeja del reto diario — cerrar la pestaña aquí
         // no puede dejar una silla pagada sin forma de reclamarla.
         rememberSeatPayment(code, { txHash, address: account });
+
+        /**
+         * Esta transacción también prueba quién eres.
+         *
+         * Importa dentro de MiniPay, donde no se puede firmar un mensaje: sin
+         * esto había que jugar una partida del reto ANTES de poder entrar a una
+         * sala, que es lo que Juan encontró absurdo probando. Pagar la entrada
+         * abre la sesión igual de bien.
+         *
+         * Va sin esperar y sin comprobar: quien ya tiene sesión no gasta nada, y
+         * que falle no puede tocar el pago que acaba de hacerse.
+         */
+        void ensureWalletSession(account, txHash);
 
         setStage("confirming");
         await publicClient.waitForTransactionReceipt({ hash: txHash });
