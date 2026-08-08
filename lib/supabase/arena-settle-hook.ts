@@ -102,6 +102,75 @@ export async function settleFinishedMatch(params: {
 }
 
 /**
+ * Mesas pagadas que NUNCA llegaron a empezar y ya no van a hacerlo.
+ *
+ * Es el caso que no tenía dueño: alguien paga su entrada, se queda esperando
+ * rival y no aparece nadie. No hubo partida, así que no hay liquidación que
+ * disparar; la sala vence a las dos horas y hasta hoy ahí se acababa la
+ * historia para nosotros, con la entrada dentro del contrato. El jugador podía
+ * recuperarla —`voidByTimeout` y `refund` los llama cualquiera, a propósito—
+ * pero eso significa saber hablarle a un contrato, que es lo mismo que no
+ * poder.
+ *
+ * Devuelve las candidatas; quién decide es `decideStaleTable`, y quien mueve el
+ * dinero es el cron.
+ */
+export async function staleOpenTables(limit = 20): Promise<
+  {
+    roomId: string;
+    tableId: string;
+    entryUnits: bigint;
+    createdAt: string;
+    roomClosed: boolean;
+    hasMatch: boolean;
+    alreadyRefunded: boolean;
+  }[]
+> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("arena_rooms")
+    .select("id, table_id, entry_units, status, created_at")
+    .not("table_id", "is", null)
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+
+  const rooms = (data ?? []) as {
+    id: string;
+    table_id: string;
+    entry_units: string;
+    status: string;
+    created_at: string;
+  }[];
+
+  const out = [];
+  for (const room of rooms) {
+    // Dos preguntas por sala, y las dos son índices: si llegó a repartirse y si
+    // ya se devolvió algo de esa mesa. Con el tope de 20 por barrida, sale
+    // barato y no hace falta una vista.
+    const { count: matches } = await db
+      .from("arena_matches")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", room.id);
+    const { count: refunds } = await db
+      .from("arena_refunds")
+      .select("id", { count: "exact", head: true })
+      .eq("table_id", room.table_id.toLowerCase());
+
+    out.push({
+      roomId: room.id,
+      tableId: room.table_id,
+      entryUnits: BigInt(room.entry_units),
+      createdAt: room.created_at,
+      roomClosed: room.status !== "open",
+      hasMatch: (matches ?? 0) > 0,
+      alreadyRefunded: (refunds ?? 0) > 0,
+    });
+  }
+  return out;
+}
+
+/**
  * Liquidaciones reclamadas que nunca llegaron a la cadena. Las retoma el cron.
  *
  * Que exista este camino es lo que permite que el de arriba no espere: una

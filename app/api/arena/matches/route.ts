@@ -13,6 +13,12 @@ const STATUS: Record<string, number> = {
   no_match: 404,
   not_host: 403,
   room_not_ready: 409,
+  // Los tres motivos por los que la mesa no está para repartir. 409 y no 400:
+  // la petición está bien formada, lo que pasa es que ahora mismo no procede.
+  room_not_full: 409,
+  players_not_ready: 409,
+  seats_not_paid: 409,
+  room_closed: 409,
   table_too_big: 409,
 };
 

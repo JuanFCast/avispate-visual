@@ -329,6 +329,13 @@ export const en = {
   "room.error.not_found": "No room with that code. Check the 6 characters.",
   "room.error.closed": "This room is closed. The host left or it timed out.",
   "room.error.full": "This room is already full.",
+  // Repartir con la mesa a medias es lo único que podía costarle la entrada a
+  // quien esperaba solo, así que el mensaje lo dice: el dinero sigue ahí.
+  "room.error.not_full":
+    "The table isn't full yet, so nobody can deal. Your entry is safe — waiting never costs it.",
+  "room.error.players_not_ready": "Someone still has to confirm they're ready.",
+  "room.error.seats_not_paid":
+    "There's a seat the chain doesn't list as paid. Nothing starts until it does.",
   "room.error.not_in_room": "You don't have a seat in this room anymore.",
   "room.error.not_host": "Only the host can do that.",
   "room.error.unauthorized": "Sign in again to keep your seat.",
@@ -1077,6 +1084,11 @@ export const es: Record<MessageKey, string> = {
   "room.error.not_found": "No hay ninguna sala con ese código. Revisa los 6 caracteres.",
   "room.error.closed": "Esta sala está cerrada. El anfitrión se fue o se venció.",
   "room.error.full": "Esta sala ya está llena.",
+  "room.error.not_full":
+    "La mesa todavía no está llena, así que nadie puede repartir. Tu entrada está guardada: esperar nunca te la cuesta.",
+  "room.error.players_not_ready": "Falta que alguien confirme que está listo.",
+  "room.error.seats_not_paid":
+    "Hay una silla que la cadena no da por pagada. No empieza nada hasta que lo esté.",
   "room.error.not_in_room": "Ya no tienes silla en esta sala.",
   "room.error.not_host": "Eso solo lo puede hacer el anfitrión.",
   "room.error.unauthorized": "Vuelve a iniciar sesión para conservar tu silla.",

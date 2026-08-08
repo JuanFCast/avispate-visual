@@ -22,6 +22,7 @@ import {
   type RoomView,
 } from "../arena-rooms";
 import { deckModeFor, isDealValid, type DeckMode } from "../arena-deck";
+import { seatIsDroppable } from "../arena-start";
 import { getSupabaseAdmin } from "./server";
 import { escrowConfigured, tableIdFor } from "../arena-escrow";
 
@@ -46,6 +47,8 @@ interface PlayerRow {
   is_host: boolean;
   is_ready: boolean;
   last_seen_at: string;
+  /** Cuándo pagó esta silla. `null` = mesa gratis. Decide si se puede soltar. */
+  paid_at: string | null;
   profiles: { alias: string | null; wallet_address: string | null } | null;
 }
 
@@ -53,7 +56,7 @@ const ROOM_COLUMNS =
   "id, code, host_profile_id, entry_units, max_players, status, created_at, deck_mode, cards_per_player, table_id";
 
 const PLAYER_COLUMNS =
-  "profile_id, seat, is_host, is_ready, last_seen_at, profiles(alias, wallet_address)";
+  "profile_id, seat, is_host, is_ready, last_seen_at, paid_at, profiles(alias, wallet_address)";
 
 /** 23505 = índice único violado. Es el que arbitra la carrera por el asiento. */
 const UNIQUE_VIOLATION = "23505";
@@ -99,31 +102,49 @@ async function closeRoom(roomId: string): Promise<void> {
 }
 
 /**
- * Saca al jugador de cualquier sala en la que estuviera. Se llama ANTES de
- * crear o entrar a otra: un jugador ocupa una silla a la vez, y así "volver a
- * mi sala" al recargar tiene una única respuesta posible.
+ * Saca al jugador de cualquier sala GRATIS en la que estuviera. Se llama ANTES
+ * de crear o entrar a otra: en las de balde un jugador ocupa una silla a la
+ * vez, y así "volver a mi sala" al recargar tiene una única respuesta posible.
  *
  * Si era el anfitrión, la sala que deja se cierra: sin anfitrión no hay quién
  * la arranque, y dejarla abierta solo sirve para que otros esperen de balde.
+ *
+ * ── Las sillas PAGADAS no se tocan ─────────────────────────────────────────
+ *
+ * Y esto era un agujero por el que se iba dinero. Crear otra sala llamaba aquí,
+ * y aquí se borraba la fila de una silla que había costado una entrada: la fila
+ * que guarda `wallet_address` y `join_tx_hash`, o sea, la única constancia
+ * nuestra de que esa dirección puso dinero en esa mesa. Un toque en "Otra sala"
+ * estando solo esperando rival y la entrada se quedaba dentro del contrato sin
+ * nadie que la reclamara desde la aplicación.
+ *
+ * Una silla pagada solo la suelta el contrato: se juega y se liquida, o se
+ * anula y se devuelve (`decideStaleTable`). Nunca un `delete` nuestro.
  */
 export async function leaveAllRooms(profileId: string): Promise<void> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("arena_room_players")
-    .select("room_id, is_host")
+    .select("room_id, is_host, paid_at")
     .eq("profile_id", profileId);
   if (error) throw error;
 
-  const rows = (data ?? []) as { room_id: string; is_host: boolean }[];
-  if (rows.length === 0) return;
+  const rows = (data ?? []) as {
+    room_id: string;
+    is_host: boolean;
+    paid_at: string | null;
+  }[];
+  const sueltas = rows.filter((r) => r.paid_at === null);
+  if (sueltas.length === 0) return;
 
   const { error: delError } = await db
     .from("arena_room_players")
     .delete()
-    .eq("profile_id", profileId);
+    .eq("profile_id", profileId)
+    .is("paid_at", null);
   if (delError) throw delError;
 
-  for (const row of rows) {
+  for (const row of sueltas) {
     if (row.is_host) await closeRoom(row.room_id);
     else await closeIfEmpty(row.room_id);
   }
@@ -300,6 +321,12 @@ export async function joinRoom(params: {
  * Nadie avisa al cerrar la pestaña, así que la ausencia se mide por el latido.
  * Pasado `PLAYER_DROP_MS` la silla se libera para que la mesa pueda llenarse
  * con gente de verdad; si el que se fue era el anfitrión, la sala se cierra.
+ *
+ * Salvo que la silla esté PAGADA, y ahí estaba la fuga: esto corre en cada
+ * lectura de la sala, así que al anfitrión que pagaba y se quedaba esperando
+ * rival le bastaba con bloquear el teléfono un minuto para que su fila —la que
+ * dice qué dirección puso el dinero— se borrara y la sala se cerrase con la
+ * entrada dentro del contrato. El porqué completo, en `seatIsDroppable`.
  */
 async function pruneAndListPlayers(room: RoomRow): Promise<PlayerRow[]> {
   const db = getSupabaseAdmin();
@@ -311,9 +338,13 @@ async function pruneAndListPlayers(room: RoomRow): Promise<PlayerRow[]> {
   if (error) throw error;
 
   const players = (data ?? []) as unknown as PlayerRow[];
-  const cutoff = Date.now() - PLAYER_DROP_MS;
-  const gone = players.filter(
-    (p) => new Date(p.last_seen_at).getTime() < cutoff
+  const now = Date.now();
+  const gone = players.filter((p) =>
+    seatIsDroppable(
+      { paidAt: p.paid_at, lastSeenAt: p.last_seen_at },
+      PLAYER_DROP_MS,
+      now
+    )
   );
   if (gone.length === 0) return players;
 

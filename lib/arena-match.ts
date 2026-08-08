@@ -84,7 +84,21 @@ export type MatchError =
   | "no_match"
   | "not_playing"
   | "not_host"
+  /** El reparto configurado no cuadra con el plano de cartas. */
   | "room_not_ready"
+  /**
+   * Los tres motivos por los que no se reparte, separados a propósito.
+   *
+   * Iban todos como `room_not_ready` y la pantalla decía "la sala no está
+   * lista", que es cierto y no sirve: quien está solo esperando y quien tiene
+   * la mesa llena con alguien sin confirmar necesitan hacer cosas distintas.
+   * Y `seats_not_paid` no es un aviso de forma sino de dinero — significa que
+   * hay una silla ocupada que la cadena no reconoce.
+   */
+  | "room_not_full"
+  | "players_not_ready"
+  | "seats_not_paid"
+  | "room_closed"
   | "invalid_code"
   | "unauthorized"
   | "server_error";

@@ -35,6 +35,8 @@ import {
   type MoveOutcome,
 } from "../arena-match";
 import { arenaPrize } from "../arena";
+import { decideMatchStart } from "../arena-start";
+import { paidPlayersOf } from "../arena-escrow";
 import { initialOf, shortWallet } from "../arena-rooms";
 import { getRoomByCode, roomIsLive } from "./arena-rooms";
 import { getSupabaseAdmin } from "./server";
@@ -136,7 +138,7 @@ export async function startMatch(params: {
 
   const { data: seated, error: seatedError } = await db
     .from("arena_room_players")
-    .select("profile_id, seat, is_ready, last_seen_at")
+    .select("profile_id, seat, is_ready, last_seen_at, wallet_address")
     .eq("room_id", room.id)
     .order("seat", { ascending: true });
   if (seatedError) throw seatedError;
@@ -146,12 +148,32 @@ export async function startMatch(params: {
     seat: number;
     is_ready: boolean;
     last_seen_at: string;
+    wallet_address: string | null;
   }[];
 
-  // La mesa tiene que estar exactamente llena y con todos listos: el botón del
-  // anfitrión ya lo exige, pero el botón es del navegador.
-  if (players.length !== room.max_players) return fail("room_not_ready");
-  if (!players.every((p) => p.is_ready)) return fail("room_not_ready");
+  /*
+   * El guardia de verdad. El botón deshabilitado de la pantalla es una cortesía
+   * para el jugador; una petición armada a mano no ve botones.
+   *
+   * En una mesa con entrada se le pregunta a la CADENA quién pagó, y no a
+   * nuestras filas. Son dos preguntas distintas —"cuánta gente hay sentada" y
+   * "cuánta gente puso dinero"— y solo daban la misma respuesta mientras nada
+   * pudiera crear una silla sin pago.
+   */
+  const tableId = room.table_id;
+  const verdict = decideMatchStart({
+    isHost: true, // ya comprobado arriba, contra la sala
+    roomLive: true, // ídem
+    maxPlayers: room.max_players,
+    seated: players.map((p) => ({
+      ready: p.is_ready,
+      walletAddress: p.wallet_address,
+    })),
+    onchainPlayers: tableId
+      ? await paidPlayersOf(tableId as `0x${string}`)
+      : null,
+  });
+  if (!verdict.ok) return fail(verdict.error);
 
   // El reparto se vuelve a validar aquí aunque la sala se creara validando: si
   // alguna vez se pudiera editar una sala, o cambiara la fórmula, repartir

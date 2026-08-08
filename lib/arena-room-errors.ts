@@ -21,6 +21,15 @@ const TEXTS: Record<string, MessageKey> = {
   room_not_found: "room.error.not_found",
   room_closed: "room.error.closed",
   room_full: "room.error.full",
+  /**
+   * Los rechazos de repartir. El de la mesa incompleta lleva además la frase
+   * que hace falta en ese momento exacto: que la entrada sigue guardada. Quien
+   * acaba de poner un dólar y ve un error rojo asume lo peor, y en este caso lo
+   * peor no pasó — no se puede repartir precisamente para que no pase.
+   */
+  room_not_full: "room.error.not_full",
+  players_not_ready: "room.error.players_not_ready",
+  seats_not_paid: "room.error.seats_not_paid",
   not_in_room: "room.error.not_in_room",
   not_host: "room.error.not_host",
   unauthorized: "room.error.unauthorized",
