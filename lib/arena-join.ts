@@ -7,7 +7,8 @@ import { ERC20_ABI, USDT_CELO_ADDRESS } from "./contracts";
 import { decidePlayStart, confirmBeforeSigning } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
 import { prepareSeat } from "./seat-secret";
-import { ensureWalletSession } from "./wallet-session-client";
+import { registerSeat } from "./arena-register";
+import { ensureWalletSession, readWalletSession } from "./wallet-session-client";
 import {
   forgetSeatPayment,
   rememberSeatPayment,
@@ -94,6 +95,27 @@ export interface ArenaJoinApi {
 
 
 /**
+ * La sesión, leída en el momento y no heredada de un closure.
+ *
+ * `authHeaders` viene del hook de la sala y se capturó cuando arrancó el pago,
+ * con `authenticated` en falso si el jugador todavía no tenía sesión. Aunque la
+ * sesión aparezca a mitad del camino —que es justo lo que hacemos ahora— esa
+ * copia de la función sigue devolviendo cabeceras vacías para siempre.
+ *
+ * Así que si no trae `Authorization`, se mira `localStorage` directamente. Es
+ * donde `ensureWalletSession` acaba de escribir, y no depende de que React haya
+ * vuelto a renderizar nada.
+ */
+async function freshAuthHeaders(
+  authHeaders: () => Promise<HeadersInit>
+): Promise<HeadersInit> {
+  const base = (await authHeaders()) as Record<string, string>;
+  if (base.Authorization) return base;
+  const session = readWalletSession();
+  return session ? { ...base, Authorization: `Bearer ${session.token}` } : base;
+}
+
+/**
  * Los pasos que van DESPUÉS del pago: contárselo al servidor y canjear la
  * ficha de la silla. Vive fuera del hook porque lo usan los dos caminos —el
  * pago normal y el reintento— y duplicarlo sería garantizar que un día se
@@ -103,8 +125,8 @@ export interface ArenaJoinApi {
  * el hash de la transacción, el segundo porque canjear una ficha ya emitida
  * devuelve otra igual de válida.
  *
- * Reintenta con espera creciente porque el fallo más común no es un error, es
- * que el nodo de Celo del servidor todavía no ve una transacción recién minada.
+ * Esto es solo el cableado: cuándo reintentar, cuándo rendirse y qué hacer con
+ * un 401 lo decide `registerSeat`, que es puro y está probado aparte.
  */
 async function registerAndClaim(params: {
   code: string;
@@ -116,45 +138,59 @@ async function registerAndClaim(params: {
 }): Promise<boolean> {
   const { code, account, txHash, secret, authHeaders, setStage } = params;
 
-  setStage("registering");
-  const registrar = async () =>
-    fetch(`/api/arena/rooms/${encodeURIComponent(code)}/paid`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(await authHeaders()) },
-      body: JSON.stringify({ txHash, address: account }),
-    });
+  const result = await registerSeat({
+    onStage: setStage,
+    wait: (ms) => new Promise((r) => setTimeout(r, ms)),
 
-  let paid = await registrar();
-  // ~30 s en total. La cadena tarda segundos en propagarse, no minutos.
-  for (const espera of [1500, 3000, 5000, 8000, 12000]) {
-    if (paid.ok) break;
-    // Un 409 no se arregla esperando: es una silla ocupada o un pagador que no
-    // coincide. Insistir solo retrasaría el aviso.
-    if (paid.status === 409) break;
-    await new Promise((r) => setTimeout(r, espera));
-    paid = await registrar();
-  }
-  if (!paid.ok) return false;
+    postPaid: async () => {
+      try {
+        const res = await fetch(
+          `/api/arena/rooms/${encodeURIComponent(code)}/paid`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(await freshAuthHeaders(authHeaders)),
+            },
+            body: JSON.stringify({ txHash, address: account }),
+          }
+        );
+        return res.status;
+      } catch {
+        // Sin red no hay código HTTP. Un 0 no es 409 ni 401, así que cae en el
+        // camino de "espera y vuelve a intentar", que es lo correcto.
+        return 0;
+      }
+    },
 
-  setStage("claiming");
-  const canjear = async () =>
-    fetch("/api/arena/seat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code, address: account, secret }),
-    });
-  let claimed = await canjear();
-  // La huella se lee de la cadena, así que hereda el mismo retraso.
-  for (const espera of [1500, 3000, 5000]) {
-    if (claimed.ok) break;
-    await new Promise((r) => setTimeout(r, espera));
-    claimed = await canjear();
-  }
+    /**
+     * La sesión que falta, sacada de la transacción que se acaba de pagar.
+     *
+     * Es el arreglo del agujero: dentro de MiniPay el jugador nuevo llega aquí
+     * sin sesión, y su primera sesión sale precisamente de este pago.
+     */
+    recoverSession: () => ensureWalletSession(account, txHash),
 
-  const data = (await claimed.json().catch(() => null)) as { token?: string } | null;
-  if (!claimed.ok || !data?.token) return false;
+    postSeat: async () => {
+      try {
+        const res = await fetch("/api/arena/seat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, address: account, secret }),
+        });
+        const data = (await res.json().catch(() => null)) as {
+          token?: string;
+        } | null;
+        return res.ok ? (data?.token ?? null) : null;
+      } catch {
+        return null;
+      }
+    },
+  });
 
-  rememberSeatToken(code, data.token);
+  if (!result.ok) return false;
+
+  rememberSeatToken(code, result.token);
   // Registrado y con ficha: ya no hay nada pendiente que reintentar.
   forgetSeatPayment(code);
   return true;
@@ -243,6 +279,9 @@ export function useArenaJoin(): ArenaJoinApi {
         // no puede dejar una silla pagada sin forma de reclamarla.
         rememberSeatPayment(code, { txHash, address: account });
 
+        setStage("confirming");
+        await publicClient.waitForTransactionReceipt({ hash: txHash });
+
         /**
          * Esta transacción también prueba quién eres.
          *
@@ -251,13 +290,19 @@ export function useArenaJoin(): ArenaJoinApi {
          * sala, que es lo que Juan encontró absurdo probando. Pagar la entrada
          * abre la sesión igual de bien.
          *
-         * Va sin esperar y sin comprobar: quien ya tiene sesión no gasta nada, y
-         * que falle no puede tocar el pago que acaba de hacerse.
+         * Va DESPUÉS de esperar el recibo, y ese orden es el arreglo. Antes
+         * salía en cuanto existía el hash, sin esperar a nada: el servidor
+         * pedía el recibo de una transacción que todavía no estaba minada, no lo
+         * encontraba y la sesión no se abría. Nadie lo reintentaba, así que el
+         * paso siguiente —que sí pide sesión— se comía cinco 401 seguidos y
+         * dejaba una silla pagada e imposible de registrar.
+         *
+         * Se espera el resultado en vez de soltarlo: no lanza nunca, tarda lo
+         * que tarda una petición, y lo que sigue lo necesita. Si aun así falla
+         * —el nodo del servidor puede ir detrás del nuestro—, `registerSeat`
+         * vuelve a pedirla en cuanto vea el primer 401.
          */
-        void ensureWalletSession(account, txHash);
-
-        setStage("confirming");
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
+        await ensureWalletSession(account, txHash);
 
         // 5 y 6. Contarlo y canjear la ficha. Mismo camino que el reintento.
         const ok = await registerAndClaim({
