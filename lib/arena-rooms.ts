@@ -9,27 +9,22 @@
  * pozo que se muestra sigue siendo el estimado de `lib/arena`.
  */
 
-/** El prefijo que hace reconocible al código incluso suelto en un chat. */
-export const ROOM_CODE_PREFIX = "AVP";
-/** Cuatro dígitos: se dicta por teléfono y se teclea sin equivocarse. */
 /**
- * Longitud del código VIEJO, de solo dígitos. Se conserva para poder seguir
- * leyendo las salas que ya existen: un código que alguien tiene en un chat no
- * puede dejar de funcionar porque nosotros cambiemos el formato.
- */
-export const ROOM_CODE_DIGITS = 4;
-
-/**
- * Longitud del código nuevo.
+ * Longitud del código de sala. Es TODO el código: seis caracteres y nada más.
  *
- * Cuatro dígitos son diez mil combinaciones: se prueban enteras en un rato, y
- * eso estaba bien mientras entrar a una sala no costara dinero — lo advierte la
- * propia migración de salas. Con una entrada de por medio, adivinar una sala
- * deja de ser una travesura.
+ * ── Por qué ya no hay prefijo ───────────────────────────────────────────────
+ *
+ * El código llevaba un `AVP-` delante para hacerlo reconocible suelto en un
+ * chat. Costaba más de lo que valía: cuatro caracteres de ceremonia en la parte
+ * de la pantalla que más se dicta, se teclea y se pega, un decorado fijo dentro
+ * del campo de unirse que había que explicar, y un formato con dos maneras de
+ * escribirse —con guion y sin él— que cada capa tenía que volver a normalizar.
+ * En un teléfono, que es donde se usa esto, `MY37GV` se lee y se dicta mejor
+ * que `AVP-MY37GV`, y el contexto ya lo da la pantalla que lo pide.
  *
  * Seis caracteres de este alfabeto son **más de mil millones** de
- * combinaciones. Sigue cabiendo en un mensaje, se dicta por teléfono sin
- * deletrear y se teclea de una vez.
+ * combinaciones. Cabe en un mensaje, se dicta sin deletrear y se teclea de una
+ * vez, que es todo lo que un código de sala tiene que hacer.
  */
 export const ROOM_CODE_LENGTH = 6;
 
@@ -42,10 +37,6 @@ export const ROOM_CODE_LENGTH = 6;
  * nadie quiere leer en su pantalla por casualidad.
  */
 const ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-
-// Los dos formatos: el nuevo y el viejo de cuatro dígitos, que sigue siendo
-// válido para las salas que ya existían.
-const CODE_RE = /^AVP-(?:[0-9A-Z]{6}|\d{4})$/;
 
 /**
  * Cada cuánto late el cliente contra el servidor. Es a la vez el latido de
@@ -160,92 +151,58 @@ export function generateRoomCode(): string {
       if (out.length === ROOM_CODE_LENGTH) break;
     }
   }
-  return `${ROOM_CODE_PREFIX}-${out}`;
+  return out;
 }
 
 /**
- * Lo que el jugador tecleó → un código canónico, o `null` si no lo es.
+ * Lo escrito → solo los símbolos que un código puede llevar, sin recortar.
  *
- * Acepta lo que la gente escribe de verdad: `H7K2MP`, `avp-h7k2mp`,
- * `AVP H7K2MP`. Escribir bien el guion no debería ser parte del juego.
+ * Sube a mayúsculas, traduce las confusiones de siempre —la `O` que era un
+ * cero, la `I` o la `ele` que eran un uno— y tira todo lo demás: espacios,
+ * guiones y cualquier letra que no esté en el alfabeto. Son letras que no
+ * generamos nunca, así que traducirlas no puede chocar con un código real.
  *
- * Y corrige las confusiones de siempre en vez de rechazarlas: quien lee `O`
- * donde había un cero, o `l` donde había un uno, entra igual. Son letras que ni
- * siquiera existen en el alfabeto, así que traducirlas no puede chocar con
- * ningún código real.
- *
- * Los códigos viejos de cuatro dígitos siguen valiendo: las salas que ya
- * existen no pueden dejar de abrirse porque hayamos cambiado el formato.
+ * No recorta a propósito, y de eso depende que `normalizeRoomCode` no mienta:
+ * si truncara, pegar nueve caracteres daría los seis primeros como si fueran un
+ * código bueno y mandaría al jugador a una sala que no es la suya.
  */
-export function normalizeRoomCode(raw: string): string | null {
-  const clean = (raw ?? "")
+function cleanRoomCode(raw: string): string {
+  return (raw ?? "")
     .toUpperCase()
     .replace(/[IL]/g, "1")
     .replace(/O/g, "0")
-    .replace(/[^A-Z0-9]/g, "");
-  const body = clean.startsWith(ROOM_CODE_PREFIX)
-    ? clean.slice(ROOM_CODE_PREFIX.length)
-    : clean;
-
-  // Formato viejo: cuatro dígitos y nada más. Sin construir la expresión con
-  // una plantilla: ahí dentro `\d` se queda en `d` y el cheque pasaría a
-  // aceptar "dddd" en silencio.
-  if (body.length === ROOM_CODE_DIGITS && /^[0-9]+$/.test(body)) {
-    return `${ROOM_CODE_PREFIX}-${body}`;
-  }
-  // Formato nuevo: solo símbolos del alfabeto, para que un código con `U` —que
-  // no generamos nunca— no se dé por bueno.
-  if (
-    body.length === ROOM_CODE_LENGTH &&
-    [...body].every((c) => ALPHABET.includes(c))
-  ) {
-    return `${ROOM_CODE_PREFIX}-${body}`;
-  }
-  return null;
-}
-
-/** ¿Es un código con la forma correcta? */
-export function isRoomCode(value: string): boolean {
-  return CODE_RE.test(value);
-}
-
-/**
- * El CUERPO del código tal y como debe quedar en el campo mientras se escribe:
- * sin el prefijo (que lo pinta la pantalla aparte), en mayúsculas, solo con
- * símbolos del alfabeto y con las confusiones ya traducidas.
- *
- * Existe porque el campo enseña `AVP-` como decorado fijo y el jugador solo
- * aporta lo de después; `formatRoomCodeInput` devuelve el código entero, que
- * ahí dentro se vería duplicado.
- */
-export function roomCodeBody(raw: string): string {
-  return formatRoomCodeInput(raw).replace(
-    new RegExp(`^${ROOM_CODE_PREFIX}-?`),
-    ""
-  );
-}
-
-/**
- * Formato mientras se escribe: mayúsculas, el prefijo puesto por nosotros y el
- * guion donde va. El jugador solo aporta el cuerpo.
- *
- * Las confusiones se corrigen aquí también, y en el momento de teclearlas: ver
- * cómo tu `O` se convierte en `0` mientras escribes enseña el alfabeto sin que
- * nadie tenga que explicarlo.
- */
-export function formatRoomCodeInput(raw: string): string {
-  const body = (raw ?? "")
-    .toUpperCase()
-    .replace(/[IL]/g, "1")
-    .replace(/O/g, "0")
-    .replace(/[^A-Z0-9]/g, "")
-    .replace(new RegExp(`^${ROOM_CODE_PREFIX}`), "")
     .split("")
     .filter((c) => ALPHABET.includes(c))
-    .slice(0, ROOM_CODE_LENGTH)
     .join("");
-  if (!body) return "";
-  return `${ROOM_CODE_PREFIX}-${body}`;
+}
+
+/**
+ * Lo que el jugador tecleó → el código canónico, o `null` si no lo es.
+ *
+ * Acepta lo que la gente escribe de verdad: `MY37GV`, `my37gv`, `  MY 37 GV `.
+ * Lo que NO acepta es otra cosa que seis símbolos del alfabeto — ni de más, ni
+ * de menos, ni con un prefijo delante.
+ */
+export function normalizeRoomCode(raw: string): string | null {
+  const code = cleanRoomCode(raw);
+  return code.length === ROOM_CODE_LENGTH ? code : null;
+}
+
+/** ¿Ya viene escrito exactamente como lo guardamos? */
+export function isRoomCode(value: string): boolean {
+  return normalizeRoomCode(value) === value;
+}
+
+/**
+ * Formato mientras se escribe: mayúsculas, solo símbolos del alfabeto y sin
+ * pasar de la cuenta.
+ *
+ * Las confusiones se corrigen en el momento de teclearlas: ver cómo tu `O` se
+ * convierte en `0` mientras escribes enseña el alfabeto sin que nadie tenga que
+ * explicarlo.
+ */
+export function formatRoomCodeInput(raw: string): string {
+  return cleanRoomCode(raw).slice(0, ROOM_CODE_LENGTH);
 }
 
 /** Inicial para el avatar. Vacío o raro → la abeja. */

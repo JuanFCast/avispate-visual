@@ -1,5 +1,10 @@
 // Verifica los códigos de sala: que sean difíciles de adivinar, cómodos de
-// dictar y teclear, y que las salas VIEJAS de cuatro dígitos sigan abriéndose.
+// dictar y teclear, y que sean SEIS CARACTERES y nada más.
+//
+// El prefijo `AVP-` se eliminó del sistema el 2026-08-08. No hay compatibilidad
+// con el formato viejo a propósito, así que buena parte de este archivo existe
+// para dejarlo comprobado: un código con prefijo NO es un código, y tampoco lo
+// son los cuatro dígitos de la primera versión.
 //
 // Correr: node scripts/verify-room-code.ts
 import {
@@ -8,7 +13,6 @@ import {
   generateRoomCode,
   isRoomCode,
   normalizeRoomCode,
-  roomCodeBody,
 } from "../lib/arena-rooms.ts";
 
 let failed = 0;
@@ -33,89 +37,96 @@ check(
   combinaciones > 1_000_000_000,
   true
 );
-check(
-  "y eso es cien mil veces más que los 10.000 de antes",
-  Math.round(combinaciones / 10_000) >= 100_000,
-  true
-);
 
 const muestra = Array.from({ length: 2000 }, () => generateRoomCode());
 
 check("todos tienen la forma correcta", muestra.every(isRoomCode), true);
+check(
+  "todos miden exactamente seis",
+  muestra.every((c) => c.length === ROOM_CODE_LENGTH),
+  true
+);
 check(
   "ninguno repetido en 2.000 (sin garantía, pero delataría un generador roto)",
   new Set(muestra).size,
   muestra.length
 );
 
+console.log("\n— El código es el código: sin prefijo ni adornos —");
+
+check(
+  "ninguno lleva AVP",
+  muestra.some((c) => c.includes("AVP")),
+  false
+);
+check(
+  "ninguno lleva guion",
+  muestra.some((c) => c.includes("-")),
+  false
+);
+
 console.log("\n— Cómodos de dictar: sin letras que se confundan —");
 
-const cuerpos = muestra.map((c) => c.slice(4));
 for (const letra of ["I", "L", "O", "U"]) {
   check(
     `nunca sale la ${letra}`,
-    cuerpos.some((b) => b.includes(letra)),
+    muestra.some((c) => c.includes(letra)),
     false
   );
 }
 
 check(
   "se usa el alfabeto entero, no un rincón",
-  new Set(cuerpos.join("")).size,
+  new Set(muestra.join("")).size,
   32
 );
 
 console.log("\n— Se acepta lo que la gente escribe de verdad —");
 
-check("tal cual", normalizeRoomCode("AVP-H7K2MP"), "AVP-H7K2MP");
-check("en minúsculas", normalizeRoomCode("avp-h7k2mp"), "AVP-H7K2MP");
-check("sin prefijo", normalizeRoomCode("h7k2mp"), "AVP-H7K2MP");
-check("con espacios", normalizeRoomCode("  AVP H7K2MP "), "AVP-H7K2MP");
-check("sin guion", normalizeRoomCode("AVPH7K2MP"), "AVP-H7K2MP");
+check("tal cual", normalizeRoomCode("MY37GV"), "MY37GV");
+check("en minúsculas", normalizeRoomCode("my37gv"), "MY37GV");
+check("con espacios alrededor", normalizeRoomCode("  MY37GV "), "MY37GV");
+check("con espacios en medio", normalizeRoomCode("MY 37 GV"), "MY37GV");
+check("con un guion de más", normalizeRoomCode("MY37-GV"), "MY37GV");
 
 console.log("\n— Y se perdonan las confusiones de siempre —");
 
-check("la O leída donde había un cero", normalizeRoomCode("H7K2MO"), "AVP-H7K2M0");
-check("la I leída donde había un uno", normalizeRoomCode("H7K2MI"), "AVP-H7K2M1");
-check("la ele minúscula", normalizeRoomCode("h7k2ml"), "AVP-H7K2M1");
+check("la O leída donde había un cero", normalizeRoomCode("MY37GO"), "MY37G0");
+check("la I leída donde había un uno", normalizeRoomCode("MY37GI"), "MY37G1");
+check("la ele minúscula", normalizeRoomCode("my37gl"), "MY37G1");
 
-console.log("\n— Las salas viejas de cuatro dígitos siguen abriéndose —");
+console.log("\n— El prefijo viejo NO se acepta, y no se mutila en silencio —");
 
-check("código viejo", normalizeRoomCode("AVP-4821"), "AVP-4821");
-check("viejo sin prefijo", normalizeRoomCode("4821"), "AVP-4821");
-check("viejo en minúsculas", normalizeRoomCode("avp-4821"), "AVP-4821");
-check("y sigue teniendo forma válida", isRoomCode("AVP-4821"), true);
+// Esto es lo que importa de verdad del cambio. `AVP-MY37GV` limpiado son nueve
+// símbolos: si `normalizeRoomCode` recortara a seis daría "AVPMY3", un código
+// con forma perfecta que lleva a otra sala. Tiene que devolver `null`.
+check("con prefijo y guion", normalizeRoomCode("AVP-MY37GV"), null);
+check("con prefijo pegado", normalizeRoomCode("AVPMY37GV"), null);
+check("con prefijo en minúsculas", normalizeRoomCode("avp-my37gv"), null);
+check("y ni siquiera se parece al recorte", normalizeRoomCode("AVP-MY37GV") === "AVPMY3", false);
+
+console.log("\n— Los códigos viejos de cuatro dígitos tampoco —");
+
+check("cuatro dígitos", normalizeRoomCode("4821"), null);
+check("cuatro dígitos con prefijo", normalizeRoomCode("AVP-4821"), null);
+check("y no tienen forma válida", isRoomCode("AVP-4821"), false);
 
 console.log("\n— Lo que no es un código, no lo es —");
 
-check("cinco símbolos", normalizeRoomCode("H7K2M"), null);
-check("siete símbolos", normalizeRoomCode("H7K2MPQ"), null);
-check("con U, que nunca generamos", normalizeRoomCode("H7K2MU"), null);
-check("tres dígitos", normalizeRoomCode("482"), null);
+check("cinco símbolos", normalizeRoomCode("MY37G"), null);
+check("siete símbolos", normalizeRoomCode("MY37GVQ"), null);
+check("con U, que nunca generamos", normalizeRoomCode("MY37GU"), null);
 check("vacío", normalizeRoomCode(""), null);
-check("solo el prefijo", normalizeRoomCode("AVP-"), null);
+check("solo signos", normalizeRoomCode("---"), null);
 
 console.log("\n— Mientras se teclea —");
 
-check("va poniendo el prefijo", formatRoomCodeInput("h"), "AVP-H");
-check("y el guion", formatRoomCodeInput("h7k"), "AVP-H7K");
-check("no deja pasar de la cuenta", formatRoomCodeInput("h7k2mpqrs"), "AVP-H7K2MP");
-check("corrige al vuelo", formatRoomCodeInput("hok"), "AVP-H0K");
+check("va en mayúsculas desde la primera", formatRoomCodeInput("m"), "M");
+check("sin prefijo que nadie pidió", formatRoomCodeInput("my37"), "MY37");
+check("no deja pasar de la cuenta", formatRoomCodeInput("my37gvqrs"), "MY37GV");
+check("corrige al vuelo", formatRoomCodeInput("mo37"), "M037");
+check("tira lo que no es del alfabeto", formatRoomCodeInput("my-37 gv"), "MY37GV");
 check("vacío se queda vacío", formatRoomCodeInput(""), "");
-check("si vuelve a escribir el prefijo, no se duplica", formatRoomCodeInput("AVPH7K"), "AVP-H7K");
-
-console.log("\n— El campo de unirse (solo el cuerpo, sin prefijo) —");
-
-// El campo pinta `AVP-` aparte, así que este devuelve lo de después. Antes solo
-// admitía 4 dígitos y los códigos nuevos NO se podían teclear: la primera
-// invitada a una mesa paga se quedó fuera por esto (2026-08-08).
-check("letras y dígitos", roomCodeBody("h7k2mp"), "H7K2MP");
-check("con el prefijo pegado", roomCodeBody("AVP-H7K2MP"), "H7K2MP");
-check("con prefijo y espacio", roomCodeBody("avp h7k2mp"), "H7K2MP");
-check("corrige la O al vuelo", roomCodeBody("h7k2mo"), "H7K2M0");
-check("no pasa de seis", roomCodeBody("h7k2mpqrst"), "H7K2MP");
-check("un código viejo cabe entero", roomCodeBody("4821"), "4821");
-check("vacío se queda vacío", roomCodeBody(""), "");
 
 console.log(
   failed === 0 ? "\nTodo bien.\n" : `\n${failed} comprobación(es) fallaron.\n`

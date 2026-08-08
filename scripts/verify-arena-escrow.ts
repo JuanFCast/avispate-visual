@@ -31,31 +31,31 @@ console.log("\n— El identificador de la mesa —");
 
 check(
   "mismo código y mismos términos → misma mesa (cliente y servidor coinciden)",
-  tableIdFor("AVP-4821", 100_000n, 2),
-  tableIdFor("AVP-4821", 100_000n, 2)
+  tableIdFor("MY37GV", 100_000n, 2),
+  tableIdFor("MY37GV", 100_000n, 2)
 );
 
 check(
   "el código no distingue mayúsculas",
-  tableIdFor("avp-4821", 100_000n, 2),
-  tableIdFor("AVP-4821", 100_000n, 2)
+  tableIdFor("my37gv", 100_000n, 2),
+  tableIdFor("MY37GV", 100_000n, 2)
 );
 
 check(
   "otra ENTRADA es otra mesa",
-  tableIdFor("AVP-4821", 500_000n, 2) === tableIdFor("AVP-4821", 100_000n, 2),
+  tableIdFor("MY37GV", 500_000n, 2) === tableIdFor("MY37GV", 100_000n, 2),
   false
 );
 
 check(
   "otro número de JUGADORES es otra mesa",
-  tableIdFor("AVP-4821", 100_000n, 4) === tableIdFor("AVP-4821", 100_000n, 2),
+  tableIdFor("MY37GV", 100_000n, 4) === tableIdFor("MY37GV", 100_000n, 2),
   false
 );
 
 check(
   "otro código es otra mesa",
-  tableIdFor("AVP-9999", 100_000n, 2) === tableIdFor("AVP-4821", 100_000n, 2),
+  tableIdFor("9XQ4TP", 100_000n, 2) === tableIdFor("MY37GV", 100_000n, 2),
   false
 );
 

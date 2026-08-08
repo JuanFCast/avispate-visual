@@ -5,9 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ROOM_CODE_LENGTH,
-  ROOM_CODE_PREFIX,
+  formatRoomCodeInput,
   normalizeRoomCode,
-  roomCodeBody,
   roomIsFull,
   type RoomError,
   type RoomView,
@@ -55,8 +54,7 @@ export default function ArenaJoin() {
   /**
    * Completo = lo que se escribió forma un código válido. Se pregunta a la
    * misma función que valida en el servidor, en vez de contar caracteres aquí:
-   * los códigos nuevos tienen seis y los viejos cuatro, y esta pantalla no
-   * tiene por qué saberse esa historia.
+   * qué cuenta como código es una regla, y una regla vive en un solo sitio.
    */
   const code = normalizeRoomCode(body);
   const complete = Boolean(code);
@@ -117,40 +115,34 @@ export default function ArenaJoin() {
         <div className="field">
           <label htmlFor="room-code">{t("room.join.label")}</label>
           {/*
-            El `AVP-` es nuestro, no del jugador: va impreso dentro del campo y
-            no se puede borrar. Antes era un placeholder acompañado de una nota
-            que explicaba que no había que escribirlo — una instrucción para
-            arreglar un campo que estaba mal hecho.
+            El campo es el código entero y nada más. Antes llevaba un `AVP-`
+            impreso a la izquierda, que era decorado nuestro metido en el sitio
+            donde el jugador escribe: había que explicar que no se tecleaba, y
+            en un teléfono se comía un cuarto del ancho del campo para no decir
+            nada. El código son seis caracteres; el campo, también.
           */}
-          <div className="room-code-field">
-            <span className="room-code-prefix" aria-hidden="true">
-              {ROOM_CODE_PREFIX}-
-            </span>
-            <input
-              id="room-code"
-              className="room-code-input"
-              value={body}
-              onChange={(e) => {
-                // Acepta lo que la gente pega de verdad: `AVP-H7K2MP`,
-                // `h7k2mp`, `avp h7k2mp`, y también los códigos viejos de
-                // cuatro dígitos. Y corrige al vuelo las confusiones de
-                // siempre: la O que era un cero, la I o la ele que eran un uno.
-                setBody(roomCodeBody(e.target.value));
-                setProblem(null);
-              }}
-              // `text`, no `numeric`: los códigos llevan letras desde que
-              // adivinarlos dejó de ser una travesura y pasó a costar dinero.
-              inputMode="text"
-              autoCapitalize="characters"
-              autoCorrect="off"
-              autoComplete="off"
-              autoFocus
-              spellCheck={false}
-              maxLength={ROOM_CODE_LENGTH}
-              placeholder="H7K2MP"
-              aria-describedby="room-code-hint"
-            />
-          </div>
+          <input
+            id="room-code"
+            className="room-code-input"
+            value={body}
+            onChange={(e) => {
+              // Corrige al vuelo las confusiones de siempre: la O que era un
+              // cero, la I o la ele que eran un uno.
+              setBody(formatRoomCodeInput(e.target.value));
+              setProblem(null);
+            }}
+            // `text`, no `numeric`: los códigos llevan letras desde que
+            // adivinarlos dejó de ser una travesura y pasó a costar dinero.
+            inputMode="text"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            autoComplete="off"
+            autoFocus
+            spellCheck={false}
+            maxLength={ROOM_CODE_LENGTH}
+            placeholder="MY37GV"
+            aria-describedby="room-code-hint"
+          />
         </div>
 
         <p id="room-code-hint" className="arena-prize-note">

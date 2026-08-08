@@ -4138,55 +4138,26 @@ body {
 }
 
 /*
- * El campo del código: el `AVP-` impreso a la izquierda y los cuatro dígitos
- * a continuación. El prefijo NO es texto editable ni un placeholder — es parte
- * del campo, como el `$` de un campo de dinero. Antes se pedía en un
- * placeholder y una nota explicaba que no había que escribirlo; ninguna
- * instrucción arregla un campo que pide lo que no quiere.
+ * El campo del código: seis caracteres y nada más.
+ *
+ * Llevaba un `AVP-` impreso a la izquierda, como el `$` de un campo de dinero.
+ * Se cayó con el prefijo: era decorado nuestro ocupando el sitio donde escribe
+ * el jugador —un cuarto del ancho en un teléfono— para no decir nada que la
+ * pantalla no dijera ya.
+ *
+ * Centrado y espaciado como se dicta, letra a letra. Un código de seis
+ * caracteres alineado a la izquierda en un campo de ancho completo se lee como
+ * un formulario a medio llenar; aquí es lo único que hay, así que va al medio.
  */
-.room-code-field {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 14px;
-  border: 2px solid var(--gray-soft);
-  border-radius: 16px;
-  background: var(--white);
-}
-
-.room-code-field:focus-within {
-  border-color: var(--cyan);
-}
-
-.room-code-prefix {
-  flex: none;
-  font-family: var(--font-title);
-  font-size: 1.5rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  color: var(--gray);
-  user-select: none;
-}
-
-/* El código, escrito por el jugador. Espaciado como se dicta: cifra a cifra. */
 .room-code-input {
   font-family: var(--font-title);
-  font-size: 1.5rem;
-  letter-spacing: 0.12em;
+  font-size: 1.6rem;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-}
-
-/* Dentro del campo con prefijo pierde su propio borde: el borde es del grupo. */
-.room-code-field .room-code-input {
-  flex: 1;
-  min-width: 0;
-  border: none;
-  background: none;
-  padding-left: 0;
-}
-
-.room-code-field .room-code-input:focus {
-  outline: none;
+  text-align: center;
+  /* La separación entre letras sobra a la derecha de la última y descentra el
+     conjunto; el sangrado se la devuelve. */
+  text-indent: 0.16em;
 }
 
 /* Un error con salida: el mensaje y, cuando la hay, la puerta. */

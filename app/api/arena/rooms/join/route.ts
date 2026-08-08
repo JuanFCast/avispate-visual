@@ -19,7 +19,7 @@ const STATUS: Record<string, number> = {
  * POST /api/arena/rooms/join — sienta al jugador en una sala por su código.
  *
  * El código se normaliza aquí también: quien escribe `4821` en el teléfono y
- * quien pega `AVP-4821` de un chat entran a la misma mesa.
+ * quien pega `my 37 gv` de un chat entran a la misma mesa.
  */
 export async function POST(req: Request) {
   const auth = await requireIdentity(req);

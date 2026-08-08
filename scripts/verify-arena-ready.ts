@@ -51,7 +51,7 @@ const sala = (
 ): RoomView => {
   const players = jugadores.map((p) => ({ ...p, isYou: p.profileId === quien }));
   return {
-    code: "AVP-H7K2MP",
+    code: "H7K2MP",
     status: "open",
     entryUnits: "1000000",
     maxPlayers: 2,
