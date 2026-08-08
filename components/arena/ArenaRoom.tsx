@@ -167,6 +167,25 @@ export default function ArenaRoom({ code }: { code: string }) {
     return <RoomProblem t={t} message={roomErrorText(t, error)} />;
   }
 
+  /*
+   * La mesa ya repartió: el efecto de arriba está llevando a la partida y aquí
+   * solo se acompaña la espera.
+   *
+   * Va ANTES de mirar si la sala está cerrada, y ese orden importa: al terminar
+   * una partida la sala se cierra (para que deje de contar como abierta en el
+   * aviso de la Arena), así que quien vuelva a esta URL vería un "sala cerrada"
+   * parpadeando antes de la redirección. Eso cuenta una avería que no hubo —la
+   * partida existe y es a donde va— y en la primera prueba real es justo el
+   * tipo de destello que hace dudar de si algo se rompió.
+   */
+  if (room.matchStarted) {
+    return (
+      <section className="arena-card room-state" aria-busy="true">
+        <p className="arena-hero-text">{t("room.going_to_match")}</p>
+      </section>
+    );
+  }
+
   if (room.status === "closed") {
     return <RoomProblem t={t} message={t("room.error.closed")} />;
   }

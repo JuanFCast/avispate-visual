@@ -475,24 +475,49 @@ export async function leaveRoom(params: {
 /**
  * La sala en la que este jugador sigue sentado, si hay alguna. Es lo que
  * permite devolverlo a su mesa después de recargar o de irse a otra pantalla.
+ *
+ * Dice además si esa mesa ya está JUGANDO, y no es un detalle: "todavía tienes
+ * una sala abierta" y "tienes una partida en curso" mandan al mismo sitio pero
+ * significan cosas distintas —una espera gente, la otra te está esperando a ti—
+ * y con un solo texto para las dos el jugador no sabe cuál de las dos es.
+ *
+ * Las salas de partidas ya terminadas no salen de aquí porque se cierran al
+ * terminar (ver `retireRoomOfMatch`). Antes se quedaban abiertas para siempre y
+ * este aviso ofrecía "volver" a una partida jugada y acabada.
  */
-export async function findActiveRoom(profileId: string): Promise<string | null> {
+export async function findActiveRoom(
+  profileId: string
+): Promise<{ code: string; inMatch: boolean } | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("arena_room_players")
-    .select("arena_rooms(code, status, created_at)")
+    .select("arena_rooms(id, code, status, created_at)")
     .eq("profile_id", profileId);
   if (error) throw error;
 
   const rows = (data ?? []) as unknown as {
-    arena_rooms: { code: string; status: RoomStatus; created_at: string } | null;
+    arena_rooms: {
+      id: string;
+      code: string;
+      status: RoomStatus;
+      created_at: string;
+    } | null;
   }[];
 
   for (const row of rows) {
     const room = row.arena_rooms;
     if (!room || room.status !== "open") continue;
     if (Date.now() - new Date(room.created_at).getTime() > ROOM_TTL_MS) continue;
-    return room.code;
+
+    // Consulta suelta y no `matchExistsForRoom` para no cerrar un círculo de
+    // imports: la partida ya depende de la sala. Mismo motivo que en `readRoom`.
+    const { count, error: matchError } = await db
+      .from("arena_matches")
+      .select("id", { count: "exact", head: true })
+      .eq("room_id", room.id);
+    if (matchError) throw matchError;
+
+    return { code: room.code, inMatch: (count ?? 0) > 0 };
   }
   return null;
 }
