@@ -378,20 +378,17 @@ export default function ArenaMatch({ code }: { code: string }) {
           {rails.left.map((p) => (
             <RailChip key={p.profileId} player={p} />
           ))}
+          {/* UNO por esquina, y nada más. El hueco que deja un círculo en la
+              esquina de su caja es un triángulo pequeño: apilando dos cosas, la
+              de arriba llega a la mitad del círculo, que es donde más ancho es.
+              El botón de silencio se fue abajo, con el de abandonar — no es
+              información de la partida y no compite por este sitio. */}
           <div className="rail-stats">
             <div className="stat-pill">
               <span className="sp-emoji">⏱️</span>
               <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
               <span className="sp-label">{t("game.stat.time")}</span>
             </div>
-            <button
-              type="button"
-              className="mute-btn"
-              onClick={toggleMuted}
-              aria-label={muted ? t("sound.unmute") : t("sound.mute")}
-            >
-              {muted ? "🔇" : "🔊"}
-            </button>
           </div>
         </aside>
 
@@ -437,15 +434,11 @@ export default function ArenaMatch({ code }: { code: string }) {
           {rails.right.map((p) => (
             <RailChip key={p.profileId} player={p} />
           ))}
-          {/* Cartas y castigos se quedan donde estaban, en la esquina de abajo:
-              ahí no estorban y son las dos cifras que uno consulta sin dejar de
-              jugar. */}
+          {/* La píldora de CARTAS se cayó, y no por sitio: decía el mismo
+              número que tu propia ficha, arriba a la izquierda. Dos sitios para
+              una cifra son dos sitios donde mirar, y encima costaba la esquina
+              que hacía falta para no pisar la carta. */}
           <div className="rail-stats">
-            <div className="stat-pill">
-              <span className="sp-emoji">🃏</span>
-              <span className="sp-value">{cardsLeft}</span>
-              <span className="sp-label">{t("game.stat.cards")}</span>
-            </div>
             <div className="stat-pill">
               <span className="sp-emoji">🧱</span>
               <span className="sp-value">{view.you?.penalties ?? 0}</span>
@@ -455,9 +448,20 @@ export default function ArenaMatch({ code }: { code: string }) {
         </aside>
       </div>
 
-      <button type="button" className="match-quit" onClick={leave}>
-        {t("match.quit")}
-      </button>
+      {/* Lo que no es partida vive fuera del tablero. */}
+      <div className="match-foot">
+        <button
+          type="button"
+          className="mute-btn"
+          onClick={toggleMuted}
+          aria-label={muted ? t("sound.unmute") : t("sound.mute")}
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
+        <button type="button" className="match-quit" onClick={leave}>
+          {t("match.quit")}
+        </button>
+      </div>
     </MatchShell>
   );
 }

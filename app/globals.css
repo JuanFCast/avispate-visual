@@ -4537,7 +4537,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  width: 52px;
+  width: var(--rail-w, 44px);
   align-self: stretch;
 }
 
@@ -4554,10 +4554,28 @@ body {
   display: block;
 }
 
-.match-board .rail-stats .mute-btn {
-  width: 40px;
-  height: 40px;
-  font-size: 1rem;
+/*
+ * Los indicadores del tablero tienen alto FIJO, y no el que salga del texto.
+ *
+ * De ese alto depende que no toquen la carta: el hueco de una esquina es un
+ * triángulo, así que cuanto más alto es el indicador, más se mete hacia el
+ * centro, que es donde el círculo es más ancho. Con el alto atado a la fuente,
+ * cualquier retoque tipográfico movía la geometría sin que nadie lo notara —
+ * hasta que se notaba en un teléfono. `verify-match-board-fit.ts` comprueba la
+ * separación con estos números.
+ */
+.match-shell .match-board .stat-pill {
+  width: var(--rail-w);
+  height: var(--rail-pill-h);
+  justify-content: center;
+  padding: 0 2px;
+}
+
+.match-shell .match-board .rail-chip {
+  width: var(--rail-w);
+  height: var(--rail-chip-h);
+  justify-content: center;
+  padding: 0 2px;
 }
 
 /*
@@ -4677,8 +4695,19 @@ body {
  * redonda, así que sin `pointer-events: none` los cuatro rincones dejarían de
  * responder. Solo el botón de silencio los recupera.
  */
-.match-board {
+/*
+ * El tablero se sale al margen de la pantalla.
+ *
+ * La columna de la app deja 16 px a cada lado. Ese aire no le sirve de nada al
+ * tablero —la carta es un círculo y ya está separada por su propia curvatura—
+ * y en cambio es exactamente el sitio que necesitan los indicadores para no
+ * pisarla. Sacándolo, los indicadores caben fuera de la caja de la carta sin
+ * costarle a la carta ni un píxel de diámetro.
+ */
+.match-shell .match-board {
   position: relative;
+  width: calc(100% + 2 * var(--board-bleed));
+  margin-inline: calc(-1 * var(--board-bleed));
 }
 
 .match-shell .match-board .match-rail {
@@ -4734,8 +4763,72 @@ body {
  * Lleva `.match-shell` en el selector para ganarle al `.shell.playing` de más
  * arriba sin tocar el reto diario, que sigue exactamente como estaba.
  */
+/*
+ * La geometría del tablero en vertical, dicha con números y no de oído.
+ *
+ * El fallo que arregla: los indicadores se montaban sobre las cartas. La carta
+ * ocupaba TODO el ancho de su caja (`100vw - 32px`) y los rieles se
+ * superponían encima confiando en que, por ser un círculo, las esquinas
+ * quedaban libres. Y quedan —pero solo las esquinas—: el hueco de una esquina
+ * es un triángulo de unos `0,146 · d` de lado, así que una pastilla de 52 px
+ * sobre una carta de 290 ya no cabe, y dos apiladas (Tiempo + silencio,
+ * Cartas + Castigos) llegaban hasta la mitad del círculo, que es donde más
+ * ancho es.
+ *
+ * Ahora hay tres cambios y cada uno tira de una palanca distinta:
+ *
+ *   · el tablero se sale a los márgenes de la pantalla (`--board-bleed`), que
+ *     era espacio muerto;
+ *   · el indicador vive casi entero FUERA de la caja de la carta
+ *     (`--rail-out` de sus `--rail-w`), y solo le muerde la diferencia;
+ *   · queda UNO por esquina, con alto fijo, para que el triángulo alcance.
+ *
+ * La cuenta del ancho sale de ahí: el diámetro es el tablero sangrado menos lo
+ * que se llevan los dos rieles. En la mayoría de los teléfonos manda el alto
+ * —media pantalla por carta— y esto no le quita nada; donde mandaría el ancho
+ * es justo donde se producía el solape.
+ */
 .shell.playing.match-shell {
-  --card-d: min(calc(100vw - 32px), calc(50dvh - 78px), 340px);
+  /* Lo que el tablero se sale de la columna de la app, a cada lado. */
+  --board-bleed: 12px;
+  /* Lo que la cuenta del ancho RESERVA para cada riel. Es fijo a propósito: si
+     dependiera del tamaño real del indicador —que abajo encoge con la carta—
+     habría un ciclo, porque ese tamaño sale del diámetro. Reservar de más solo
+     importa cuando manda el ancho, y cuando manda el ancho la pantalla es alta
+     y el indicador está a tamaño completo de todos modos. */
+  --rail-out: 30px;
+
+  --card-d: min(
+    calc(100vw - 32px + 2 * var(--board-bleed) - 2 * var(--rail-out)),
+    calc(50dvh - 78px),
+    340px
+  );
+
+  /*
+   * El indicador encoge CON la carta, y esa es la parte que faltaba.
+   *
+   * Con medidas fijas la cuenta salía en un teléfono y se caía en el de al
+   * lado: en una pantalla corta la carta baja a 195 px —manda el alto, media
+   * pantalla por carta— y su esquina libre pasa a medir 28, así que una
+   * pastilla de 44 que allí sobra aquí invade. Atándolas al diámetro, la
+   * proporción se mantiene sea cual sea la pantalla.
+   *
+   * El 0,15 no es un gusto: el hueco de la esquina de un círculo mide
+   * `0,146 · d` de lado, y estos son esos mismos porcentajes con el margen que
+   * hace falta para que se vea separado y no al ras.
+   */
+  --rail-w: clamp(28px, calc(var(--card-d) * 0.15), 44px);
+  --rail-chip-h: clamp(30px, calc(var(--card-d) * 0.165), 48px);
+  --rail-pill-h: clamp(28px, calc(var(--card-d) * 0.15), 44px);
+}
+
+/* Pantalla corta: en un indicador de 30 px no cabe "CASTIGOS", y el emoji con
+   la cifra ya dicen lo mismo. La etiqueta es lo primero que sobra. */
+@media (max-height: 640px) {
+  .match-shell .match-board .sp-label,
+  .match-shell .match-board .rail-chip-name {
+    display: none;
+  }
 }
 
 /*
@@ -4758,6 +4851,23 @@ body {
     --card-gap: clamp(32px, 6vw, 72px);
     margin-bottom: 8px;
   }
+}
+
+/* El pie del tablero: silencio y abandonar. Ninguna de las dos es información
+   de la partida, así que ninguna de las dos merece una esquina de la carta. */
+.match-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 2px;
+}
+
+.match-foot .mute-btn {
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+  flex: none;
 }
 
 .match-quit {
