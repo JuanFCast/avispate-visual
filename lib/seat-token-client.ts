@@ -59,3 +59,46 @@ export function withSeatHeader(
   if (!token) return headers;
   return { ...headers, [SEAT_HEADER]: token };
 }
+
+/**
+ * El pago de la silla, guardado en el dispositivo hasta que el servidor lo
+ * acepta.
+ *
+ * Sin esto, una silla pagada cuyo registro falla deja al jugador delante de un
+ * botón que dice "pagar" — y pagar otra vez es lo único que no debe hacer.
+ * Guardando el hash se le puede ofrecer TERMINAR, que es lo que falta de
+ * verdad. Se borra cuando el registro entra.
+ */
+const PAID_PREFIX = "avispateSeatPaid_v1:";
+
+export interface PendingSeatPayment {
+  txHash: string;
+  address: string;
+}
+
+export function rememberSeatPayment(
+  code: string,
+  payment: PendingSeatPayment
+): void {
+  try {
+    store()?.setItem(PAID_PREFIX + code.toUpperCase(), JSON.stringify(payment));
+  } catch {
+    // Sin sitio para guardarlo se pierde la vía de reintento, no el dinero:
+    // el pago sigue en el contrato y la mesa acaba devolviéndolo.
+  }
+}
+
+export function seatPaymentFor(code: string): PendingSeatPayment | null {
+  try {
+    const raw = store()?.getItem(PAID_PREFIX + code.toUpperCase());
+    if (!raw) return null;
+    const p = JSON.parse(raw) as PendingSeatPayment;
+    return p?.txHash && p?.address ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+export function forgetSeatPayment(code: string): void {
+  store()?.removeItem(PAID_PREFIX + code.toUpperCase());
+}

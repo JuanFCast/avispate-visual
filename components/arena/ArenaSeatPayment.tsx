@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useArenaJoin, type JoinStage } from "@/lib/arena-join";
-import { seatTokenFor } from "@/lib/seat-token-client";
+import { seatPaymentFor, seatTokenFor } from "@/lib/seat-token-client";
 import { ARENA_COMMISSION_BPS, fmtEntry } from "@/lib/arena";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -44,9 +44,18 @@ export default function ArenaSeatPayment({
   onSeated,
 }: Props) {
   const t = useT();
-  const { stage, error, payAndSit } = useArenaJoin();
-  // Si la ficha ya está guardada, es que se pagó y se canjeó: lo que falló fue
-  // el refresco. Se ofrece continuar en vez de volver a cobrar.
+  const { stage, error, payAndSit, finishPending } = useArenaJoin();
+  /**
+   * ¿Hay un pago hecho en este dispositivo que el servidor no aceptó todavía?
+   *
+   * Mientras lo haya, esta pantalla NO puede ofrecer pagar. El dinero ya salió;
+   * lo único que falta es contarlo. Pasó en la primera prueba real: el registro
+   * se cayó por un retraso del nodo y el jugador se quedó viendo un botón de
+   * pagar, que es justo lo que no debía tocar.
+   */
+  const [pendiente, setPendiente] = useState<boolean>(() =>
+    Boolean(seatPaymentFor(code))
+  );
   const [alreadyPaid] = useState(() => Boolean(seatTokenFor(code)));
 
   const busy = stage !== null;
@@ -61,6 +70,18 @@ export default function ArenaSeatPayment({
       maxPlayers,
       authHeaders,
     });
+    setPendiente(Boolean(seatPaymentFor(code)));
+    if (ok) onSeated();
+  }
+
+  /** Termina un pago ya hecho. No firma ni cobra nada. */
+  async function finish() {
+    const ok = await finishPending({
+      code,
+      tableId: tableId as `0x${string}`,
+      authHeaders,
+    });
+    setPendiente(Boolean(seatPaymentFor(code)));
     if (ok) onSeated();
   }
 
@@ -74,14 +95,22 @@ export default function ArenaSeatPayment({
       <button
         type="button"
         className="btn-primary"
-        onClick={pay}
+        onClick={pendiente ? finish : pay}
         disabled={busy}
         aria-busy={busy}
       >
         {busy
           ? t(STAGE_KEY[stage])
-          : t("arena.pay.button", { entry })}
+          : pendiente
+            ? t("arena.pay.finish")
+            : t("arena.pay.button", { entry })}
       </button>
+
+      {pendiente && !busy && (
+        <p className="hint" aria-live="polite">
+          {t("arena.pay.already_paid")}
+        </p>
+      )}
 
       {alreadyPaid && !busy && (
         <p className="hint" aria-live="polite">

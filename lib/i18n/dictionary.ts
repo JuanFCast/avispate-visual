@@ -111,6 +111,9 @@ export const en = {
   "arena.pay.support":
     "{entry} USDT goes into the pot. The winner takes it minus the {commission}% house cut. Nobody sits without paying — not even the host.",
   "arena.pay.button": "Pay {entry} USDT and sit",
+  "arena.pay.finish": "Finish taking my seat",
+  "arena.pay.already_paid":
+    "Your entry is already paid — only the registration is missing. Do not pay again.",
   "arena.pay.stage.checking": "Checking your wallet…",
   "arena.pay.stage.approving": "Approving USDT…",
   "arena.pay.stage.confirm": "Confirm in your wallet…",
@@ -836,6 +839,9 @@ export const es: Record<MessageKey, string> = {
   "arena.pay.support":
     "{entry} USDT van al pozo. Quien gane se lo lleva menos el {commission}% de la casa. Nadie se sienta sin pagar, tampoco quien creó la sala.",
   "arena.pay.button": "Pagar {entry} USDT y sentarme",
+  "arena.pay.finish": "Terminar de tomar mi silla",
+  "arena.pay.already_paid":
+    "Tu entrada ya está pagada, solo falta registrarla. No vuelvas a pagar.",
   "arena.pay.stage.checking": "Comprobando tu billetera…",
   "arena.pay.stage.approving": "Autorizando USDT…",
   "arena.pay.stage.confirm": "Confirma en tu billetera…",
