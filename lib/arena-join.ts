@@ -64,6 +64,15 @@ export interface ArenaJoinApi {
   stage: JoinStage | null;
   error: MessageKey | null;
   /**
+   * Consigue la ficha de una silla que YA está registrada pero cuya ficha se
+   * perdió. No firma, no cobra y no toca la cadena para escribir.
+   */
+  claimSeatToken: (params: {
+    code: string;
+    tableId: `0x${string}`;
+    address: string;
+  }) => Promise<boolean>;
+  /**
    * Termina de registrar un pago que YA se hizo. No firma nada y no cobra: es
    * el camino para una silla pagada cuyo registro se cayó.
    */
@@ -313,5 +322,36 @@ export function useArenaJoin(): ArenaJoinApi {
     []
   );
 
-  return { stage, error, payAndSit, finishPending };
+  /**
+   * Recuperar solo la ficha.
+   *
+   * Hace falta para un caso real: la silla quedó registrada —a mano o por un
+   * reintento— pero el canje nunca ocurrió, así que el jugador está sentado y
+   * el servidor le rechaza cada acción por falta de ficha. El secreto sigue en
+   * su dispositivo, que es lo único que hace falta.
+   */
+  const claimSeatToken = useCallback<ArenaJoinApi["claimSeatToken"]>(
+    async ({ code, tableId, address }) => {
+      try {
+        const { secret } = prepareSeat(tableId);
+        const res = await fetch("/api/arena/seat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code, address, secret }),
+        });
+        const data = (await res.json().catch(() => null)) as {
+          token?: string;
+        } | null;
+        if (!res.ok || !data?.token) return false;
+        rememberSeatToken(code, data.token);
+        forgetSeatPayment(code);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    []
+  );
+
+  return { stage, error, payAndSit, finishPending, claimSeatToken };
 }

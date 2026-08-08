@@ -21,6 +21,9 @@ import ArenaHeader from "./ArenaHeader";
  * tiene por qué descargarlo.
  */
 import ArenaSeatPayment from "./ArenaSeatPayment";
+import { useArenaJoin } from "@/lib/arena-join";
+import { seatTokenFor } from "@/lib/seat-token-client";
+import { useActiveWallet } from "@/lib/wallet";
 
 const AccessCard = dynamic(() => import("../AccessCard"), {
   ssr: false,
@@ -70,6 +73,30 @@ export default function ArenaRoom({ code }: { code: string }) {
   } = useArenaRoom(code);
 
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const wallet = useActiveWallet();
+  const { claimSeatToken } = useArenaJoin();
+
+  /**
+   * Sentado en una mesa con entrada pero sin ficha: el servidor va a rechazar
+   * cada acción por falta de permiso, y el jugador no tiene forma de pedirla.
+   *
+   * Ocurre cuando la silla se registró pero el canje no llegó a hacerse — pasó
+   * en la primera prueba real. El secreto sigue en el dispositivo, así que se
+   * canjea solo, sin molestar a nadie y sin volver a tocar la cadena.
+   */
+  useEffect(() => {
+    const tableId = room?.tableId;
+    const mine = room?.you;
+    if (!tableId || !mine || !wallet.address) return;
+    if (seatTokenFor(room.code)) return;
+    void claimSeatToken({
+      code: room.code,
+      tableId: tableId as `0x${string}`,
+      address: wallet.address,
+    }).then((ok) => {
+      if (ok) refresh();
+    });
+  }, [room?.tableId, room?.you, room?.code, wallet.address, claimSeatToken, refresh]);
 
   useEffect(() => {
     if (!copied) return;
