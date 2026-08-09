@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAccount, type Connector } from "wagmi";
 import { useProfile } from "./profile-context";
+import type { CanonicalWallet } from "./pay-guard";
 import {
   decideWalletIdentity,
   mayTransact,
@@ -152,6 +153,25 @@ export function useWalletIdentity(): {
     canonical: walletAddress,
     connected: isConnected ? address : null,
   };
+}
+
+/**
+ * El perfil, traducido a los tres estados que el guardián de pago entiende.
+ *
+ * En un solo sitio a propósito: cada pantalla que lo dedujera por su cuenta
+ * volvería a tener la oportunidad de confundir "todavía no lo sé" con "no hay",
+ * que es el error que este tipo existe para hacer imposible.
+ */
+export function useCanonicalWallet(): CanonicalWallet {
+  const { ready, loading, authenticated, walletAddress } = useProfile();
+
+  // Sin saber si hay sesión, o con el perfil en vuelo: no se sabe.
+  if (!ready || (authenticated && loading)) return { status: "loading" };
+  // Sin sesión no hay perfil que respetar: la wallet conectada es la identidad.
+  if (!authenticated) return { status: "none" };
+  return walletAddress
+    ? { status: "known", address: walletAddress }
+    : { status: "none" };
 }
 
 /** `0x1234…abcd`: dirección abreviada para mostrar en la UI. */

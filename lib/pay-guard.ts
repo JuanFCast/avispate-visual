@@ -22,6 +22,26 @@ export type WalletProbe =
    */
   | { status: "unreachable"; reason: string };
 
+/**
+ * La wallet del perfil, con sus TRES estados y no dos.
+ *
+ * Era `string | null`, y ese `null` decía dos cosas incompatibles: "este jugador
+ * no tiene wallet anotada" y "todavía no ha llegado el perfil". El guardián leía
+ * las dos como la primera, así que mientras el perfil cargaba **se apagaba
+ * solo**: cualquier wallet conectada podía pagar en esa ventana, incluida una
+ * embebida creada por accidente. Justo lo que existe para impedir.
+ *
+ * Con los tres estados separados, "no lo sé" deja de poder disfrazarse de "no
+ * hay", que es la forma que este error toma una y otra vez.
+ */
+export type CanonicalWallet =
+  /** El perfil todavía no llegó. No se sabe, así que no se firma. */
+  | { status: "loading" }
+  /** Se sabe: este jugador no tiene wallet anotada. La que traiga será la suya. */
+  | { status: "none" }
+  /** Se sabe cuál es. Solo esa firma. */
+  | { status: "known"; address: string };
+
 /** Una jugada ya pagada que todavía no consta en el servidor. */
 export interface PendingPlay {
   txHash: string;
@@ -45,6 +65,11 @@ export type PayDecision =
    * respuesta distinta — conectar la de siempre, la que cobra los premios.
    */
   | { kind: "wrong_wallet"; canonical: string; connected: string }
+  /**
+   * Todavía no se sabe de quién es esta cuenta. No es un rechazo: es que aún no
+   * hay con qué decidir, y decidir sin saber es como se apagaba el guardián.
+   */
+  | { kind: "checking" }
   /** Vía libre, y esta es la dirección con la que hay que seguir TODO. */
   | { kind: "proceed"; address: string };
 
@@ -81,13 +106,11 @@ export function decidePlayStart(input: {
   probe: WalletProbe;
   pending: PendingPlay | null;
   /**
-   * `profiles.wallet_address`: la wallet del perfil, la que cobra.
-   *
-   * `null` o ausente cuando el jugador todavía no tiene ninguna anotada — ahí
-   * no hay nada que contrastar y la que traiga será la suya. Omitirlo no
-   * relaja nada más: los tres pasos anteriores siguen igual.
+   * La wallet del perfil, en sus tres estados. Omitirlo equivale a `none` y
+   * deja los tres pasos anteriores intactos: es lo que usan las llamadas que
+   * no tienen perfil a mano (y lo que hacía el guardián antes de existir esto).
    */
-  canonical?: string | null;
+  canonical?: CanonicalWallet;
 }): PayDecision {
   if (input.pending) return { kind: "resume_pending", pending: input.pending };
 
@@ -99,13 +122,22 @@ export function decidePlayStart(input: {
   if (accounts.length === 0) return { kind: "reconnect", reason: "locked" };
 
   const expected = norm(input.expected);
-  const canonical = norm(input.canonical);
+  const canonical = input.canonical ?? { status: "none" };
 
-  /** Último filtro: con perfil, solo firma la wallet del perfil. */
-  const conLaDelPerfil = (address: string): PayDecision =>
-    !canonical || address === canonical
+  /**
+   * Último filtro: con perfil, solo firma la wallet del perfil.
+   *
+   * Y `loading` para, no pasa. Es la diferencia que faltaba: no saber de quién
+   * es la cuenta nunca puede valer como permiso.
+   */
+  const conLaDelPerfil = (address: string): PayDecision => {
+    if (canonical.status === "loading") return { kind: "checking" };
+    if (canonical.status === "none") return { kind: "proceed", address };
+    const suya = norm(canonical.address);
+    return address === suya
       ? { kind: "proceed", address }
-      : { kind: "wrong_wallet", canonical, connected: address };
+      : { kind: "wrong_wallet", canonical: suya, connected: address };
+  };
 
   // Sin dirección previa (primera conexión) la que expone la wallet es la
   // buena; no hay nada anterior que invalidar.
@@ -129,8 +161,8 @@ export function decidePlayStart(input: {
 export function confirmBeforeSigning(
   validated: string,
   probe: WalletProbe,
-  /** La wallet del perfil, si se conoce. Se re-exige también aquí. */
-  canonical?: string | null
+  /** La wallet del perfil. Se re-exige también aquí, `loading` incluido. */
+  canonical?: CanonicalWallet
 ): { ok: true } | { ok: false; decision: PayDecision } {
   const decision = decidePlayStart({
     expected: validated,

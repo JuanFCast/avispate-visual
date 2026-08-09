@@ -101,6 +101,10 @@ export const en = {
      premios— porque la respuesta es conectar ESA, no una cualquiera. */
   "pay.block.wrong_wallet":
     "This account's wallet is {canonical}, and you have {connected} connected. Connect yours to play — it's the one that collects your prizes. Nothing was charged.",
+  // No es un rechazo: es que aún no sabemos de quién es la cuenta, y cobrar sin
+  // saberlo es exactamente lo que no se puede hacer.
+  "pay.block.checking":
+    "One moment — we're checking your account before charging anything. Try again in a second.",
   "pay.block.needs_name":
     "Pick a name for this wallet before you play, so your score can be saved. Nothing was charged.",
   "pay.block.name_taken":
@@ -884,6 +888,8 @@ export const es: Record<MessageKey, string> = {
     "Tu billetera cambió a otra cuenta ({address}). Vamos a revisar tu nombre otra vez antes de cobrar nada. No te hemos cobrado nada.",
   "pay.block.wrong_wallet":
     "La billetera de esta cuenta es {canonical}, y tienes conectada {connected}. Conecta la tuya para jugar — es la que cobra tus premios. No te hemos cobrado nada.",
+  "pay.block.checking":
+    "Un momento — estamos comprobando tu cuenta antes de cobrar nada. Vuelve a intentarlo en un segundo.",
   "pay.block.needs_name":
     "Elige un nombre para esta billetera antes de jugar, para que tu puntaje se pueda guardar. No te hemos cobrado nada.",
   "pay.block.name_taken":

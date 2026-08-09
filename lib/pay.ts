@@ -20,7 +20,7 @@ import {
 import { isMiniPay } from "./minipay";
 import { confirmBeforeSigning, type PayDecision } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
-import { useProfile } from "./profile-context";
+import { useCanonicalWallet } from "./wallet";
 import { ensureWalletSession } from "./wallet-session-client";
 import type { MessageKey } from "./i18n";
 
@@ -226,7 +226,7 @@ export function usePayToPlay() {
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
   /** La wallet del perfil: la que cobra, y por tanto la única que puede firmar. */
-  const { walletAddress: canonical } = useProfile();
+  const canonical = useCanonicalWallet();
 
   const playForDeck = useCallback(
     async (

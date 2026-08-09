@@ -6,7 +6,7 @@ import { celo } from "viem/chains";
 import { ERC20_ABI, USDT_CELO_ADDRESS } from "./contracts";
 import { decidePlayStart, confirmBeforeSigning } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
-import { useProfile } from "./profile-context";
+import { useCanonicalWallet } from "./wallet";
 import { prepareSeat } from "./seat-secret";
 import { registerSeat } from "./arena-register";
 import { ensureWalletSession, readWalletSession } from "./wallet-session-client";
@@ -201,7 +201,7 @@ export function useArenaJoin(): ArenaJoinApi {
   const { address, chainId, connector } = useAccount();
   // La wallet del perfil, la que cobra el premio. Entra en el guardián para que
   // pagar una entrada exija la misma cuenta que va a recibir el pozo.
-  const { walletAddress: canonical } = useProfile();
+  const canonical = useCanonicalWallet();
   const publicClient = usePublicClient({ chainId: celo.id });
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();

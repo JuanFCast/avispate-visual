@@ -210,7 +210,7 @@ check(
     expected: RABBY,
     probe: { status: "answered", accounts: [RABBY] },
     pending: null,
-    canonical: RABBY,
+    canonical: { status: "known", address: RABBY },
   }),
   { kind: "proceed", address: RABBY }
 );
@@ -221,7 +221,7 @@ check(
     expected: EMBEBIDA,
     probe: { status: "answered", accounts: [EMBEBIDA] },
     pending: null,
-    canonical: RABBY,
+    canonical: { status: "known", address: RABBY },
   }),
   { kind: "wrong_wallet", canonical: RABBY, connected: EMBEBIDA }
 );
@@ -244,7 +244,7 @@ check(
     expected: EMBEBIDA,
     probe: { status: "answered", accounts: [EMBEBIDA, RABBY] },
     pending: null,
-    canonical: RABBY,
+    canonical: { status: "known", address: RABBY },
   }),
   { kind: "wrong_wallet", canonical: RABBY, connected: EMBEBIDA }
 );
@@ -257,7 +257,7 @@ check(
     expected: RABBY,
     probe: { status: "answered", accounts: [] },
     pending: null,
-    canonical: RABBY,
+    canonical: { status: "known", address: RABBY },
   }),
   { kind: "reconnect", reason: "locked" }
 );
@@ -268,7 +268,7 @@ check(
     expected: RABBY,
     probe: { status: "unreachable", reason: "timeout" },
     pending: null,
-    canonical: RABBY,
+    canonical: { status: "known", address: RABBY },
   }),
   { kind: "reconnect", reason: "unreachable" }
 );
@@ -281,7 +281,7 @@ check(
     expected: EMBEBIDA,
     probe: { status: "answered", accounts: [EMBEBIDA] },
     pending: { txHash: "0xabc", player: EMBEBIDA, deckSize: 10 },
-    canonical: RABBY,
+    canonical: { status: "known", address: RABBY },
   }).kind,
   "resume_pending"
 );
@@ -294,7 +294,7 @@ check(
     expected: RABBY,
     probe: { status: "answered", accounts: [EMBEBIDA] },
     pending: null,
-    canonical: RABBY,
+    canonical: { status: "known", address: RABBY },
   }),
   { kind: "account_changed", expected: RABBY, actual: EMBEBIDA }
 );
@@ -305,7 +305,7 @@ check(
     expected: null,
     probe: { status: "answered", accounts: [EMBEBIDA] },
     pending: null,
-    canonical: null,
+    canonical: { status: "none" },
   }),
   { kind: "proceed", address: EMBEBIDA }
 );
@@ -314,7 +314,7 @@ console.log("\n— Y pegado a la firma se vuelve a exigir —");
 
 check(
   "la canónica firma",
-  confirmBeforeSigning(RABBY, { status: "answered", accounts: [RABBY] }, RABBY),
+  confirmBeforeSigning(RABBY, { status: "answered", accounts: [RABBY] }, { status: "known", address: RABBY }),
   { ok: true }
 );
 
@@ -322,7 +322,7 @@ check(
 // embebida y el pago se habría hecho a nombre de otra identidad.
 check(
   "la embebida NO firma, aunque conteste bien",
-  confirmBeforeSigning(EMBEBIDA, { status: "answered", accounts: [EMBEBIDA] }, RABBY),
+  confirmBeforeSigning(EMBEBIDA, { status: "answered", accounts: [EMBEBIDA] }, { status: "known", address: RABBY }),
   {
     ok: false,
     decision: { kind: "wrong_wallet", canonical: RABBY, connected: EMBEBIDA },
@@ -347,11 +347,98 @@ console.log("\n— Ninguna ajena pasa, se mire como se mire —");
   ];
   const pasaron = ajenas.filter(
     (probe) =>
-      decidePlayStart({ expected: EMBEBIDA, probe, pending: null, canonical: RABBY })
-        .kind === "proceed"
+      decidePlayStart({
+        expected: EMBEBIDA,
+        probe,
+        pending: null,
+        canonical: { status: "known", address: RABBY },
+      }).kind === "proceed"
   );
   check("ninguna de las cinco cobra", pasaron.length, 0);
 }
+
+// ---------------------------------------------------------------------------
+// "Todavia no lo se" NO es "no hay". El agujero que el barrido encontro.
+// ---------------------------------------------------------------------------
+//
+// `canonical` era `string | null`, y ese null decia dos cosas incompatibles:
+// "este jugador no tiene wallet anotada" y "el perfil aun no ha llegado". El
+// guardian leia las dos como la primera, asi que MIENTRAS EL PERFIL CARGABA se
+// apagaba solo y cualquier wallet conectada podia pagar — incluida la embebida
+// accidental, que es justo contra lo que existe.
+
+console.log("\n— El guardian no se apaga mientras carga el perfil —");
+
+check(
+  "PIPERABBY, perfil en vuelo: NO se cobra",
+  decidePlayStart({
+    expected: EMBEBIDA,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: null,
+    canonical: { status: "loading" },
+  }),
+  { kind: "checking" }
+);
+
+// Ni siquiera con la wallet correcta: no saber no autoriza, en ningun sentido.
+check(
+  "ni con la canonica puesta, si aun no se sabe",
+  decidePlayStart({
+    expected: RABBY,
+    probe: { status: "answered", accounts: [RABBY] },
+    pending: null,
+    canonical: { status: "loading" },
+  }),
+  { kind: "checking" }
+);
+
+check(
+  "y pegado a la firma tampoco",
+  confirmBeforeSigning(
+    RABBY,
+    { status: "answered", accounts: [RABBY] },
+    { status: "loading" }
+  ),
+  { ok: false, decision: { kind: "checking" } }
+);
+
+// Un jugador nuevo de verdad SI juega: `none` no es `loading`.
+check(
+  "sin wallet anotada (jugador nuevo) si se puede",
+  decidePlayStart({
+    expected: EMBEBIDA,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: null,
+    canonical: { status: "none" },
+  }),
+  { kind: "proceed", address: EMBEBIDA }
+);
+
+// Y el orden se respeta: una jugada ya pagada se termina aunque no se sepa de
+// quien es la cuenta. Nunca se cobra dos veces por resolver una identidad.
+check(
+  "una jugada pendiente manda incluso sobre el 'no lo se'",
+  decidePlayStart({
+    expected: EMBEBIDA,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: { txHash: "0xabc", player: EMBEBIDA, deckSize: 10 },
+    canonical: { status: "loading" },
+  }).kind,
+  "resume_pending"
+);
+
+// Y la wallet inaccesible sigue mandando sobre el "no lo se": son dos frenos y
+// el mensaje correcto es el de reconectar, no el de esperar.
+check(
+  "wallet bloqueada gana al 'no lo se'",
+  decidePlayStart({
+    expected: RABBY,
+    probe: { status: "answered", accounts: [] },
+    pending: null,
+    canonical: { status: "loading" },
+  }),
+  { kind: "reconnect", reason: "locked" }
+);
 
 console.log(
   failed === 0

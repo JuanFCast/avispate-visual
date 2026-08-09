@@ -37,7 +37,7 @@ import {
 } from "@/lib/pay-guard";
 import { probeWallet } from "@/lib/wallet-access";
 import { useIsMiniPay } from "@/lib/minipay";
-import { useActiveWallet } from "@/lib/wallet";
+import { useActiveWallet, useCanonicalWallet } from "@/lib/wallet";
 import { checkAliasBeforePaying } from "@/lib/alias-claim";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import { useT } from "@/lib/i18n/client";
@@ -145,6 +145,8 @@ export type PayBlock =
    * que no haya duda de cuál conectar: es la que tiene el historial y cobra.
    */
   | { kind: "wrong_wallet"; canonical: string; connected: string }
+  /** Aún no se sabe de quién es la cuenta. Se espera; no se cobra. */
+  | { kind: "checking" }
   /** Hace falta un nombre para poder guardar el puntaje. */
   | { kind: "needs_name" }
   /** El nombre ya está vinculado a otra dirección (casi siempre, suya). */
@@ -186,6 +188,9 @@ export default function GameShell() {
   const t = useT();
   const profile = useProfile();
   const activeWallet = useActiveWallet();
+  // La wallet del perfil en sus tres estados. `loading` frena el cobro en vez
+  // de dejarlo pasar, que es lo que hacía cuando esto era `string | null`.
+  const canonical = useCanonicalWallet();
   const inMiniPay = useIsMiniPay();
   const { openConnectModal } = useConnectModal();
   const queryClient = useQueryClient();
@@ -322,7 +327,7 @@ export default function GameShell() {
       expected: activeWallet.address,
       probe: await probeWallet(activeWallet.connector),
       pending: pendingPlay(),
-      canonical: profile.walletAddress,
+      canonical,
     });
     if (decision.kind !== "proceed") {
       setPayStage(null);
@@ -442,6 +447,12 @@ export default function GameShell() {
           canonical: decision.canonical,
           connected: decision.connected,
         });
+        return;
+      case "checking":
+        // Todavía no se sabe de quién es la cuenta. No es un rechazo y no deja
+        // rastro: el perfil llega en un instante y el jugador vuelve a tocar.
+        // Lo que NO puede pasar es que se cobre mientras tanto.
+        setPayBlock({ kind: "checking" });
         return;
     }
   }

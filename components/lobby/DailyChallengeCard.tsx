@@ -99,6 +99,8 @@ export default function DailyChallengeCard({
           canonical: shortAddress(block.canonical),
           connected: shortAddress(block.connected),
         });
+      case "checking":
+        return t("pay.block.checking");
       case "needs_name":
         return t("pay.block.needs_name");
       case "name_taken":
