@@ -356,7 +356,48 @@ console.log("\n— Un perfil que NO cargo no es un perfil vacio —");
     true
   );
 
+  // ── La ventana de UN render entre firmar y pedir el perfil ──────────────
+  //
+  // Al firmar, `authenticated` pasa a true en el acto; el estado del perfil
+  // sigue siendo el vacio de cuando no habia sesion, con `loading: false`. Ese
+  // render decia "autenticado + termino de cargar + sin alias" = jugador nuevo,
+  // y de ahi el parpadeo del formulario de alias. `refresh` corre en un efecto,
+  // o sea despues de pintar, asi que no llega a tiempo de evitarlo.
+  const reciénFirmado = {
+    ready: true,
+    loading: false, // <- lo que traia el estado de antes de la sesion
+    failed: false,
+    authenticated: true,
+    walletAddress: null,
+  };
+  check(
+    "sin `fetched`, ese render parecia jugador nuevo",
+    canonicalFromProfile(reciénFirmado),
+    { status: "none" }
+  );
+  // Con `fetched` en falso, `loading` se deriva true y el render dice "no lo se".
+  check(
+    "con el estado marcado como no traido, no se sabe",
+    canonicalFromProfile({ ...reciénFirmado, loading: true }),
+    { status: "loading" }
+  );
+
   const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  check(
+    "el perfil sabe si corresponde a esta sesion",
+    /fetched: boolean/.test(ctx),
+    true
+  );
+  check(
+    "y 'cargando' incluye el hueco de firmar",
+    /state\.loading \|\| \(authenticated && !state\.fetched\)/.test(ctx),
+    true
+  );
+  check(
+    "el fallo no se queda cargando para siempre",
+    /failed: true, fetched: true/.test(ctx),
+    true
+  );
   check("el fallo se guarda como tal", /const FAILED: ProfileState/.test(ctx), true);
   check(
     "y el catch ya no lo guarda como vacio",

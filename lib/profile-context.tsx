@@ -26,6 +26,19 @@ interface ProfileState {
    * apagaba porque leía `walletAddress: null` como "no tiene ninguna".
    */
   failed: boolean;
+  /**
+   * Este perfil corresponde a la sesión que hay AHORA.
+   *
+   * Sin esto había una ventana de un render con la respuesta equivocada: al
+   * firmar, `authenticated` pasa a true en el acto, pero el estado sigue siendo
+   * el vacío de cuando no había sesión — con `loading: false`. Ese render dice
+   * "autenticado, terminó de cargar, sin alias", que es un jugador nuevo. De ahí
+   * el parpadeo del formulario de alias a quien ya tiene uno.
+   *
+   * `refresh` corre en un efecto, o sea DESPUÉS de pintar, así que no llega a
+   * tiempo de evitarlo. Esto sí, porque se mira en el mismo render.
+   */
+  fetched: boolean;
   /** Alias del jugador, o null si todavía no lo eligió. */
   alias: string | null;
   /** Wallet embebida en minúsculas, o null. */
@@ -48,12 +61,19 @@ const ProfileContext = createContext<ProfileContextValue | null>(null);
 const EMPTY: ProfileState = {
   loading: false,
   failed: false,
+  // Sin sesión no hay nada que traer, pero tampoco corresponde a ninguna: si
+  // aparece una, este perfil deja de valer y hay que volver a preguntar.
+  fetched: false,
   alias: null,
   walletAddress: null,
 };
 
-/** Había sesión y el perfil no se pudo cargar. No es lo mismo que vacío. */
-const FAILED: ProfileState = { ...EMPTY, failed: true };
+/**
+ * Había sesión y el perfil no se pudo cargar. No es lo mismo que vacío.
+ * `fetched: true` porque SÍ se preguntó: lo que falta no es la respuesta, es
+ * que la respuesta sirva. Si no, se quedaría cargando para siempre.
+ */
+const FAILED: ProfileState = { ...EMPTY, failed: true, fetched: true };
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { ready: privyReady, authenticated: privyAuth, getAccessToken } = usePrivy();
@@ -142,6 +162,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setState({
         loading: false,
         failed: false,
+        fetched: true,
         alias: data.alias ?? null,
         walletAddress: data.walletAddress ?? null,
       });
@@ -189,9 +210,27 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     [getToken]
   );
 
+  /**
+   * "Cargando" incluye el hueco entre firmar y pedir el perfil.
+   *
+   * Va DESPUÉS del `...state` a propósito: si el jugador tiene sesión y lo que
+   * hay guardado no se trajo para ella, todavía no sabemos nada de él — aunque
+   * el estado diga `loading: false` porque venía de cuando no había sesión.
+   * Ese render era el del parpadeo del alias.
+   */
+  const loading = state.loading || (authenticated && !state.fetched);
+
   return (
     <ProfileContext.Provider
-      value={{ ...state, ready, authenticated, refresh, setAlias, getToken }}
+      value={{
+        ...state,
+        loading,
+        ready,
+        authenticated,
+        refresh,
+        setAlias,
+        getToken,
+      }}
     >
       {children}
     </ProfileContext.Provider>
