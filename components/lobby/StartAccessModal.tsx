@@ -70,10 +70,29 @@ export default function StartAccessModal({
    * es lo que dejó a Juan pagando una partida que no se podía guardar
    * (2026-08-07).
    */
+  /**
+   * Y no se pide mientras el perfil todavía está llegando.
+   *
+   * `sessionCoversWallet` compara la wallet conectada con la del PERFIL, y justo
+   * después de firmar el perfil aún no ha llegado: `profile.walletAddress` es
+   * null, así que la comparación da falso y esto pedía un alias que el jugador
+   * ya tiene. Se veía como un parpadeo — el formulario de alias aparecía un
+   * instante y desaparecía solo en cuanto el perfil entraba.
+   *
+   * Es el mismo error de siempre con otra cara: contestar "no" a una pregunta
+   * cuya respuesta todavía es "no lo sé". Mientras se sepa, se espera.
+   */
+  const sessionSettling = profile.authenticated && profile.loading;
   const needsWalletAlias =
-    wallet.isConnected && walletAliasReady && !walletAlias && !sessionCoversWallet;
+    wallet.isConnected &&
+    walletAliasReady &&
+    !walletAlias &&
+    !sessionCoversWallet &&
+    !sessionSettling;
   const checkingWalletAlias =
-    wallet.isConnected && !walletAliasReady && !sessionCoversWallet;
+    wallet.isConnected &&
+    !sessionCoversWallet &&
+    (!walletAliasReady || sessionSettling);
 
   /**
    * Identidad completa → volver al lobby (sin countdown ni cobro automático).
