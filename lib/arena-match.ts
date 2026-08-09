@@ -110,6 +110,17 @@ export interface MatchPlayerView {
   seat: number;
   cardsLeft: number;
   correct: number;
+  /**
+   * Duelos GANADOS: veces que este jugador se llevó una carta que otro estaba
+   * reclamando en ese mismo instante.
+   *
+   * No es "cuántas cartas tomó" — eso es `correct`, y sube igual en una partida
+   * donde nadie compite. Un duelo exige que hubiera otro yendo a por la misma
+   * jugada y que el servidor resolviera a favor de este. Quién ganó lo decide
+   * el cerrojo de `arena_apply_move`, con el reloj del servidor; el navegador no
+   * manda ningún tiempo y no participa en la cuenta.
+   */
+  duelsWon: number;
   errors: number;
   /** Cartas que le cayeron por fallar. Es lo que duele, no el reloj. */
   penalties: number;

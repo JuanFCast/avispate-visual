@@ -23,11 +23,17 @@ function ordinal(place: number, t: Translate): string {
  * puesto: quedar segundo de cuatro y quedar último son dos partidas distintas y
  * "Perdiste" las cuenta igual.
  *
- * Las manos tomadas —cuántas veces cada uno puso su carta sobre la base— son la
- * cifra que faltaba y la que de verdad cuenta la partida: las cartas que quedan
- * dicen dónde terminaste, las tomadas dicen cuánto jugaste para llegar ahí. Van
- * dos veces a propósito: el total arriba, junto al tiempo, porque es la medida
- * de la partida entera; y por jugador en la tabla, porque es la de cada uno.
+ * Los DUELOS GANADOS son la cifra que faltaba, y sustituyen a las "manos
+ * tomadas" que había antes. La diferencia no es de nombre: aquello era la suma
+ * de `correct`, o sea cada carta que alguien puso sobre la base, y subía igual
+ * en una partida donde nadie compitió por nada. Contaba jugadas normales.
+ *
+ * Un duelo es lo otro: dos fueron a por la misma carta casi a la vez y el
+ * servidor decidió quién llegó primero. Eso sí cuenta la partida — es lo único
+ * que distingue ganar una carrera de tomar una carta que nadie te disputaba.
+ * Van dos veces a propósito: el total arriba, junto al tiempo, porque dice cuán
+ * peleada estuvo la mesa entera; y por jugador en la tabla, porque dice quién
+ * ganó esas carreras.
  *
  * Y el dinero se dice en cifras. Si la mesa cobraba, aquí aparece cuánto se
  * ganó y si el pago ya salió; si no cobraba, se dice eso, que también es una
@@ -49,7 +55,7 @@ export default function ArenaMatchOver({
   const many = standings.length > 2;
   const place = standings.findIndex((p) => p.isYou) + 1;
   const winner = standings.find((p) => p.profileId === view.winnerProfileId);
-  const taken = standings.reduce((sum, p) => sum + p.correct, 0);
+  const duels = standings.reduce((sum, p) => sum + p.duelsWon, 0);
 
   /**
    * Con un rival, "tu rival" señala a alguien. Con tres deja de señalar, así
@@ -96,8 +102,8 @@ export default function ArenaMatchOver({
           <dd>{formatMs(elapsedMs)}</dd>
         </div>
         <div className="match-over-figure">
-          <dt>{t("match.over.taken")}</dt>
-          <dd>{taken}</dd>
+          <dt>{t("match.over.duels")}</dt>
+          <dd>{duels}</dd>
         </div>
       </dl>
 
@@ -105,7 +111,7 @@ export default function ArenaMatchOver({
         <thead>
           <tr>
             <th scope="col">{t("match.table.player")}</th>
-            <th scope="col">{t("match.table.taken")}</th>
+            <th scope="col">{t("match.table.duels")}</th>
             <th scope="col">{t("match.table.left")}</th>
             <th scope="col">{t("match.table.errors")}</th>
             <th scope="col">{t("match.table.penalties")}</th>
@@ -223,7 +229,7 @@ function Row({
           </span>
         )}
       </th>
-      <td>{player.correct}</td>
+      <td>{player.duelsWon}</td>
       <td>{player.cardsLeft}</td>
       <td>{player.errors}</td>
       <td>{player.penalties}</td>

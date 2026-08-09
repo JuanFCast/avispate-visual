@@ -392,10 +392,11 @@ export const en = {
   "match.over.everyone_left": "Everyone else left the match, so it's yours.",
   "match.over.you_left": "You left the match.",
   "match.over.time": "Match time",
-  // Cuántas veces se puso una carta sobre la base, entre todos. Es la medida de
-  // cuánto se jugó: las cartas que quedan dicen dónde terminaste, esto dice
-  // cuánto costó llegar ahí.
-  "match.over.taken": "Hands taken",
+  // Carreras ganadas: veces que dos fueron a por la misma carta casi a la vez y
+  // el servidor resolvió a favor de alguien. NO es cuántas cartas se tomaron —
+  // eso subía igual en una partida sin competencia, y era justo la confusión
+  // que tenía la cifra anterior ("Manos tomadas").
+  "match.over.duels": "Duels won",
   "match.over.no_prize":
     "Nothing was charged and nothing was paid out: this match was for testing the game, not the pot.",
   /* --- La plata, en cifras --- */
@@ -407,7 +408,8 @@ export const en = {
   "match.over.prize.to_winner": "{name} takes {amount} USDT.",
   "match.over.again": "Another room",
   "match.table.player": "Player",
-  "match.table.taken": "Hands",
+  // Cabecera estrecha en un teléfono de cinco columnas: "Duels won" no cabe.
+  "match.table.duels": "Duels",
   "match.table.left": "Cards left",
   "match.table.errors": "Errors",
   // Cabecera de una tabla de cinco columnas en un teléfono: "Penalty cards" no
@@ -1149,7 +1151,7 @@ export const es: Record<MessageKey, string> = {
   "match.over.everyone_left": "Los demás abandonaron la partida, así que es tuya.",
   "match.over.you_left": "Abandonaste la partida.",
   "match.over.time": "Tiempo de la partida",
-  "match.over.taken": "Manos tomadas",
+  "match.over.duels": "Duelos ganados",
   "match.over.no_prize":
     "No se cobró ni se pagó nada: esta partida era para probar el juego, no el pozo.",
   "match.over.prize.won": "Ganaste",
@@ -1160,7 +1162,7 @@ export const es: Record<MessageKey, string> = {
   "match.over.prize.to_winner": "{name} se lleva {amount} USDT.",
   "match.over.again": "Otra sala",
   "match.table.player": "Jugador",
-  "match.table.taken": "Tomadas",
+  "match.table.duels": "Duelos",
   "match.table.left": "Cartas",
   "match.table.errors": "Errores",
   "match.table.penalties": "Castigos",

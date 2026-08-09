@@ -445,9 +445,10 @@ ok(
   "es la salida de la pantalla: sin él no hay a dónde ir"
 );
 ok(
-  "los resultados cuentan las manos tomadas",
-  /player\.correct/.test(overSrc) && /match\.over\.taken/.test(overSrc),
-  "por jugador en la tabla y el total arriba"
+  "los resultados cuentan los duelos ganados",
+  /player\.duelsWon/.test(overSrc) && /match\.over\.duels/.test(overSrc),
+  "por jugador en la tabla y el total arriba. Antes era `player.correct`, que " +
+    "contaba jugadas normales y no carreras (ver `verify-arena-duels.ts`)"
 );
 ok(
   "los resultados dicen qué pasó con la plata",

@@ -64,6 +64,7 @@ interface MatchPlayerRow {
   seat: number;
   deck: number[];
   correct: number;
+  duels_won: number;
   errors: number;
   penalties: number;
   finished_at: string | null;
@@ -76,7 +77,7 @@ const MATCH_COLUMNS =
   "id, room_id, code, seed, base_card, move_seq, starts_at, finished_at, winner_profile_id, end_reason, deck_mode, cards_per_player";
 
 const PLAYER_COLUMNS =
-  "id, profile_id, seat, deck, correct, errors, penalties, finished_at, left_at, last_seen_at, profiles(alias, wallet_address)";
+  "id, profile_id, seat, deck, correct, duels_won, errors, penalties, finished_at, left_at, last_seen_at, profiles(alias, wallet_address)";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -271,6 +272,9 @@ function toPlayerView(
     seat: row.seat,
     cardsLeft: row.deck.length,
     correct: row.correct,
+    // `?? 0` porque una partida empezada ANTES de la migración de duelos no
+    // tiene la columna rellena. Cero es la verdad ahí: no se midió ninguno.
+    duelsWon: row.duels_won ?? 0,
     errors: row.errors,
     penalties: row.penalties,
     online: now - new Date(row.last_seen_at).getTime() < RIVAL_STALE_MS,
@@ -626,9 +630,22 @@ export interface MoveResult {
  * Juzga un toque y lo aplica.
  *
  * El cliente manda contra qué base creía estar jugando (`seq`) y qué carta
- * creía tener (`card`). Las dos cosas se comprueban: la primera aquí y otra vez
- * dentro del cerrojo, la segunda solo dentro del cerrojo. Si algo cambió en el
- * camino la jugada se descarta como `stale`, que no cuesta carta ni castigo.
+ * creía tener (`card`). Las dos cosas se comprueban DENTRO del cerrojo, en
+ * `arena_apply_move`. Si algo cambió en el camino la jugada se descarta como
+ * `stale`, que no cuesta carta ni castigo.
+ *
+ * ── Por qué ya no se adelanta el `stale` aquí ──────────────────────────────
+ *
+ * Antes había un atajo: si esta lectura —sin cerrojo— veía el `move_seq` ya
+ * movido, se devolvía `stale` sin llegar a llamar al RPC. Ahorraba una ida a la
+ * base y costaba lo único que no se podía perder: **ese `stale` es la huella de
+ * un duelo**, y el duelo solo se puede reconocer dentro del cerrojo, que es el
+ * único sitio donde consta quién se llevó la base y en qué instante
+ * (`20260809000000_arena_duels.sql`). Cortado aquí, la carrera se resolvia bien
+ * pero no la veia nadie.
+ *
+ * Que el veredicto salga de un solo sitio es además lo correcto por su cuenta:
+ * esta lectura y el cerrojo pueden discrepar, y el que manda es el cerrojo.
  */
 export async function applyMove(params: {
   code: string;
@@ -655,12 +672,10 @@ export async function applyMove(params: {
     return { ok: true as const, value: { outcome, matchedSymbol, view: view.value } };
   };
 
-  // Toque contra una base que ya cambió, o con una carta que ya no tiene: no se
-  // juzga. Sería injusto castigar por mirar una foto vieja.
-  if (match.move_seq !== params.seq || mine.deck[0] !== params.card) {
-    return finish("stale", null);
-  }
-
+  // El símbolo se calcula contra la foto que tenemos; si esa foto ya envejeció,
+  // el cerrojo devolverá `stale` y este cálculo se descarta sin usarse. La regla
+  // del juego sigue viviendo aquí, junto al mazo; la carrera se resuelve allá,
+  // junto a las filas.
   const cards = buildMatchDeck(match.seed);
   const expected = sharedSymbol(cards[params.card], cards[match.base_card]);
   const correct = expected !== null && expected === params.symbolId;
