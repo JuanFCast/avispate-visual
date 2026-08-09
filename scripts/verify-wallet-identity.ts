@@ -171,6 +171,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   check(
     "PIPERABBY: con canonica no se crea nada",
     decideEmbeddedCreation({
+      inMiniPay: false,
       profileReady: true,
       canonical: RABBY,
       hasEmbedded: false,
@@ -185,6 +186,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   check(
     "aunque Privy lo vea como usuario sin wallets",
     decideEmbeddedCreation({
+      inMiniPay: false,
       profileReady: true,
       canonical: RABBY,
       hasEmbedded: false,
@@ -196,6 +198,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   check(
     "jugador nuevo de verdad: si se le crea",
     decideEmbeddedCreation({
+      inMiniPay: false,
       profileReady: true,
       canonical: null,
       hasEmbedded: false,
@@ -207,6 +210,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   check(
     "ya tiene embebida: no se duplica",
     decideEmbeddedCreation({
+      inMiniPay: false,
       profileReady: true,
       canonical: null,
       hasEmbedded: true,
@@ -218,6 +222,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   check(
     "entro firmando con la suya: no se le crea otra",
     decideEmbeddedCreation({
+      inMiniPay: false,
       profileReady: true,
       canonical: null,
       hasEmbedded: false,
@@ -230,6 +235,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   check(
     "sin perfil todavia: NO se crea nada",
     decideEmbeddedCreation({
+      inMiniPay: false,
       profileReady: false,
       canonical: null,
       hasEmbedded: false,
@@ -240,6 +246,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   check(
     "ni siquiera pareciendo un jugador nuevo",
     decideEmbeddedCreation({
+      inMiniPay: false,
       profileReady: false,
       canonical: RABBY,
       hasEmbedded: false,
@@ -257,6 +264,7 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   const crean = combos.filter(
     ([ready, conCanonica, emb, ext]) =>
       decideEmbeddedCreation({
+        inMiniPay: false,
         profileReady: ready,
         canonical: conCanonica ? RABBY : null,
         hasEmbedded: emb,
@@ -265,6 +273,133 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   );
   check("de 16 combinaciones, solo una crea", crean.length, 1);
   check("y es la del jugador nuevo", crean[0], [true, false, false, false]);
+}
+
+console.log("\n— DENTRO de MiniPay no se crea una embebida. Nunca. —");
+{
+  // El jugador ya tiene wallet: la inyectada. Crearle otra seria el caso
+  // PipeRabby pero dentro de MiniPay — dos identidades en el mismo entorno.
+  const enMiniPay = {
+    inMiniPay: true,
+    profileReady: true,
+    canonical: null,
+    hasEmbedded: false,
+    hasExternal: false,
+  };
+
+  check("MiniPay + inyectada + sin perfil", decideEmbeddedCreation(enMiniPay), {
+    kind: "never",
+    reason: "minipay",
+  });
+
+  // El caso que la regla del perfil NO cubria: Privy ve un "usuario sin
+  // wallets" porque la inyectada no esta enlazada a su cuenta, y le
+  // provisionaria una. `loginMethods` incluye email, asi que es alcanzable.
+  check(
+    "MiniPay + inyectada + login por correo (sin nada enlazado)",
+    decideEmbeddedCreation({ ...enMiniPay, hasEmbedded: false, hasExternal: false }),
+    { kind: "never", reason: "minipay" }
+  );
+
+  check(
+    "MiniPay + inyectada + perfil existente",
+    decideEmbeddedCreation({ ...enMiniPay, canonical: RABBY }),
+    { kind: "never", reason: "minipay" }
+  );
+
+  // No espera al perfil: este camino solo puede NEGAR, nunca autorizar, asi
+  // que adelantarse es seguro.
+  check(
+    "y ni siquiera espera al perfil",
+    decideEmbeddedCreation({ ...enMiniPay, profileReady: false }),
+    { kind: "never", reason: "minipay" }
+  );
+
+  // Barrido: dentro de MiniPay, NINGUNA combinacion crea.
+  const dentro: string[] = [];
+  for (const ready of [true, false])
+    for (const conCanonica of [true, false])
+      for (const emb of [true, false])
+        for (const ext of [true, false])
+          dentro.push(
+            decideEmbeddedCreation({
+              inMiniPay: true,
+              profileReady: ready,
+              canonical: conCanonica ? RABBY : null,
+              hasEmbedded: emb,
+              hasExternal: ext,
+            }).kind
+          );
+  check("las 16 combinaciones dicen 'never'", new Set(dentro), new Set(["never"]));
+}
+
+console.log("\n— Y FUERA de MiniPay nada cambia —");
+{
+  // La regla es especifica de MiniPay: Rabby, MetaMask y el correo en web
+  // siguen exactamente como estaban.
+  check(
+    "web: el jugador nuevo SIGUE recibiendo su embebida",
+    decideEmbeddedCreation({
+      inMiniPay: false,
+      profileReady: true,
+      canonical: null,
+      hasEmbedded: false,
+      hasExternal: false,
+    }),
+    { kind: "create" }
+  );
+  check(
+    "web + wallet externa: intacto",
+    decideEmbeddedCreation({
+      inMiniPay: false,
+      profileReady: true,
+      canonical: null,
+      hasEmbedded: false,
+      hasExternal: true,
+    }),
+    { kind: "never", reason: "has_external" }
+  );
+  check(
+    "web + canonica: intacto",
+    decideEmbeddedCreation({
+      inMiniPay: false,
+      profileReady: true,
+      canonical: RABBY,
+      hasEmbedded: false,
+      hasExternal: false,
+    }),
+    { kind: "never", reason: "has_canonical" }
+  );
+  check(
+    "web + ya tiene embebida: intacto",
+    decideEmbeddedCreation({
+      inMiniPay: false,
+      profileReady: true,
+      canonical: null,
+      hasEmbedded: true,
+      hasExternal: false,
+    }),
+    { kind: "never", reason: "has_embedded" }
+  );
+  check(
+    "web + perfil sin llegar: sigue esperando",
+    decideEmbeddedCreation({
+      inMiniPay: false,
+      profileReady: false,
+      canonical: null,
+      hasEmbedded: false,
+      hasExternal: false,
+    }),
+    { kind: "wait" }
+  );
+
+  const proveedor = readFileSync(join(ROOT, "lib/embedded-wallet.tsx"), "utf8");
+  check("el proveedor pasa si estamos en MiniPay", /inMiniPay,/.test(proveedor), true);
+  check(
+    "y lo saca de la deteccion de siempre",
+    /useIsMiniPay\(\)/.test(proveedor),
+    true
+  );
 }
 
 console.log("\n— Esperar esta bien; esperar SIN TOPE es un cuelgue —");

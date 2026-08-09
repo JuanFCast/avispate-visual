@@ -12,6 +12,7 @@ import {
 import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAccount, useConnect } from "wagmi";
 import { useProfile } from "./profile-context";
+import { useIsMiniPay } from "./minipay";
 import { decideEmbeddedCreation } from "./wallet-identity";
 
 /**
@@ -105,6 +106,8 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
   const { wallets, ready: walletsReady } = useWallets();
   // El perfil, que es quien sabe si esta identidad YA tiene wallet.
   const profile = useProfile();
+  // Y dentro de MiniPay la respuesta ya está: su wallet inyectada.
+  const inMiniPay = useIsMiniPay();
   const { createWallet } = useCreateWallet();
   const { isConnected } = useAccount();
   const { connect, connectors } = useConnect();
@@ -210,6 +213,7 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
    * lo que decida.
    */
   const creation = decideEmbeddedCreation({
+    inMiniPay,
     profileReady: profile.ready && !profile.loading,
     canonical: profile.walletAddress,
     hasEmbedded,

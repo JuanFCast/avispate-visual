@@ -133,10 +133,18 @@ export type EmbeddedCreation =
   /** Ya tiene wallet. Nunca se le crea otra. */
   | {
       kind: "never";
-      reason: "has_canonical" | "has_external" | "has_embedded";
+      reason: "minipay" | "has_canonical" | "has_external" | "has_embedded";
     };
 
 export function decideEmbeddedCreation(check: {
+  /**
+   * Estamos dentro de MiniPay.
+   *
+   * Detectarlo ES detectar su wallet: `isMiniPay()` mira
+   * `window.ethereum.isMiniPay`, o sea el proveedor inyectado. Si eso está, el
+   * jugador ya tiene wallet por definición y no hay nada que crearle.
+   */
+  inMiniPay: boolean;
   /** ¿Ya llegó el perfil del servidor? Sin él no se sabe si hay canónica. */
   profileReady: boolean;
   /** `profiles.wallet_address`. Si existe, no se crea nada jamás. */
@@ -146,6 +154,28 @@ export function decideEmbeddedCreation(check: {
   /** El usuario tiene una wallet propia enlazada en Privy. */
   hasExternal: boolean;
 }): EmbeddedCreation {
+  /**
+   * Dentro de MiniPay NUNCA se crea una embebida. Va lo primero, y por delante
+   * incluso de esperar al perfil.
+   *
+   * El jugador ya tiene wallet: la inyectada, que es la identidad con la que
+   * juega y con la que cobra. Crearle otra sería exactamente el caso PipeRabby
+   * pero dentro de MiniPay — dos identidades en el mismo entorno.
+   *
+   * Y aplica aunque entre por CORREO. `loginMethods` incluye email, así que
+   * alguien puede abrir sesión de Privy dentro de MiniPay; para Privy ese
+   * usuario "no tiene wallets" porque la inyectada no está enlazada a su
+   * cuenta, y le provisionaría una. La regla del perfil no lo cubre: solo
+   * frena si el perfil YA tiene dirección anotada.
+   *
+   * No espera al perfil porque no lo necesita y adelantarse aquí es seguro:
+   * este camino solo puede NEGAR la creación, nunca autorizarla.
+   *
+   * Fuera de MiniPay no cambia nada: Rabby, MetaMask y el resto siguen por los
+   * mismos filtros de siempre.
+   */
+  if (check.inMiniPay) return { kind: "never", reason: "minipay" };
+
   // Sin saber si tiene canónica no se crea. Es la diferencia entre esperar dos
   // segundos y regalarle una segunda identidad a alguien que ya tenía la suya.
   if (!check.profileReady) return { kind: "wait" };
