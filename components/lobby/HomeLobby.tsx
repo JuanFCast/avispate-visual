@@ -88,9 +88,31 @@ export default function HomeLobby({
    * cuenta lo que está pasando y, si tarda de más, se le da el botón.
    */
   function walletCta(): CtaState {
-    // Sin sesión de Privy no hay wallet que crear: es MiniPay (o una externa)
-    // terminando de conectarse, y ahí el mensaje de siempre es el correcto.
-    if (embeddedWallet.status === "idle") return checking;
+    /**
+     * Privy no tiene sesión. Aquí estaba el callejón sin salida.
+     *
+     * Se llega a esta función porque `profile.authenticated` dijo que sí, y ese
+     * valor es `privyAuth || walletSession`. Con la sesión sin firma suelta en
+     * el almacenamiento —la que nadie limpiaba al cerrar sesión— pasaba esto:
+     * el perfil contaba como autenticado, Privy no, y `status` quedaba en
+     * "idle". Sin wallet conectada, esta rama devolvía "Preparando…" y ahí se
+     * quedaba PARA SIEMPRE: no había nada cargando, era una contradicción entre
+     * dos formas de contestar "¿hay sesión?". Por eso ningún tiempo de espera lo
+     * destrababa, y por eso `/perfil` decía "inicia sesión" mientras el lobby
+     * seguía preparando algo.
+     *
+     * Nadie va a crear ni conectar nada aquí. Lo honesto es ofrecer entrar.
+     */
+    if (embeddedWallet.status === "idle") {
+      // Salvo que wagmi siga reenganchando de verdad: eso sí es esperar a algo.
+      if (wallet.reconnecting) return checking;
+      return {
+        support: t("cta.login.support"),
+        label: t("cta.login.label"),
+        disabled: false,
+        action: "access",
+      };
+    }
     // Entró firmando con su propia billetera y ahora no está conectada. Esto
     // no se arregla esperando —la firma la da él—, así que el botón abre el
     // conector en vez de dejarlo mirando un "Preparando…" eterno.

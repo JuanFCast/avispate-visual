@@ -174,6 +174,42 @@ console.log("\n— Un paso roto no puede dejar el logout a medias —");
   check("y con el almacenamiento bloqueado tambien", pasos2, ["recarga"]);
 }
 
+console.log("\n— El callejon sin salida del lobby —");
+{
+  // `profile.authenticated` es `privyAuth || walletSession`. Con la sesion sin
+  // firma suelta en el almacenamiento —la que nadie limpiaba al cerrar sesion—
+  // el perfil decia "hay sesion", Privy decia que no (status "idle") y sin
+  // wallet conectada el CTA se quedaba en "Preparando..." PARA SIEMPRE. No
+  // habia nada cargando: era una contradiccion entre dos formas de contestar la
+  // misma pregunta, y por eso ningun tiempo de espera la destrababa.
+  const lobby = readFileSync(join(ROOT, "components/lobby/HomeLobby.tsx"), "utf8");
+  const rama = lobby.slice(lobby.indexOf('embeddedWallet.status === "idle"'));
+  const hastaElFinal = rama.slice(0, rama.indexOf('embeddedWallet.status === "external"'));
+
+  check(
+    "sin sesion de Privy ya no se espera en seco",
+    /if \(embeddedWallet\.status === "idle"\) return checking;/.test(lobby),
+    false
+  );
+  check(
+    "se ofrece entrar",
+    /cta\.login\.label/.test(hastaElFinal),
+    true
+  );
+  check(
+    "y el boton hace algo",
+    /action: "access"/.test(hastaElFinal),
+    true
+  );
+  // Lo unico que sigue justificando esperar ahi: que wagmi este reenganchando
+  // de verdad. Eso si es esperar a algo, y ademas ya caduca.
+  check(
+    "salvo que wagmi siga reenganchando",
+    /wallet\.reconnecting\) return checking/.test(hastaElFinal),
+    true
+  );
+}
+
 console.log("\n— Enchufado en el boton —");
 {
   const perfil = readFileSync(join(ROOT, "app/perfil/page.tsx"), "utf8");
