@@ -37,6 +37,14 @@ export type PayDecision =
   | { kind: "reconnect"; reason: "locked" | "unreachable" }
   /** La wallet expone una cuenta distinta a la que la app tenía. */
   | { kind: "account_changed"; expected: string; actual: string }
+  /**
+   * La wallet que va a firmar NO es la del perfil.
+   *
+   * Distinto de `account_changed`, aunque se parezcan: aquello es "cambiaste de
+   * cuenta desde que empezamos" y esto es "esta cuenta no es la tuya", con una
+   * respuesta distinta — conectar la de siempre, la que cobra los premios.
+   */
+  | { kind: "wrong_wallet"; canonical: string; connected: string }
   /** Vía libre, y esta es la dirección con la que hay que seguir TODO. */
   | { kind: "proceed"; address: string };
 
@@ -59,12 +67,27 @@ const norm = (a: string | null | undefined): string =>
  * 3. Dirección confirmada. La cuenta que la wallet expone AHORA manda sobre la
  *    que la app tenía guardada. Si no coinciden, no se sigue con datos de la
  *    anterior: se revalida la identidad entera con la nueva.
+ * 4. Y es la wallet DEL PERFIL. Lo último antes de dejar pasar, y lo que
+ *    faltaba: que la wallet conteste y sea la misma de hace un segundo no la
+ *    convierte en la tuya. Una embebida que Privy creó sola contesta
+ *    perfectamente y es igual de estable — y no es quien tiene el historial ni
+ *    quien cobra el premio (PipeRabby, 2026-08-07). Va aquí, ANTES del saldo y
+ *    de cualquier transacción, para que el freno llegue con la plata todavía
+ *    dentro.
  */
 export function decidePlayStart(input: {
   /** Dirección que la app cree tener conectada (la de wagmi). */
   expected: string | null | undefined;
   probe: WalletProbe;
   pending: PendingPlay | null;
+  /**
+   * `profiles.wallet_address`: la wallet del perfil, la que cobra.
+   *
+   * `null` o ausente cuando el jugador todavía no tiene ninguna anotada — ahí
+   * no hay nada que contrastar y la que traiga será la suya. Omitirlo no
+   * relaja nada más: los tres pasos anteriores siguen igual.
+   */
+  canonical?: string | null;
 }): PayDecision {
   if (input.pending) return { kind: "resume_pending", pending: input.pending };
 
@@ -76,13 +99,21 @@ export function decidePlayStart(input: {
   if (accounts.length === 0) return { kind: "reconnect", reason: "locked" };
 
   const expected = norm(input.expected);
+  const canonical = norm(input.canonical);
+
+  /** Último filtro: con perfil, solo firma la wallet del perfil. */
+  const conLaDelPerfil = (address: string): PayDecision =>
+    !canonical || address === canonical
+      ? { kind: "proceed", address }
+      : { kind: "wrong_wallet", canonical, connected: address };
+
   // Sin dirección previa (primera conexión) la que expone la wallet es la
   // buena; no hay nada anterior que invalidar.
-  if (!expected) return { kind: "proceed", address: accounts[0] };
+  if (!expected) return conLaDelPerfil(accounts[0]);
 
   // La cuenta esperada sigue expuesta aunque no sea la primera de la lista:
   // varias wallets devuelven todas las autorizadas y el orden no es promesa.
-  if (accounts.includes(expected)) return { kind: "proceed", address: expected };
+  if (accounts.includes(expected)) return conLaDelPerfil(expected);
 
   return { kind: "account_changed", expected, actual: accounts[0] };
 }
@@ -97,12 +128,15 @@ export function decidePlayStart(input: {
  */
 export function confirmBeforeSigning(
   validated: string,
-  probe: WalletProbe
+  probe: WalletProbe,
+  /** La wallet del perfil, si se conoce. Se re-exige también aquí. */
+  canonical?: string | null
 ): { ok: true } | { ok: false; decision: PayDecision } {
   const decision = decidePlayStart({
     expected: validated,
     probe,
     pending: null,
+    canonical,
   });
   if (decision.kind === "proceed" && decision.address === norm(validated)) {
     return { ok: true };

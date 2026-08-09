@@ -94,6 +94,11 @@ export default function DailyChallengeCard({
         return t("pay.block.account_changed", {
           address: shortAddress(block.actual),
         });
+      case "wrong_wallet":
+        return t("pay.block.wrong_wallet", {
+          canonical: shortAddress(block.canonical),
+          connected: shortAddress(block.connected),
+        });
       case "needs_name":
         return t("pay.block.needs_name");
       case "name_taken":

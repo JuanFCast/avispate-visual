@@ -96,6 +96,11 @@ export const en = {
     "We need to reconnect your wallet. It may be locked or disconnected. Nothing was charged.",
   "pay.block.account_changed":
     "Your wallet switched to a different account ({address}). We'll check your name again before charging anything. Nothing was charged.",
+  /* Distinto de `account_changed`: aquello es "cambiaste a mitad", esto es
+     "esta cuenta no es la tuya". Se nombra la que manda —la que cobra los
+     premios— porque la respuesta es conectar ESA, no una cualquiera. */
+  "pay.block.wrong_wallet":
+    "This account's wallet is {canonical}, and you have {connected} connected. Connect yours to play — it's the one that collects your prizes. Nothing was charged.",
   "pay.block.needs_name":
     "Pick a name for this wallet before you play, so your score can be saved. Nothing was charged.",
   "pay.block.name_taken":
@@ -877,6 +882,8 @@ export const es: Record<MessageKey, string> = {
     "Necesitamos volver a conectar tu billetera. Puede estar bloqueada o haberse desconectado. No te hemos cobrado nada.",
   "pay.block.account_changed":
     "Tu billetera cambió a otra cuenta ({address}). Vamos a revisar tu nombre otra vez antes de cobrar nada. No te hemos cobrado nada.",
+  "pay.block.wrong_wallet":
+    "La billetera de esta cuenta es {canonical}, y tienes conectada {connected}. Conecta la tuya para jugar — es la que cobra tus premios. No te hemos cobrado nada.",
   "pay.block.needs_name":
     "Elige un nombre para esta billetera antes de jugar, para que tu puntaje se pueda guardar. No te hemos cobrado nada.",
   "pay.block.name_taken":

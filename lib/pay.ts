@@ -20,6 +20,7 @@ import {
 import { isMiniPay } from "./minipay";
 import { confirmBeforeSigning, type PayDecision } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
+import { useProfile } from "./profile-context";
 import { ensureWalletSession } from "./wallet-session-client";
 import type { MessageKey } from "./i18n";
 
@@ -224,6 +225,8 @@ export function usePayToPlay() {
   const publicClient = usePublicClient({ chainId: celo.id });
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
+  /** La wallet del perfil: la que cobra, y por tanto la única que puede firmar. */
+  const { walletAddress: canonical } = useProfile();
 
   const playForDeck = useCallback(
     async (
@@ -252,7 +255,10 @@ export function usePayToPlay() {
        */
       const assertSameAccount = async () => {
         const probe = await probeWallet(connector);
-        const verdict = confirmBeforeSigning(account, probe);
+        // Se re-exige también la wallet del perfil: entre la comprobación de
+        // arriba y esta firma cabe un cambio a una cuenta que no es la que
+        // cobra, y firmar con ella dejaría el pago a nombre de otra identidad.
+        const verdict = confirmBeforeSigning(account, probe, canonical);
         if (!verdict.ok) throw new WalletChangedError(verdict.decision);
       };
 

@@ -140,6 +140,11 @@ export type PayBlock =
   | { kind: "reconnect" }
   /** La wallet expone otra cuenta distinta a la que la app tenía validada. */
   | { kind: "account_changed"; actual: string }
+  /**
+   * La wallet que iba a firmar no es la del perfil. Se nombra la que manda para
+   * que no haya duda de cuál conectar: es la que tiene el historial y cobra.
+   */
+  | { kind: "wrong_wallet"; canonical: string; connected: string }
   /** Hace falta un nombre para poder guardar el puntaje. */
   | { kind: "needs_name" }
   /** El nombre ya está vinculado a otra dirección (casi siempre, suya). */
@@ -310,10 +315,14 @@ export default function GameShell() {
     // 1 y 2. Wallet accesible y dirección confirmada. Falla CERRADO: si la
     //        wallet no contesta, no se cobra. Y si ya hay una jugada pagada sin
     //        registrar, esto devuelve `resume_pending` y NUNCA se cobra otra.
+    // `canonical` es el paso 2b: no basta con que la wallet conteste y sea la
+    // de hace un segundo, tiene que ser la DEL PERFIL. Una embebida creada por
+    // accidente contesta igual de bien y no es quien cobra (`wallet-identity.ts`).
     const decision = decidePlayStart({
       expected: activeWallet.address,
       probe: await probeWallet(activeWallet.connector),
       pending: pendingPlay(),
+      canonical: profile.walletAddress,
     });
     if (decision.kind !== "proceed") {
       setPayStage(null);
@@ -426,6 +435,13 @@ export default function GameShell() {
         return;
       case "account_changed":
         setPayBlock({ kind: "account_changed", actual: decision.actual });
+        return;
+      case "wrong_wallet":
+        setPayBlock({
+          kind: "wrong_wallet",
+          canonical: decision.canonical,
+          connected: decision.connected,
+        });
         return;
     }
   }

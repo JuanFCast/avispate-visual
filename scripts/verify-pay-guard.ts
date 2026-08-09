@@ -187,6 +187,172 @@ check(
   ME
 );
 
+// ---------------------------------------------------------------------------
+// La wallet DEL PERFIL: el filtro que faltaba, y el caso real que lo pidió.
+// ---------------------------------------------------------------------------
+//
+// PipeRabby entró con su Rabby bloqueada. Privy lo dio por "usuario sin
+// wallets" y le creó una embebida. Esa embebida contesta perfectamente, es
+// estable entre comprobaciones y pasa los tres filtros anteriores sin
+// despeinarse — y no es quien tiene el historial ni quien cobra el premio.
+//
+// Que la wallet conteste y sea la misma de hace un segundo no la convierte en
+// la tuya. Eso es lo que se fija aquí.
+
+const RABBY = "0x46d5f9fe98461928dbad7a22b95bade5fa178c18";
+const EMBEBIDA = "0xfd43f6003484579ca068313736632eea8c651477";
+
+console.log("\n— La wallet del perfil manda —");
+
+check(
+  "con la canónica conectada, vía libre",
+  decidePlayStart({
+    expected: RABBY,
+    probe: { status: "answered", accounts: [RABBY] },
+    pending: null,
+    canonical: RABBY,
+  }),
+  { kind: "proceed", address: RABBY }
+);
+
+check(
+  "PIPERABBY: la embebida accidental NO puede pagar",
+  decidePlayStart({
+    expected: EMBEBIDA,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: null,
+    canonical: RABBY,
+  }),
+  { kind: "wrong_wallet", canonical: RABBY, connected: EMBEBIDA }
+);
+
+// El detalle que lo hacía invisible: para los filtros de antes, la embebida es
+// una wallet impecable. Sin `canonical` habría pasado.
+check(
+  "y sin la canónica habría pasado — por eso hacía falta",
+  decidePlayStart({
+    expected: EMBEBIDA,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: null,
+  }),
+  { kind: "proceed", address: EMBEBIDA }
+);
+
+check(
+  "aunque la wallet exponga las dos, solo firma la del perfil",
+  decidePlayStart({
+    expected: EMBEBIDA,
+    probe: { status: "answered", accounts: [EMBEBIDA, RABBY] },
+    pending: null,
+    canonical: RABBY,
+  }),
+  { kind: "wrong_wallet", canonical: RABBY, connected: EMBEBIDA }
+);
+
+console.log("\n— Rabby bloqueada o reconectando —");
+
+check(
+  "bloqueada: se reconecta, y NO se convierte en 'wallet equivocada'",
+  decidePlayStart({
+    expected: RABBY,
+    probe: { status: "answered", accounts: [] },
+    pending: null,
+    canonical: RABBY,
+  }),
+  { kind: "reconnect", reason: "locked" }
+);
+
+check(
+  "sin respuesta: tampoco se cobra",
+  decidePlayStart({
+    expected: RABBY,
+    probe: { status: "unreachable", reason: "timeout" },
+    pending: null,
+    canonical: RABBY,
+  }),
+  { kind: "reconnect", reason: "unreachable" }
+);
+
+// El orden importa: una jugada ya pagada se termina ANTES de mirar de quién es
+// la wallet. Nunca se cobra dos veces por arreglar una identidad.
+check(
+  "una jugada pendiente manda sobre todo lo demás",
+  decidePlayStart({
+    expected: EMBEBIDA,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: { txHash: "0xabc", player: EMBEBIDA, deckSize: 10 },
+    canonical: RABBY,
+  }).kind,
+  "resume_pending"
+);
+
+console.log("\n— Cambio REAL de cuenta —");
+
+check(
+  "cambió de cuenta y encima no es la del perfil: gana 'cambió'",
+  decidePlayStart({
+    expected: RABBY,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: null,
+    canonical: RABBY,
+  }),
+  { kind: "account_changed", expected: RABBY, actual: EMBEBIDA }
+);
+
+check(
+  "jugador nuevo sin canónica: la que trae es la suya",
+  decidePlayStart({
+    expected: null,
+    probe: { status: "answered", accounts: [EMBEBIDA] },
+    pending: null,
+    canonical: null,
+  }),
+  { kind: "proceed", address: EMBEBIDA }
+);
+
+console.log("\n— Y pegado a la firma se vuelve a exigir —");
+
+check(
+  "la canónica firma",
+  confirmBeforeSigning(RABBY, { status: "answered", accounts: [RABBY] }, RABBY),
+  { ok: true }
+);
+
+// Sin esto, entre la comprobación de arriba y la firma cabía un cambio a la
+// embebida y el pago se habría hecho a nombre de otra identidad.
+check(
+  "la embebida NO firma, aunque conteste bien",
+  confirmBeforeSigning(EMBEBIDA, { status: "answered", accounts: [EMBEBIDA] }, RABBY),
+  {
+    ok: false,
+    decision: { kind: "wrong_wallet", canonical: RABBY, connected: EMBEBIDA },
+  }
+);
+
+check(
+  "y sin canónica se comporta como siempre",
+  confirmBeforeSigning(EMBEBIDA, { status: "answered", accounts: [EMBEBIDA] }),
+  { ok: true }
+);
+
+console.log("\n— Ninguna ajena pasa, se mire como se mire —");
+{
+  // Cinco formas de traer la wallet equivocada. Ninguna cobra.
+  const ajenas = [
+    { status: "answered", accounts: [EMBEBIDA] } as const,
+    { status: "answered", accounts: [OTRA] } as const,
+    { status: "answered", accounts: [EMBEBIDA, OTRA] } as const,
+    { status: "answered", accounts: [] } as const,
+    { status: "unreachable", reason: "x" } as const,
+  ];
+  const pasaron = ajenas.filter(
+    (probe) =>
+      decidePlayStart({ expected: EMBEBIDA, probe, pending: null, canonical: RABBY })
+        .kind === "proceed"
+  );
+  check("ninguna de las cinco cobra", pasaron.length, 0);
+}
+
 console.log(
   failed === 0
     ? "\nTodo bien.\n"

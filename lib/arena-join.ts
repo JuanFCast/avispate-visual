@@ -6,6 +6,7 @@ import { celo } from "viem/chains";
 import { ERC20_ABI, USDT_CELO_ADDRESS } from "./contracts";
 import { decidePlayStart, confirmBeforeSigning } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
+import { useProfile } from "./profile-context";
 import { prepareSeat } from "./seat-secret";
 import { registerSeat } from "./arena-register";
 import { ensureWalletSession, readWalletSession } from "./wallet-session-client";
@@ -198,6 +199,9 @@ async function registerAndClaim(params: {
 
 export function useArenaJoin(): ArenaJoinApi {
   const { address, chainId, connector } = useAccount();
+  // La wallet del perfil, la que cobra el premio. Entra en el guardián para que
+  // pagar una entrada exija la misma cuenta que va a recibir el pozo.
+  const { walletAddress: canonical } = useProfile();
   const publicClient = usePublicClient({ chainId: celo.id });
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
@@ -218,16 +222,22 @@ export function useArenaJoin(): ArenaJoinApi {
 
         // 2. La wallet: accesible y con la dirección confirmada. Mismo guardián
         //    que el reto diario, así que falla cerrado.
+        // `canonical`: además de accesible y estable, la wallet tiene que ser
+        // la DEL PERFIL. Una embebida creada por accidente pasa los otros dos
+        // filtros sin despeinarse (`wallet-identity.ts`).
         const decision = decidePlayStart({
           expected: address,
           probe: await probeWallet(connector),
           pending: null,
+          canonical,
         });
         if (decision.kind !== "proceed") {
           setError(
             decision.kind === "reconnect"
               ? "pay.block.reconnect"
-              : "pay.block.account_changed"
+              : decision.kind === "wrong_wallet"
+                ? "pay.block.wrong_wallet"
+                : "pay.block.account_changed"
           );
           setStage(null);
           return false;
@@ -258,9 +268,17 @@ export function useArenaJoin(): ArenaJoinApi {
         }
 
         // 4. El pago. Última comprobación pegada a la firma.
-        const verdict = confirmBeforeSigning(account, await probeWallet(connector));
+        const verdict = confirmBeforeSigning(
+          account,
+          await probeWallet(connector),
+          canonical
+        );
         if (!verdict.ok) {
-          setError("pay.block.account_changed");
+          setError(
+            verdict.decision.kind === "wrong_wallet"
+              ? "pay.block.wrong_wallet"
+              : "pay.block.account_changed"
+          );
           setStage(null);
           return false;
         }
@@ -336,7 +354,7 @@ export function useArenaJoin(): ArenaJoinApi {
         return false;
       }
     },
-    [address, chainId, connector, publicClient, switchChainAsync, writeContractAsync]
+    [address, canonical, chainId, connector, publicClient, switchChainAsync, writeContractAsync]
   );
 
   /**
