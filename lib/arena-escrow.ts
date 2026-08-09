@@ -139,7 +139,11 @@ export interface JoinVerification {
   player?: string;
   /** La huella que dejó al pagar. */
   commitment?: string;
-  /** Pagó una dirección distinta a la que afirmó el navegador. */
+  /**
+   * Pagó una dirección distinta a la que afirmó el navegador. Informativo: no
+   * decide nada, porque quien manda es `player`. Sirve para avisar al cliente
+   * de que está mirando otra wallet, no para negarle el registro.
+   */
   payerMismatch?: boolean;
 }
 
@@ -157,7 +161,8 @@ export interface JoinVerification {
 export async function verifyJoinTx(
   txHash: string,
   tableId: Hash,
-  expectedPlayer: string
+  /** Lo que el navegador CREE que pagó. Opcional: solo sirve para comparar. */
+  expectedPlayer?: string
 ): Promise<JoinVerification> {
   if (!escrowConfigured()) return { ok: false };
   try {
@@ -182,7 +187,9 @@ export async function verifyJoinTx(
       ok: true,
       player,
       commitment: (match.args.seatCommitment as string).toLowerCase(),
-      payerMismatch: player !== expectedPlayer.toLowerCase(),
+      payerMismatch: expectedPlayer
+        ? player !== expectedPlayer.toLowerCase()
+        : false,
     };
   } catch {
     return { ok: false };

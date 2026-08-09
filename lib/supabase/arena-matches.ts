@@ -120,7 +120,7 @@ async function listMatchPlayers(matchId: string): Promise<MatchPlayerRow[]> {
  */
 export async function startMatch(params: {
   code: string;
-  hostProfileId: string;
+  actorProfileId: string;
 }): Promise<MatchResult<MatchRow>> {
   const db = getSupabaseAdmin();
 
@@ -129,7 +129,40 @@ export async function startMatch(params: {
   // sin evaluar en el camino más recorrido, que es justo donde no se nota.
   const room = await getRoomByCode(params.code);
   if (!room) return fail("no_match");
-  if (room.host_profile_id !== params.hostProfileId) return fail("not_host");
+
+  /**
+   * Quién puede repartir.
+   *
+   * En una mesa GRATIS, el anfitrión: `host_profile_id` lo fijó la sesión que
+   * creó la sala y ahí sigue valiendo, porque no hay dinero de por medio.
+   *
+   * En una mesa CON ENTRADA, cualquiera que esté sentado — y estar sentado ya
+   * significa haber pagado y haber probado la ficha (`arena-actor.ts`). Son dos
+   * razones:
+   *
+   *   · `host_profile_id` sale de la sesión del creador, y con la regla nueva
+   *     la silla es de la wallet que pagó. Cuando no son el mismo perfil, atar
+   *     el reparto al primero deja la mesa muerta: cuatro entradas pagadas y
+   *     nadie que pueda repartir hasta que la mesa venza. Eso es exactamente el
+   *     final que estamos quitando de en medio.
+   *   · Y aflojarlo no regala nada, porque `decideMatchStart` sigue exigiendo
+   *     la mesa exactamente llena, TODOS los sentados en la lista de pagadores
+   *     del contrato y TODOS listos. Con esas tres cosas puestas, la partida ya
+   *     va a empezar: quién toca el botón deja de ser una decisión con
+   *     consecuencias.
+   */
+  if (room.table_id) {
+    const { data: seat, error: seatError } = await db
+      .from("arena_room_players")
+      .select("id")
+      .eq("room_id", room.id)
+      .eq("profile_id", params.actorProfileId)
+      .maybeSingle();
+    if (seatError) throw seatError;
+    if (!seat) return fail("not_host");
+  } else if (room.host_profile_id !== params.actorProfileId) {
+    return fail("not_host");
+  }
 
   const existing = await getMatchByCode(params.code);
   if (existing) return { ok: true, value: existing };
@@ -162,7 +195,7 @@ export async function startMatch(params: {
    */
   const tableId = room.table_id;
   const verdict = decideMatchStart({
-    isHost: true, // ya comprobado arriba, contra la sala
+    isHost: true, // el permiso para repartir ya se resolvió arriba
     roomLive: true, // ídem
     maxPlayers: room.max_players,
     seated: players.map((p) => ({

@@ -1,18 +1,23 @@
 import { NextResponse } from "next/server";
-import { requireIdentity } from "@/lib/http";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { getRoomByCode } from "@/lib/supabase/arena-rooms";
-import { ensureProfile } from "@/lib/supabase/profiles";
+import { ensureProfileByWallet } from "@/lib/supabase/profiles";
 import { escrowConfigured, verifyJoinTx } from "@/lib/arena-escrow";
-import {
-  nextFreeSeat,
-  recordSeatPayment,
-} from "@/lib/supabase/arena-escrow-db";
+import { seatPaidPlayer } from "@/lib/supabase/arena-escrow-db";
+import { allow, clientKey } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
 const TX_RE = /^0x[0-9a-f]{64}$/i;
 const ADDR_RE = /^0x[0-9a-f]{40}$/i;
+
+/**
+ * Generoso a propósito: el camino normal reintenta con espera creciente hasta
+ * seis veces, y encima puede haber varios jugadores tras la misma IP —una casa,
+ * una oficina, una red móvil—. Esto no está para molestar a quien reintenta,
+ * sino para que un bucle no se vuelva un grifo de lecturas al RPC.
+ */
+const LIMIT = { limit: 30, windowMs: 60_000 };
 
 interface Ctx {
   params: Promise<{ code: string }>;
@@ -21,8 +26,7 @@ interface Ctx {
 /**
  * POST /api/arena/rooms/[code]/paid — la silla ya está pagada; siéntame.
  *
- * Este es el paso que antes no existía. El orden completo de una mesa con
- * entrada es:
+ * El orden completo de una mesa con entrada:
  *
  *   crear sala → ver el código → pagar `join` on-chain → ESTO → canjear la
  *   silla en `/api/arena/seat` → jugar
@@ -31,19 +35,38 @@ interface Ctx {
  * porque hasta que la sala no existe no hay código, y sin código no hay mesa
  * que pagar. Nadie se sienta sin pagar, tampoco quien montó la partida.
  *
- * La silla se crea aquí contra la CADENA: se lee del evento quién pagó, no se
- * le cree al navegador. Si la cadena dice otra dirección, el pago no se pierde
- * —está en el contrato a nombre de quien pagó— pero no se sienta a nadie: eso
- * lo tiene que reconciliar la persona, no nosotros adivinando.
+ * ── Por qué esto NO pide sesión (decisión del 2026-08-08) ──────────────────
+ *
+ * Porque la sesión no probaba nada aquí y sí podía estorbar.
+ *
+ * No probaba nada: lo que autoriza la silla es el evento `Joined` del contrato,
+ * y de él sale también la dirección. La sesión nunca se comparaba con el
+ * pagador —solo se exigía que existiera alguna—, así que cualquiera con una
+ * cuenta valía. Lo único que decidía era el `profile_id` de la silla, y eso era
+ * peor que inútil: un tercero que copiara el txHash de la cadena podía llegar
+ * antes y dejar el pago de otra wallet apuntando a SU perfil. El pagador se
+ * quedaba con la silla registrada y sin poder jugarla.
+ *
+ * Y estorbaba: dentro de MiniPay la primera sesión del jugador nace de esta
+ * misma transacción, y `/api/session/wallet` consume el hash de una sola vez.
+ * Quien mirara la cadena podía canjearlo primero y dejar al pagador sin sesión
+ * posible con ese hash — o sea, con un 401 permanente delante de su silla ya
+ * pagada. Sin sesión de por medio, ese ataque se queda sin efecto.
+ *
+ * Así que el perfil se deriva de la wallet que pagó, leída del evento. La
+ * cadena dice quién es; nosotros no lo elegimos ni se lo preguntamos a nadie.
+ *
+ * Jugar sigue exigiendo la ficha de silla: registrar es contar un hecho que ya
+ * ocurrió, actuar es otra cosa y la gobierna `arena-actor.ts`.
  */
 export async function POST(req: Request, ctx: Ctx) {
-  const auth = await requireIdentity(req);
-  if ("response" in auth) return auth.response;
-
   if (!escrowConfigured()) {
     return NextResponse.json({ error: "escrow_disabled" }, { status: 503 });
   }
 
+  // Los cheques baratos van antes de tocar la cadena: forma del código, forma
+  // del hash y existencia de la sala se resuelven sin salir de aquí, y así una
+  // petición basura no cuesta una lectura al RPC.
   const { code: raw } = await ctx.params;
   const code = normalizeRoomCode(raw);
   if (!code) {
@@ -52,12 +75,19 @@ export async function POST(req: Request, ctx: Ctx) {
 
   const body = await req.json().catch(() => null);
   const txHash = String(body?.txHash ?? "");
-  const address = String(body?.address ?? "");
   if (!TX_RE.test(txHash)) {
     return NextResponse.json({ error: "invalid_tx_hash" }, { status: 400 });
   }
-  if (!ADDR_RE.test(address)) {
+  // La dirección es opcional y solo informativa: quien pagó lo dice la cadena.
+  // Se acepta para poder avisar cuando el navegador se equivoca de wallet, pero
+  // no participa en ninguna decisión.
+  const claimed = String(body?.address ?? "");
+  if (claimed && !ADDR_RE.test(claimed)) {
     return NextResponse.json({ error: "invalid_address" }, { status: 400 });
+  }
+
+  if (!allow(clientKey(req), LIMIT)) {
+    return NextResponse.json({ error: "slow_down" }, { status: 429 });
   }
 
   try {
@@ -74,27 +104,29 @@ export async function POST(req: Request, ctx: Ctx) {
     }
 
     // La cadena es la fuente de verdad sobre quién pagó y en qué mesa.
-    const check = await verifyJoinTx(txHash, tableId, address);
+    const check = await verifyJoinTx(txHash, tableId, claimed || undefined);
     if (!check.ok || !check.player) {
       // O la transacción no es el pago de esta mesa, o el nodo todavía no la
       // ve. El cliente reintenta; nunca se le pide pagar otra vez.
       return NextResponse.json({ error: "join_not_found" }, { status: 400 });
     }
-    if (check.payerMismatch) {
-      return NextResponse.json(
-        { error: "payer_mismatch", payer: check.player },
-        { status: 409 }
-      );
-    }
 
-    const profile = await ensureProfile(auth.identity);
-    const seat = await nextFreeSeat(room.id);
-    const written = await recordSeatPayment({
+    /**
+     * El pagador se sienta AUNQUE el navegador se haya equivocado de wallet.
+     *
+     * Antes esto era un 409 que paraba el registro en seco. Era el reflejo de
+     * cuando la dirección del cuerpo importaba; ahora no importa, y negarse a
+     * registrar un pago que la cadena confirma sería crear a mano el final que
+     * este endpoint existe para evitar. Se sienta a quien pagó y se le devuelve
+     * la dirección real, que es lo que el cliente necesita para pedir su ficha
+     * con la wallet correcta.
+     */
+    const profile = await ensureProfileByWallet(check.player);
+    const written = await seatPaidPlayer({
       roomId: room.id,
       profileId: profile.id,
       address: check.player,
       txHash,
-      seat,
     });
 
     if (written.status === "conflict") {
@@ -103,7 +135,7 @@ export async function POST(req: Request, ctx: Ctx) {
 
     // `ok` y `duplicate` responden igual a propósito: reintentar el registro de
     // un pago que ya constaba no es un error, es la red haciendo su trabajo.
-    return NextResponse.json({ seated: true, tableId });
+    return NextResponse.json({ seated: true, tableId, payer: check.player });
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }

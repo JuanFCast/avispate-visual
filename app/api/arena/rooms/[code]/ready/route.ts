@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireIdentity } from "@/lib/http";
-import { guardRoomSeat } from "@/lib/arena-guard";
+import { resolveActor } from "@/lib/arena-actor";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { setReady } from "@/lib/supabase/arena-rooms";
-import { ensureProfile } from "@/lib/supabase/profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -21,27 +19,31 @@ const STATUS: Record<string, number> = {
  * POST /api/arena/rooms/[code]/ready — el jugador se marca (o se desmarca)
  * como listo. Devuelve la sala completa para que quien tocó el botón vea el
  * cambio sin esperar al siguiente latido.
+ *
+ * En una mesa con entrada quien se marca listo es la WALLET que probó la ficha
+ * de silla, no el perfil de la sesión: el porqué está en `arena-actor.ts`.
  */
 export async function POST(req: Request, ctx: Ctx) {
-  const auth = await requireIdentity(req);
-  if ("response" in auth) return auth.response;
-
   const { code: raw } = await ctx.params;
   const code = normalizeRoomCode(raw);
   if (!code) {
     return NextResponse.json({ error: "invalid_code" }, { status: 400 });
   }
 
-  // Actuar sobre una silla de una mesa con entrada exige haberla pagado.
-  const seat = await guardRoomSeat(req, code, "act");
-  if ("response" in seat) return seat.response;
+  // Actuar sobre una silla de una mesa con entrada exige haberla pagado, y se
+  // actúa como esa silla.
+  const resolved = await resolveActor(req, code, "act");
+  if ("response" in resolved) return resolved.response;
 
   const body = await req.json().catch(() => null);
   const ready = body?.ready !== false;
 
   try {
-    const profile = await ensureProfile(auth.identity);
-    const result = await setReady({ code, profileId: profile.id, ready });
+    const result = await setReady({
+      code,
+      profileId: resolved.actor.profileId,
+      ready,
+    });
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error },

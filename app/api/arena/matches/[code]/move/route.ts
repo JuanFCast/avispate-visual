@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
-import { requireIdentity } from "@/lib/http";
-import { guardRoomSeat } from "@/lib/arena-guard";
+import { resolveActor } from "@/lib/arena-actor";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
 import { applyMove } from "@/lib/supabase/arena-matches";
-import { ensureProfile } from "@/lib/supabase/profiles";
 
 export const dynamic = "force-dynamic";
 
@@ -20,20 +18,21 @@ interface Ctx {
  *
  * La respuesta trae la partida completa y recién leída, así que quien tocó ve
  * el resultado sin esperar al siguiente latido.
+ *
+ * En una mesa con entrada quien mueve es la WALLET que probó la ficha de silla,
+ * no el perfil de la sesión: el porqué está en `arena-actor.ts`.
  */
 export async function POST(req: Request, ctx: Ctx) {
-  const auth = await requireIdentity(req);
-  if ("response" in auth) return auth.response;
-
   const { code: raw } = await ctx.params;
   const code = normalizeRoomCode(raw);
   if (!code) {
     return NextResponse.json({ error: "invalid_code" }, { status: 400 });
   }
 
-  // Actuar sobre una silla de una mesa con entrada exige haberla pagado.
-  const seat = await guardRoomSeat(req, code, "act");
-  if ("response" in seat) return seat.response;
+  // Actuar sobre una silla de una mesa con entrada exige haberla pagado, y se
+  // actúa como esa silla.
+  const resolved = await resolveActor(req, code, "act");
+  if ("response" in resolved) return resolved.response;
 
   const body = await req.json().catch(() => null);
   const seq = Number(body?.seq);
@@ -44,10 +43,9 @@ export async function POST(req: Request, ctx: Ctx) {
   }
 
   try {
-    const profile = await ensureProfile(auth.identity);
     const result = await applyMove({
       code,
-      profileId: profile.id,
+      profileId: resolved.actor.profileId,
       seq,
       card,
       symbolId,

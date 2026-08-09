@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { optionalIdentity } from "@/lib/http";
+import { seatAddressFor } from "@/lib/arena-guard";
 import { normalizeRoomCode } from "@/lib/arena-rooms";
-import { readRoom } from "@/lib/supabase/arena-rooms";
+import { getRoomByCode, readRoom } from "@/lib/supabase/arena-rooms";
+import { seatProfileOf } from "@/lib/supabase/arena-escrow-db";
 import { ensureProfile } from "@/lib/supabase/profiles";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,12 @@ interface Ctx {
  * la sala cada pocos segundos de todos modos, así que ese mismo GET refresca su
  * `last_seen_at`. Es un efecto secundario en un GET a conciencia — la
  * alternativa era duplicar las peticiones para decir "sigo aquí".
+ *
+ * En una mesa con entrada, quién eres lo dice la FICHA de silla antes que la
+ * sesión, por lo mismo que en las rutas que actúan (`arena-actor.ts`). Si aquí
+ * mandara la sesión, un jugador cuyo perfil no coincidiera con la wallet que
+ * pagó vería su propia mesa como si no estuviera sentado —sin `you`, sin botón
+ * de listo y con el de pagar delante— y su latido no refrescaría nada.
  */
 export async function GET(req: Request, ctx: Ctx) {
   const { code: raw } = await ctx.params;
@@ -28,13 +36,23 @@ export async function GET(req: Request, ctx: Ctx) {
   }
 
   try {
-    const identity = await optionalIdentity(req);
-    const profile = identity ? await ensureProfile(identity) : null;
-    const result = await readRoom({
-      code,
-      viewerProfileId: profile?.id ?? null,
-      touch: true,
-    });
+    const room = await getRoomByCode(code);
+    const seatAddress = seatAddressFor(req, room?.table_id ?? null);
+
+    // La ficha primero; la sesión solo si no hay ficha que valga. Se pide una u
+    // otra, no las dos: sin ficha útil no hay nada que buscar por wallet, y con
+    // ella la sesión no aporta.
+    let viewerProfileId: string | null = null;
+    if (room && seatAddress) {
+      viewerProfileId = await seatProfileOf(room.id, seatAddress);
+    }
+    if (!viewerProfileId) {
+      const identity = await optionalIdentity(req);
+      const profile = identity ? await ensureProfile(identity) : null;
+      viewerProfileId = profile?.id ?? null;
+    }
+
+    const result = await readRoom({ code, viewerProfileId, touch: true });
     if (!result.ok) {
       return NextResponse.json(
         { error: result.error },

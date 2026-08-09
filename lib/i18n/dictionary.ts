@@ -309,6 +309,11 @@ export const en = {
     "We couldn't confirm your seat on this table. Reload the room; if it persists, your entry is paid and safe.",
   "room.error.seat_not_paid":
     "The chain doesn't show this wallet paying this table. Check you're on the wallet you paid with.",
+  // Pagó, y el registro de la silla se quedó a medias. Lo único que importa
+  // decirle es que su dinero está donde debe y que NO tiene que pagar de nuevo.
+  "room.error.seat_not_registered":
+    "Your entry is paid, but the seat wasn't registered yet. Reload the room to finish — you won't be charged again.",
+  "room.error.slow_down": "Too many attempts. Wait a moment and try again.",
   "room.guest.waiting_host": "Everyone is ready. Waiting for the host to deal…",
   "room.start.cta": "Start the match",
   // Qué falta, con cifras: "Waiting for 1 player…" se entiende sin contar
@@ -1065,6 +1070,9 @@ export const es: Record<MessageKey, string> = {
     "No pudimos confirmar tu silla en esta mesa. Recarga la sala; si sigue, tu entrada está pagada y a salvo.",
   "room.error.seat_not_paid":
     "La cadena no muestra que esta billetera haya pagado esta mesa. Revisa que estés con la que pagaste.",
+  "room.error.seat_not_registered":
+    "Tu entrada está pagada, pero la silla todavía no quedó registrada. Recarga la sala para terminar — no se te vuelve a cobrar.",
+  "room.error.slow_down": "Demasiados intentos. Espera un momento y vuelve a probar.",
   "room.guest.waiting_host":
     "Ya están todos listos. Esperando a que el anfitrión reparta…",
   "room.start.cta": "Iniciar partida",

@@ -68,6 +68,60 @@ export async function recordSeatPayment(params: {
 }
 
 /**
+ * El perfil dueño de la silla que pagó esa dirección, o `null`.
+ *
+ * Es la traducción de "la wallet que probó la ficha" a "con qué fila actúa",
+ * y el único puente que `arena-actor.ts` necesita: la autoridad viene de la
+ * dirección, el `profile_id` solo dice a qué fila aplicarla.
+ */
+export async function seatProfileOf(
+  roomId: string,
+  address: string
+): Promise<string | null> {
+  const db = getSupabaseAdmin();
+  const { data, error } = await db
+    .from("arena_room_players")
+    .select("profile_id")
+    .eq("room_id", roomId)
+    .eq("wallet_address", address.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  return (data?.profile_id as string | undefined) ?? null;
+}
+
+/**
+ * Sienta a quien pagó, buscándole asiento y reintentando si se lo quitan.
+ *
+ * `nextFreeSeat` mira y `recordSeatPayment` escribe, y entre las dos cabe otra
+ * petición: dos jugadores que registran su pago a la vez calculan el mismo
+ * asiento y el segundo choca contra `(room_id, seat)`. Sin este bucle ese
+ * choque sale por la ruta como un 409, que `registerSeat` trata como final —
+ * y el final sería una entrada pagada que nunca se registra por haber llegado
+ * en el mismo segundo que otra. Se recalcula y se vuelve a intentar, que es
+ * justo lo que `classifySeatWrite` pide al devolver `seat_taken`.
+ *
+ * Los otros dos desenlaces no se reintentan porque no cambiarían: el mismo
+ * pago ya registrado es éxito, y una dirección ya sentada con OTRO pago es un
+ * conflicto de verdad que hay que contar.
+ */
+export async function seatPaidPlayer(params: {
+  roomId: string;
+  profileId: string;
+  address: string;
+  txHash: string;
+}): Promise<EscrowWrite> {
+  let last: EscrowWrite = { status: "conflict", reason: "seat_taken" };
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const seat = await nextFreeSeat(params.roomId);
+    last = await recordSeatPayment({ ...params, seat });
+    if (last.status !== "conflict" || last.reason !== "seat_taken") return last;
+  }
+
+  return last;
+}
+
+/**
  * Deja constancia de la liquidación. UNA por mesa: el índice único sobre
  * `table_id` es lo que impide que un cron solapado pague dos veces el pozo.
  *

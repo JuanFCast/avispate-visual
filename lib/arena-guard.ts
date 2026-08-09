@@ -44,15 +44,20 @@ export interface RoomTerms {
  * Lee la lista de pagadores de la cadena en cada llamada a propósito: es un
  * `eth_call` barato y la alternativa —cachearla— abre la puerta a sentar a
  * alguien con una foto vieja de quién había pagado.
+ *
+ * Cuando deja pasar devuelve la DIRECCIÓN que la ficha probó (o `null` en una
+ * sala gratis, donde no hay ninguna que probar). No es un detalle: en una mesa
+ * con entrada esa dirección es quien actúa —ver `arena-actor.ts`—, así que
+ * quien pregunta necesita recibirla y no volver a deducirla por su cuenta.
  */
 export async function requireSeat(
   req: Request,
   room: RoomTerms,
   action: SeatAction
-): Promise<{ ok: true } | { response: NextResponse }> {
+): Promise<{ ok: true; address: string | null } | { response: NextResponse }> {
   const tableId = room.tableId;
   // Sala gratis: nada que proteger, todo sigue como estaba.
-  if (!tableId) return { ok: true };
+  if (!tableId) return { ok: true, address: null };
 
   const raw = req.headers.get(SEAT_HEADER);
   const seat = raw ? verifySeatToken(raw.trim()) : null;
@@ -64,7 +69,9 @@ export async function requireSeat(
     onchainPlayers: await paidPlayersOf(tableId as `0x${string}`),
     action,
   });
-  if (verdict.ok) return { ok: true };
+  // `seat` no es null cuando el veredicto es favorable: `decideSeatAccess`
+  // rechaza antes de mirar nada más si la ficha no vino.
+  if (verdict.ok) return { ok: true, address: seat?.address ?? null };
 
   return {
     response: NextResponse.json(
@@ -85,12 +92,30 @@ export async function guardRoomSeat(
   req: Request,
   code: string,
   action: SeatAction
-): Promise<{ ok: true } | { response: NextResponse }> {
+): Promise<{ ok: true; address: string | null } | { response: NextResponse }> {
   const room = await getRoomByCode(code);
   // Sala inexistente o gratis: el 404 lo da la ruta con su propio mensaje.
-  if (!room || !roomIsEscrowed(room)) return { ok: true };
+  if (!room || !roomIsEscrowed(room)) return { ok: true, address: null };
 
   return await requireSeat(req, { tableId: room.table_id ?? null }, action);
+}
+
+/**
+ * La dirección de la ficha, mirando solo la firma y la mesa. Sin cadena.
+ *
+ * Es para LEER, no para actuar. La diferencia importa: `requireSeat` pregunta
+ * además al contrato quién pagó, y eso es un acierto en una acción y un
+ * desperdicio en una lectura que el cliente repite cada pocos segundos como
+ * latido. Para saber cuál de las sillas pintadas es la tuya basta con que la
+ * ficha esté bien firmada por nosotros y sea de esta mesa: no abre ningún
+ * permiso, solo dice a quién se está mirando.
+ */
+export function seatAddressFor(req: Request, tableId: string | null): string | null {
+  if (!tableId) return null;
+  const raw = req.headers.get(SEAT_HEADER);
+  const seat = raw ? verifySeatToken(raw.trim()) : null;
+  if (!seat) return null;
+  return seat.tableId.toLowerCase() === tableId.toLowerCase() ? seat.address : null;
 }
 
 /**

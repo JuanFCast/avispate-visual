@@ -17,6 +17,14 @@ const TEXTS: Record<string, MessageKey> = {
   seat_token_required: "room.error.seat_token",
   seat_token_wrong_table: "room.error.seat_token",
   seat_not_paid: "room.error.seat_not_paid",
+  /**
+   * La ficha vale pero de esa wallet no consta silla: el pago está hecho y el
+   * registro quedó a medias. Es el único de esta lista que se arregla solo
+   * volviendo a intentarlo, y por eso no puede caer en el genérico — quien lee
+   * "no se pudo" después de pagar un dólar piensa en el dólar, no en recargar.
+   */
+  seat_not_registered: "room.error.seat_not_registered",
+  slow_down: "room.error.slow_down",
   invalid_code: "room.error.invalid_code",
   room_not_found: "room.error.not_found",
   room_closed: "room.error.closed",
