@@ -75,7 +75,7 @@ export default function ProfileHeader() {
   return (
     <header className="profile-header">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo-avispate.png" alt="" className="profile-avatar" />
+      <img src="/logo-avispate.webp" alt="" className="profile-avatar" />
       <p className="profile-eyebrow">{t("profile.eyebrow")}</p>
 
       {!editing ? (

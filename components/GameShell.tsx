@@ -732,7 +732,7 @@ export default function GameShell() {
           <span className="topbar-side" aria-hidden="true" />
           <h1 className="title">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-avispate.png" alt="" className="brand-icon" />
+            <img src="/logo-avispate.webp" alt="" className="brand-icon" />
             Avíspate
           </h1>
           <button
@@ -751,7 +751,7 @@ export default function GameShell() {
       {phase === "setup" && !howTo.resolved && (
         <div className="lobby-boot" aria-hidden="true">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-avispate.png" alt="" className="lobby-boot-logo" />
+          <img src="/logo-avispate.webp" alt="" className="lobby-boot-logo" />
         </div>
       )}
 

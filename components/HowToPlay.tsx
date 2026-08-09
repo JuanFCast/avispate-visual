@@ -281,7 +281,7 @@ export function HowToPlay({ onClose }: { onClose: () => void }) {
       <div className="howto-inner">
         <header className="howto-top">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-avispate.png" alt="" className="howto-logo" />
+          <img src="/logo-avispate.webp" alt="" className="howto-logo" />
           <div
             className="howto-progress"
             aria-label={t("howto.progress", { n: index + 1 })}

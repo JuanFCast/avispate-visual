@@ -111,7 +111,7 @@ export default function PerfilPage() {
       <main className="app-shell profile-page page-stack page-profile">
         <div className="profile-guard">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-avispate.png" alt="" className="profile-avatar" />
+          <img src="/logo-avispate.webp" alt="" className="profile-avatar" />
           <h1 className="profile-alias-big">{t("profile.title")}</h1>
           <p className="empty-note">{t("profile.guard.text")}</p>
           <Link href="/" className="btn-primary">
