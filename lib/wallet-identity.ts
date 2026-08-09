@@ -160,6 +160,37 @@ export function decideEmbeddedCreation(check: {
   return { kind: "create" };
 }
 
+/**
+ * Cuánto puede durar un "todavía no lo sé" antes de dejar de creérselo.
+ *
+ * Esperar es correcto: mientras wagmi reengancha la wallet de siempre o Privy
+ * arranca, ofrecerle "entrar" a quien ya está dentro es el parpadeo que hace
+ * pensar que la sesión no se guardó. Pero esperar SIN TOPE no es prudencia, es
+ * un cuelgue — y es el que se veía: sesión cerrada, y el lobby en "Preparando…"
+ * para siempre.
+ *
+ * Pasa cuando wagmi intenta reconectar un conector que ya no puede existir. El
+ * caso concreto: la wallet embebida se anuncia por EIP-6963 solo si hay sesión
+ * de Privy; sin ella nadie la anuncia nunca, y la reconexión guardada se queda
+ * esperando a un proveedor que no va a llegar.
+ *
+ * Así que el "no lo sé" caduca. Equivocarse por el lado de enseñar el botón de
+ * entrar se corrige solo en cuanto la sesión aparece —el botón cambia—; el otro
+ * lado no se corrige nunca sin recargar.
+ */
+export const SETTLE_LIMIT_MS = 6_000;
+
+/** ¿Lleva demasiado tiempo sin decidirse? */
+export function waitingExpired(
+  /** Cuándo empezó la espera, o `null` si no se está esperando. */
+  since: number | null,
+  now: number,
+  limitMs: number = SETTLE_LIMIT_MS
+): boolean {
+  if (since === null) return false;
+  return now - since >= limitMs;
+}
+
 /** ¿Se puede firmar, pagar o cobrar con lo que hay ahora mismo? */
 export function mayTransact(verdict: WalletIdentityVerdict): boolean {
   return verdict.kind === "ok" || verdict.kind === "no_canonical";

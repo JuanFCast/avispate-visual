@@ -1,11 +1,14 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAccount, type Connector } from "wagmi";
 import { useProfile } from "./profile-context";
 import {
   decideWalletIdentity,
   mayTransact,
+  SETTLE_LIMIT_MS,
+  waitingExpired,
   walletToShow,
   type WalletIdentityVerdict,
 } from "./wallet-identity";
@@ -69,10 +72,41 @@ export interface ActiveWalletState {
  */
 export function useActiveWallet(): ActiveWalletState {
   const { address, isConnected, connector, chainId, status } = useAccount();
+  const enganchando = status === "reconnecting" || status === "connecting";
+
+  /**
+   * El reenganche CADUCA.
+   *
+   * wagmi guarda con qué conector estabas y lo reintenta al montar. Si ese
+   * conector ya no puede existir, se queda en "reconnecting" para siempre — y
+   * la pantalla, que trata ese estado como "espera, no le ofrezcas entrar", se
+   * queda en "Preparando…" sin salida. Es lo que pasaba con sesión cerrada: la
+   * wallet embebida solo se anuncia por EIP-6963 mientras hay sesión de Privy,
+   * así que sin ella wagmi espera un proveedor que nadie va a anunciar.
+   *
+   * Pasado el tope se deja de esperar y la pantalla ofrece entrar. Si la wallet
+   * aparece después, `isConnected` lo dice y todo sigue: equivocarse por este
+   * lado se corrige solo, por el otro solo se corrige recargando.
+   */
+  const desde = useRef<number | null>(null);
+  const [, setTick] = useState(0);
+
+  if (enganchando && desde.current === null) desde.current = Date.now();
+  if (!enganchando) desde.current = null;
+
+  useEffect(() => {
+    if (!enganchando) return;
+    const t = setTimeout(() => setTick((n) => n + 1), SETTLE_LIMIT_MS + 100);
+    return () => clearTimeout(t);
+  }, [enganchando]);
+
+  const reconnecting =
+    enganchando && !waitingExpired(desde.current, Date.now());
+
   return {
     address: address ? address.toLowerCase() : "",
     isConnected,
-    reconnecting: status === "reconnecting" || status === "connecting",
+    reconnecting,
     connectorName: connector?.name ?? "",
     connector,
     chainId,

@@ -15,6 +15,8 @@ import {
   decideEmbeddedCreation,
   decideWalletIdentity,
   mayTransact,
+  SETTLE_LIMIT_MS,
+  waitingExpired,
   walletToShow,
 } from "../lib/wallet-identity.ts";
 
@@ -262,6 +264,33 @@ console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
   );
   check("de 16 combinaciones, solo una crea", crean.length, 1);
   check("y es la del jugador nuevo", crean[0], [true, false, false, false]);
+}
+
+console.log("\n— Esperar esta bien; esperar SIN TOPE es un cuelgue —");
+{
+  // El sintoma real: sesion cerrada y el lobby en "Preparando..." para siempre.
+  // Pasa cuando wagmi reintenta un conector que ya no puede existir — la
+  // embebida solo se anuncia por EIP-6963 mientras hay sesion de Privy.
+  check("no se espera si no se esta esperando", waitingExpired(null, 10_000), false);
+  check("recien empezado: se espera", waitingExpired(1_000, 1_500), false);
+  check("justo antes del tope: se espera", waitingExpired(0, SETTLE_LIMIT_MS - 1), false);
+  check("en el tope: se deja de esperar", waitingExpired(0, SETTLE_LIMIT_MS), true);
+  check("pasado el tope: se deja de esperar", waitingExpired(0, SETTLE_LIMIT_MS + 5_000), true);
+  // Un tope de verdad, no uno tan largo que no sirva.
+  check("el tope es humano", SETTLE_LIMIT_MS <= 10_000 && SETTLE_LIMIT_MS >= 2_000, true);
+
+  const wallet = readFileSync(join(ROOT, "lib/wallet.ts"), "utf8");
+  check(
+    "el reenganche de wagmi caduca",
+    /waitingExpired\(desde\.current/.test(wallet),
+    true
+  );
+  const perfilCtx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  check(
+    "y la espera a Privy tambien",
+    /privyReady \|\| privyTimedOut/.test(perfilCtx),
+    true
+  );
 }
 
 console.log("\n— Y esta enchufada donde importa —");

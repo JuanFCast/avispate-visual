@@ -13,6 +13,7 @@ import {
   readWalletSession,
   WALLET_SESSION_EVENT,
 } from "./wallet-session-client";
+import { SETTLE_LIMIT_MS } from "./wallet-identity";
 
 interface ProfileState {
   /** Aún cargando el perfil del servidor. */
@@ -67,7 +68,27 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
    * Con sesión de wallet ya está contestada la pregunta y no hay a quién
    * esperar. Sin ella sí hay que esperar a Privy, que es quien sabe.
    */
-  const ready = walletSession || privyReady;
+  /**
+   * Y esta espera también CADUCA.
+   *
+   * Si Privy no termina de arrancar —red mala, SDK atascado— `ready` se quedaba
+   * en falso para siempre y toda la app colgando de él: el lobby en
+   * "Preparando…" sin botón que tocar. Pasado el tope se da por contestada la
+   * pregunta con lo que se sabe (no hay sesión) y el jugador recupera el botón
+   * de entrar. Si Privy aparece luego, esto vuelve a true y la pantalla se
+   * corrige sola.
+   */
+  const [privyTimedOut, setPrivyTimedOut] = useState(false);
+  useEffect(() => {
+    if (privyReady) {
+      setPrivyTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => setPrivyTimedOut(true), SETTLE_LIMIT_MS);
+    return () => clearTimeout(t);
+  }, [privyReady]);
+
+  const ready = walletSession || privyReady || privyTimedOut;
 
   /**
    * Privy manda cuando hay sesión suya: es la identidad más completa (correo,
