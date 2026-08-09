@@ -54,9 +54,22 @@ check(
 
 console.log("\n— El código es el código: sin prefijo ni adornos —");
 
+/*
+ * El PREFIJO, no la subcadena.
+ *
+ * Esto decía `c.includes("AVP")` y fallaba una de cada cinco corridas. No era el
+ * generador: el alfabeto Crockford tiene A, V y P, así que un código aleatorio
+ * de seis símbolos contiene "AVP" en alguna parte con probabilidad ~4/32³ — que
+ * sobre los 2.000 de la muestra sale a un 22% por corrida. La comprobación
+ * acusaba al azar de un defecto que no existía.
+ *
+ * Lo que se quería fijar es que un código generado no arrastre el prefijo viejo,
+ * y eso es `AVP-` al principio. Que aparezcan esas tres letras en medio de un
+ * código es tan irrelevante como cualquier otro trío.
+ */
 check(
-  "ninguno lleva AVP",
-  muestra.some((c) => c.includes("AVP")),
+  "ninguno arrastra el prefijo AVP-",
+  muestra.some((c) => c.startsWith("AVP-")),
   false
 );
 check(
