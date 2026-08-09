@@ -11,6 +11,8 @@ import {
 } from "react";
 import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAccount, useConnect } from "wagmi";
+import { useProfile } from "./profile-context";
+import { decideEmbeddedCreation } from "./wallet-identity";
 
 /**
  * La wallet embebida de Privy, desde que el jugador entra con su correo hasta
@@ -89,6 +91,8 @@ interface LinkedAccountLike {
 export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
   const { ready: privyReady, authenticated, user } = usePrivy();
   const { wallets, ready: walletsReady } = useWallets();
+  // El perfil, que es quien sabe si esta identidad YA tiene wallet.
+  const profile = useProfile();
   const { createWallet } = useCreateWallet();
   const { isConnected } = useAccount();
   const { connect, connectors } = useConnect();
@@ -181,13 +185,28 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
     };
   }, [embedded, embeddedAddress]);
 
-  // 2. Crear la wallet si Privy no la trajo sola. `createOnLogin` debería
-  //    haberla creado al entrar; cuando se atasca, este empujón la destraba sin
-  //    que el jugador tenga que recargar. Solo aplica a quien no tiene NINGUNA
-  //    wallet: el que entró firmando ya trae la suya y no se le crea otra.
+  /**
+   * 2. Crear la wallet — y ahora ESTE es el único sitio que la crea.
+   *
+   * `createOnLogin` está apagado (`wallet-providers.tsx`) porque Privy decidía
+   * mirando su propio registro, que no ve el perfil de Avíspate. Aquí sí se ve,
+   * y la regla es una identidad, una wallet: si el perfil ya tiene dirección no
+   * se crea nada, esté la extensión bloqueada, dormida o sin responder. Eso se
+   * arregla desbloqueándola, no estrenando otra.
+   *
+   * `decideEmbeddedCreation` es pura y está probada aparte; aquí solo se ejecuta
+   * lo que decida.
+   */
+  const creation = decideEmbeddedCreation({
+    profileReady: profile.ready && !profile.loading,
+    canonical: profile.walletAddress,
+    hasEmbedded,
+    hasExternal,
+  });
+
   useEffect(() => {
     if (!privyReady || !authenticated || !walletsReady) return;
-    if (hasEmbedded || hasExternal || createTriedRef.current) return;
+    if (creation.kind !== "create" || createTriedRef.current) return;
     const timer = setTimeout(() => {
       createTriedRef.current = true;
       // Lanza si ya existe o si hay una creación en curso: las dos son buenas
@@ -195,7 +214,7 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
       createWallet().catch(() => {});
     }, CREATE_GRACE_MS);
     return () => clearTimeout(timer);
-  }, [privyReady, authenticated, walletsReady, hasEmbedded, hasExternal, manual, createWallet]);
+  }, [privyReady, authenticated, walletsReady, creation.kind, manual, createWallet]);
 
   // 3. Conectar la embebida a wagmi, y volver a intentarlo mientras no lo esté.
   //    El intento único de antes era el origen del cuelgue: si el conector aún

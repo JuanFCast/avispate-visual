@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
+  decideEmbeddedCreation,
   decideWalletIdentity,
   mayTransact,
   walletToShow,
@@ -159,6 +160,110 @@ console.log("\n— La regla no depende de la sesion ni de wagmi —");
   check("ninguna ajena opera", permisos, [false, false, false, false, false]);
 }
 
+console.log("\n— UNA identidad, UNA wallet: cuando se crea una embebida —");
+{
+  // La regla estricta: si el perfil ya tiene direccion, NUNCA se crea otra.
+  // Ni bloqueada, ni dormida, ni sin responder. Eso se desbloquea, no se
+  // sustituye.
+  check(
+    "PIPERABBY: con canonica no se crea nada",
+    decideEmbeddedCreation({
+      profileReady: true,
+      canonical: RABBY,
+      hasEmbedded: false,
+      hasExternal: false,
+    }),
+    { kind: "never", reason: "has_canonical" }
+  );
+
+  // Este es el escenario exacto que se pregunto: entra por correo, su Rabby
+  // esta solo CONECTADA (no enlazada en Privy), asi que para Privy es un
+  // "usuario sin wallets". Antes eso bastaba para provisionarle una.
+  check(
+    "aunque Privy lo vea como usuario sin wallets",
+    decideEmbeddedCreation({
+      profileReady: true,
+      canonical: RABBY,
+      hasEmbedded: false,
+      hasExternal: false,
+    }).kind,
+    "never"
+  );
+
+  check(
+    "jugador nuevo de verdad: si se le crea",
+    decideEmbeddedCreation({
+      profileReady: true,
+      canonical: null,
+      hasEmbedded: false,
+      hasExternal: false,
+    }),
+    { kind: "create" }
+  );
+
+  check(
+    "ya tiene embebida: no se duplica",
+    decideEmbeddedCreation({
+      profileReady: true,
+      canonical: null,
+      hasEmbedded: true,
+      hasExternal: false,
+    }),
+    { kind: "never", reason: "has_embedded" }
+  );
+
+  check(
+    "entro firmando con la suya: no se le crea otra",
+    decideEmbeddedCreation({
+      profileReady: true,
+      canonical: null,
+      hasEmbedded: false,
+      hasExternal: true,
+    }),
+    { kind: "never", reason: "has_external" }
+  );
+
+  // Falla CERRADO. Crear de mas es irreversible; esperar cuesta segundos.
+  check(
+    "sin perfil todavia: NO se crea nada",
+    decideEmbeddedCreation({
+      profileReady: false,
+      canonical: null,
+      hasEmbedded: false,
+      hasExternal: false,
+    }),
+    { kind: "wait" }
+  );
+  check(
+    "ni siquiera pareciendo un jugador nuevo",
+    decideEmbeddedCreation({
+      profileReady: false,
+      canonical: RABBY,
+      hasEmbedded: false,
+      hasExternal: false,
+    }).kind,
+    "wait"
+  );
+
+  // Un barrido: de todas las combinaciones, solo UNA crea.
+  const combos: boolean[][] = [];
+  for (const ready of [true, false])
+    for (const conCanonica of [true, false])
+      for (const emb of [true, false])
+        for (const ext of [true, false]) combos.push([ready, conCanonica, emb, ext]);
+  const crean = combos.filter(
+    ([ready, conCanonica, emb, ext]) =>
+      decideEmbeddedCreation({
+        profileReady: ready,
+        canonical: conCanonica ? RABBY : null,
+        hasEmbedded: emb,
+        hasExternal: ext,
+      }).kind === "create"
+  );
+  check("de 16 combinaciones, solo una crea", crean.length, 1);
+  check("y es la del jugador nuevo", crean[0], [true, false, false, false]);
+}
+
 console.log("\n— Y esta enchufada donde importa —");
 {
   const perfil = readFileSync(join(ROOT, "app/perfil/page.tsx"), "utf8");
@@ -183,6 +288,27 @@ console.log("\n— Y esta enchufada donde importa —");
   // El invariante, no la forma: la EXTERNA se elige primero. Comprobar que ya
   // no existe el patron viejo no serviria — es subcadena del nuevo, porque la
   // embebida sigue siendo el segundo recurso para quien solo entro por correo.
+  // Las dos vias de creacion que decidian a ciegas.
+  const providers = readFileSync(join(ROOT, "lib/wallet-providers.tsx"), "utf8");
+  check(
+    "Privy ya no crea wallets por su cuenta al entrar",
+    /createOnLogin: "users-without-wallets"/.test(providers),
+    false
+  );
+  check("createOnLogin apagado", /createOnLogin: "off"/.test(providers), true);
+  // El perfil tiene que envolver a la embebida, o la decision se toma a ciegas.
+  check(
+    "el perfil envuelve a la wallet embebida",
+    /<ProfileProvider>[\s\S]*<EmbeddedWalletProvider>/.test(providers),
+    true
+  );
+  check(
+    "la creacion pasa por la regla",
+    /decideEmbeddedCreation\(\{/.test(embebida) &&
+      /creation\.kind !== "create"/.test(embebida),
+    true
+  );
+
   const servidor = readFileSync(join(ROOT, "lib/privy-server.ts"), "utf8");
   check(
     "el servidor prefiere la wallet EXTERNA del jugador",

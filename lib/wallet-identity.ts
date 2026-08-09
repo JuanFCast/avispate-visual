@@ -97,6 +97,69 @@ export function decideWalletIdentity(
   };
 }
 
+/**
+ * ¿Hay que crearle una wallet embebida a este jugador?
+ *
+ * ── Una identidad, una wallet ──────────────────────────────────────────────
+ *
+ * La regla de Avíspate es más estricta que "hay una canónica entre varias": una
+ * identidad tiene UNA wallet. Que la extensión esté bloqueada o no conteste no
+ * es motivo para estrenarle otra — es motivo para pedirle que la desbloquee.
+ *
+ * ── Por qué esta decisión tiene que estar AQUÍ ─────────────────────────────
+ *
+ * Porque es el único sitio que sabe. Las dos vías por las que nacía una embebida
+ * decidían mirando el registro de Privy (`linkedAccounts`), que no sabe nada del
+ * perfil de Avíspate:
+ *
+ *   · Privy al entrar, con `createOnLogin: "users-without-wallets"`.
+ *   · Nuestro propio `createWallet()` de `embedded-wallet.tsx`, a los 6 s.
+ *
+ * Para las dos, un jugador que entra por correo y tiene su Rabby solo CONECTADA
+ * —no enlazada a su cuenta de Privy— es un "usuario sin wallets". Da igual que
+ * su perfil lleve meses apuntando a una dirección con historial y premios: esa
+ * columna no entra en la decisión, y no puede, porque vive en nuestra base.
+ *
+ * Así que la decisión se trae aquí, donde sí se ve el perfil, y las dos vías de
+ * arriba se apagan. Falla CERRADO: mientras no se sepa si hay canónica, no se
+ * crea nada. Crear de más es irreversible —una wallet nueva ya existe— y no
+ * crear a tiempo solo cuesta unos segundos de espera.
+ */
+export type EmbeddedCreation =
+  /** Jugador nuevo de verdad: no tiene ninguna wallet en ningún sitio. */
+  | { kind: "create" }
+  /** Todavía no se sabe. No se crea nada. */
+  | { kind: "wait" }
+  /** Ya tiene wallet. Nunca se le crea otra. */
+  | {
+      kind: "never";
+      reason: "has_canonical" | "has_external" | "has_embedded";
+    };
+
+export function decideEmbeddedCreation(check: {
+  /** ¿Ya llegó el perfil del servidor? Sin él no se sabe si hay canónica. */
+  profileReady: boolean;
+  /** `profiles.wallet_address`. Si existe, no se crea nada jamás. */
+  canonical: string | null;
+  /** Privy ya tiene una embebida para este usuario. */
+  hasEmbedded: boolean;
+  /** El usuario tiene una wallet propia enlazada en Privy. */
+  hasExternal: boolean;
+}): EmbeddedCreation {
+  // Sin saber si tiene canónica no se crea. Es la diferencia entre esperar dos
+  // segundos y regalarle una segunda identidad a alguien que ya tenía la suya.
+  if (!check.profileReady) return { kind: "wait" };
+
+  if (check.hasEmbedded) return { kind: "never", reason: "has_embedded" };
+  if (check.hasExternal) return { kind: "never", reason: "has_external" };
+
+  // La regla nueva, y la que cierra el incidente: el perfil ya tiene wallet.
+  // Que ahora mismo no esté conectada no la borra — hay que desbloquearla.
+  if (norm(check.canonical)) return { kind: "never", reason: "has_canonical" };
+
+  return { kind: "create" };
+}
+
 /** ¿Se puede firmar, pagar o cobrar con lo que hay ahora mismo? */
 export function mayTransact(verdict: WalletIdentityVerdict): boolean {
   return verdict.kind === "ok" || verdict.kind === "no_canonical";

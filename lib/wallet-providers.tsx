@@ -28,8 +28,8 @@ import OutboxBridge from "@/components/OutboxBridge";
  * que el chunk deja de pedirse donde nadie lo necesita.
  *
  * Orden (fuera → dentro):
- *   PrivyProvider → WagmiProvider → RainbowKitProvider → EmbeddedWalletProvider
- *   → ProfileProvider.
+ *   PrivyProvider → WagmiProvider → RainbowKitProvider → ProfileProvider
+ *   → EmbeddedWalletProvider.
  * La identidad y el ranking siguen atados a Privy (correo); wagmi solo gestiona
  * la wallet ACTIVA (embebida o externa) para pagos, balances y premios. El
  * puente entre las dos —crear la embebida y conectarla, con sus reintentos—
@@ -67,7 +67,26 @@ export default function WalletProviders({ children }: { children: ReactNode }) {
           // Sin UIs de Privy: gestionamos la wallet desde nuestra propia UI.
           showWalletUIs: false,
           ethereum: {
-            createOnLogin: "users-without-wallets",
+            /**
+             * APAGADO a propósito, y es lo que cierra el incidente PipeRabby.
+             *
+             * `"users-without-wallets"` suena a lo que queremos y no lo es:
+             * Privy decide quién "no tiene wallets" mirando SU registro
+             * (`linkedAccounts`), que no sabe nada del perfil de Avíspate. Un
+             * jugador que entra por correo con su Rabby solo CONECTADA —no
+             * enlazada a su cuenta de Privy— cuenta como usuario sin wallets, y
+             * se le provisiona una embebida aunque su perfil lleve meses
+             * apuntando a una dirección con historial y premios. Esa columna
+             * vive en nuestra base y Privy no puede consultarla.
+             *
+             * Así que la decisión se toma donde sí se ve el perfil:
+             * `decideEmbeddedCreation` en `wallet-identity.ts`, ejecutada por
+             * `embedded-wallet.tsx`. Un jugador nuevo de verdad sigue teniendo
+             * su embebida — la crea nuestro código en cuanto consta que no
+             * tiene ninguna; uno que ya tiene wallet no recibe una segunda,
+             * esté su extensión bloqueada o no.
+             */
+            createOnLogin: "off",
           },
           solana: {
             createOnLogin: "off",
@@ -77,12 +96,20 @@ export default function WalletProviders({ children }: { children: ReactNode }) {
     >
       <WagmiProvider config={wagmiConfig}>
         <RainbowKitProvider modalSize="compact">
-          <EmbeddedWalletProvider>
-            <MiniPayBridge />
-            <WelcomeGasBridge />
-            <OutboxBridge />
-            <ProfileProvider>{children}</ProfileProvider>
-          </EmbeddedWalletProvider>
+          {/* El perfil va POR FUERA de la wallet embebida, y ese orden es
+              parte del arreglo: quien decide si hay que crear una embebida
+              necesita saber si esta identidad ya tiene wallet, y eso lo sabe
+              el perfil. Al revés —como estaba— la decisión se tomaba a ciegas.
+              `ProfileProvider` no depende de la embebida: se apoya en Privy y
+              en la sesión de wallet, las dos ya disponibles aquí. */}
+          <ProfileProvider>
+            <EmbeddedWalletProvider>
+              <MiniPayBridge />
+              <WelcomeGasBridge />
+              <OutboxBridge />
+              {children}
+            </EmbeddedWalletProvider>
+          </ProfileProvider>
         </RainbowKitProvider>
       </WagmiProvider>
     </PrivyProvider>
