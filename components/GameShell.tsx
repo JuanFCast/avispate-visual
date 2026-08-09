@@ -220,6 +220,29 @@ export default function GameShell() {
    * el ranking. Cuando ambas identidades son la misma persona con una sola
    * dirección —el caso normal— los dos valores coinciden y el orden da igual;
    * importa cuando no: sesión de correo con una wallet externa distinta.
+   *
+   * ── Sobre el `?? ""`, que TIENE la forma del bug pero no lo es ────────────
+   *
+   * Mientras las dos fuentes cargan esto es cadena vacía, o sea el patrón de
+   * "no lo sé disfrazado de no hay" que se persiguió por toda la app. Se revisó
+   * hasta el final y aquí no hace daño, por tres cosas que hay que conservar
+   * juntas — si alguna se toca, sí lo haría:
+   *
+   *   1. Sus DOS consumidores lo absorben: `handleStart` hace
+   *      `currentAlias || playerName` y la bandeja `currentAlias || undefined`.
+   *      La cadena vacía nunca se persiste ni viaja: se convierte en el nombre
+   *      tecleado o en "no mando alias".
+   *   2. Quien decide no es esta cadena. `checkAliasBeforePaying` pregunta
+   *      PRIMERO al servidor por la dirección (`/api/wallet-alias`) y, si esa
+   *      wallet ya tiene nombre, devuelve `ok` sin llegar a mirar el alias que
+   *      se le pasó. Un jugador con nombre nunca recibe `needs_name` por esto.
+   *   3. Y cuando sí se mira —wallet estrenando, sin nombre en el servidor—
+   *      `needs_name` es la respuesta correcta: esa wallet necesita uno.
+   *
+   * El camino que lo hacía sospechoso es real: "jugar otra vez" en la pantalla
+   * de resultados llama a `handleStart` sin pasar por el CTA del lobby, que es
+   * quien exige alias antes de ofrecer jugar. Pero por (2) el veredicto sigue
+   * saliendo del servidor y de la wallet, no de este valor.
    */
   const currentAlias = walletAlias ?? profile.alias ?? "";
 
