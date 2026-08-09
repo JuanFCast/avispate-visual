@@ -12,6 +12,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
+  canonicalFromProfile,
   decideEmbeddedCreation,
   decideWalletIdentity,
   mayTransact,
@@ -289,6 +290,83 @@ console.log("\n— Esperar esta bien; esperar SIN TOPE es un cuelgue —");
   check(
     "y la espera a Privy tambien",
     /privyReady \|\| privyTimedOut/.test(perfilCtx),
+    true
+  );
+}
+
+console.log("\n— Un perfil que NO cargo no es un perfil vacio —");
+{
+  // El caso que se vio en produccion: `refresh()` hacia `catch { setState(EMPTY) }`
+  // y EMPTY es `alias: null, walletAddress: null`. Como `authenticated` se
+  // calcula aparte y seguia en true, un fallo de carga quedaba indistinguible
+  // de "jugador nuevo sin nada": se le pedia alias a quien ya tenia el suyo, y
+  // de paso el guardian de pago se apagaba.
+  const cargado = {
+    ready: true,
+    loading: false,
+    failed: false,
+    authenticated: true,
+    walletAddress: RABBY,
+  };
+
+  check("perfil cargado: se sabe cual es", canonicalFromProfile(cargado), {
+    status: "known",
+    address: RABBY,
+  });
+
+  check(
+    "perfil que FALLO: no se sabe, no se autoriza",
+    canonicalFromProfile({ ...cargado, failed: true, walletAddress: null }),
+    { status: "loading" }
+  );
+
+  check(
+    "perfil cargando: tampoco se sabe",
+    canonicalFromProfile({ ...cargado, loading: true, walletAddress: null }),
+    { status: "loading" }
+  );
+
+  // Y la distincion que importa: sin sesion SI se sabe que no hay perfil, y un
+  // jugador nuevo autenticado SI puede estrenar wallet. `none` no es `loading`.
+  check(
+    "sin sesion: se sabe que no hay",
+    canonicalFromProfile({ ...cargado, authenticated: false, walletAddress: null }),
+    { status: "none" }
+  );
+  check(
+    "jugador nuevo con sesion: se sabe que aun no tiene",
+    canonicalFromProfile({ ...cargado, walletAddress: null }),
+    { status: "none" }
+  );
+  check(
+    "todavia arrancando: no se sabe",
+    canonicalFromProfile({ ...cargado, ready: false }),
+    { status: "loading" }
+  );
+
+  // El fallo NO puede colarse como "no tiene wallet" por ninguna combinacion.
+  const conFallo = [true, false].flatMap((loading) =>
+    [RABBY, null].map((w) =>
+      canonicalFromProfile({ ...cargado, failed: true, loading, walletAddress: w })
+    )
+  );
+  check(
+    "con fallo, siempre 'no lo se'",
+    conFallo.every((v) => v.status === "loading"),
+    true
+  );
+
+  const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  check("el fallo se guarda como tal", /const FAILED: ProfileState/.test(ctx), true);
+  check(
+    "y el catch ya no lo guarda como vacio",
+    /catch \{\s*setState\(EMPTY\);/.test(ctx),
+    false
+  );
+  const lobby2 = readFileSync(join(ROOT, "components/lobby/HomeLobby.tsx"), "utf8");
+  check(
+    "el lobby ofrece reintentar en vez de pedir alias",
+    /profile\.authenticated && profile\.failed/.test(lobby2),
     true
   );
 }

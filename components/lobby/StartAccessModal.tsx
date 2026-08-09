@@ -59,8 +59,13 @@ export default function StartAccessModal({
     !inMiniPay && !wallet.reconnecting && walletAuth.needsSignature;
   const signing = walletAuth.stage !== null;
 
+  // `!profile.failed` por lo mismo que en el lobby: un perfil que no cargó no
+  // es un perfil sin alias, y pedírselo a quien ya tiene uno es el bug.
   const needsEmailAlias =
-    profile.authenticated && !profile.loading && !profile.alias;
+    profile.authenticated &&
+    !profile.loading &&
+    !profile.failed &&
+    !profile.alias;
   /**
    * Se pide alias para la wallet cuando ya se confirmó que no tiene ninguno.
    *

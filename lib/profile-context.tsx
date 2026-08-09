@@ -18,6 +18,14 @@ import { SETTLE_LIMIT_MS } from "./wallet-identity";
 interface ProfileState {
   /** Aún cargando el perfil del servidor. */
   loading: boolean;
+  /**
+   * La carga del perfil FALLÓ. Distinto de "cargado y vacío", y esa distinción
+   * es la que faltaba: antes un fallo se guardaba como `EMPTY` —alias null,
+   * wallet null— y quedaba indistinguible de un jugador nuevo. A quien tenía
+   * alias y wallet de siempre se le pedía alias, y el guardián de pago se
+   * apagaba porque leía `walletAddress: null` como "no tiene ninguna".
+   */
+  failed: boolean;
   /** Alias del jugador, o null si todavía no lo eligió. */
   alias: string | null;
   /** Wallet embebida en minúsculas, o null. */
@@ -36,7 +44,16 @@ interface ProfileContextValue extends ProfileState {
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
 
-const EMPTY: ProfileState = { loading: false, alias: null, walletAddress: null };
+/** Sin sesión: no hay perfil, y eso SÍ se sabe. */
+const EMPTY: ProfileState = {
+  loading: false,
+  failed: false,
+  alias: null,
+  walletAddress: null,
+};
+
+/** Había sesión y el perfil no se pudo cargar. No es lo mismo que vacío. */
+const FAILED: ProfileState = { ...EMPTY, failed: true };
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
   const { ready: privyReady, authenticated: privyAuth, getAccessToken } = usePrivy();
@@ -110,8 +127,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     }
     setState((s) => ({ ...s, loading: true }));
     const token = await getToken();
+    // Hay sesión pero no se pudo sacar el token: tampoco se sabe nada del
+    // perfil. Es un fallo, no un perfil vacío.
     if (!token) {
-      setState(EMPTY);
+      setState(FAILED);
       return;
     }
     try {
@@ -122,11 +141,12 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
       setState({
         loading: false,
+        failed: false,
         alias: data.alias ?? null,
         walletAddress: data.walletAddress ?? null,
       });
     } catch {
-      setState(EMPTY);
+      setState(FAILED);
     }
   }, [authenticated, getToken]);
 

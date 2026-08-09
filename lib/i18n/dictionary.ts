@@ -174,6 +174,10 @@ export const en = {
 
   "cta.checking.support": "Checking your entry…",
   "cta.checking.label": "Getting ready…",
+  // El perfil no cargó. No se le pide alias a quien ya tiene uno: se reintenta.
+  "cta.profile_failed.support":
+    "We couldn't load your account. Your name and your wallet are safe.",
+  "cta.profile_failed.label": "Try again",
   "cta.free.support": "Your free game on this deck is ready today.",
   "cta.free.label": "Play free",
   "cta.paid.support": "Entry {fee} USDT · 80% goes to the prize.",
@@ -957,6 +961,9 @@ export const es: Record<MessageKey, string> = {
 
   "cta.checking.support": "Comprobando tu entrada…",
   "cta.checking.label": "Preparando…",
+  "cta.profile_failed.support":
+    "No pudimos cargar tu cuenta. Tu nombre y tu billetera están a salvo.",
+  "cta.profile_failed.label": "Reintentar",
   "cta.free.support": "Tu partida gratis de hoy en este mazo está lista.",
   "cta.free.label": "Jugar gratis",
   "cta.paid.support": "Entrada {fee} USDT · 80% va al premio.",

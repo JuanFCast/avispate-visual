@@ -186,6 +186,21 @@ export default function HomeLobby({
     // entrar. Es un parpadeo corto, pero es el que hace pensar al jugador que
     // la sesión no se guardó.
     if (wallet.reconnecting) return checking;
+    /**
+     * El perfil no se pudo cargar. NO es un jugador sin alias.
+     *
+     * Antes daban lo mismo: `refresh()` guardaba `EMPTY` al fallar y esta rama
+     * leía `alias: null` como "elige un nombre" — a alguien que lleva meses con
+     * el suyo. Se ofrece reintentar, que es lo que de verdad falta.
+     */
+    if (profile.authenticated && profile.failed) {
+      return {
+        support: t("cta.profile_failed.support"),
+        label: t("cta.profile_failed.label"),
+        disabled: false,
+        action: "reload",
+      };
+    }
     if (profile.authenticated) {
       if (!profile.alias) {
         return {
@@ -273,6 +288,7 @@ export default function HomeLobby({
           if (cta.action === "access") return onRequestAccess();
           if (cta.action === "connect") return openConnectModal?.();
           if (cta.action === "retry") return embeddedWallet.retry();
+          if (cta.action === "reload") return void profile.refresh();
           onStart(deckSize);
         }}
         onShowHowTo={onShowHowTo}

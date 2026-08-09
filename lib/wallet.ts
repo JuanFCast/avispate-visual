@@ -6,6 +6,7 @@ import { useAccount, type Connector } from "wagmi";
 import { useProfile } from "./profile-context";
 import type { CanonicalWallet } from "./pay-guard";
 import {
+  canonicalFromProfile,
   decideWalletIdentity,
   mayTransact,
   SETTLE_LIMIT_MS,
@@ -163,15 +164,14 @@ export function useWalletIdentity(): {
  * que es el error que este tipo existe para hacer imposible.
  */
 export function useCanonicalWallet(): CanonicalWallet {
-  const { ready, loading, authenticated, walletAddress } = useProfile();
-
-  // Sin saber si hay sesión, o con el perfil en vuelo: no se sabe.
-  if (!ready || (authenticated && loading)) return { status: "loading" };
-  // Sin sesión no hay perfil que respetar: la wallet conectada es la identidad.
-  if (!authenticated) return { status: "none" };
-  return walletAddress
-    ? { status: "known", address: walletAddress }
-    : { status: "none" };
+  const { ready, loading, failed, authenticated, walletAddress } = useProfile();
+  return canonicalFromProfile({
+    ready,
+    loading,
+    failed,
+    authenticated,
+    walletAddress,
+  });
 }
 
 /** `0x1234…abcd`: dirección abreviada para mostrar en la UI. */

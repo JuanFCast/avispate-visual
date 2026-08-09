@@ -34,7 +34,9 @@ export interface CtaState {
    * "connect" abre el conector de wallets y "retry" vuelve a intentar crear o
    * conectar la wallet embebida.
    */
-  action: "start" | "access" | "connect" | "retry" | "resume";
+  // "reload" vuelve a pedir el perfil cuando su carga falló — que NO es lo
+  // mismo que un jugador sin alias, aunque antes se vieran igual.
+  action: "start" | "access" | "connect" | "retry" | "resume" | "reload";
 }
 
 interface Props {

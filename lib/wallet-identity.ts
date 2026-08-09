@@ -191,6 +191,40 @@ export function waitingExpired(
   return now - since >= limitMs;
 }
 
+/**
+ * El perfil, traducido a los tres estados de la wallet canónica.
+ *
+ * Pura para poder probarla, y en un solo sitio para que ninguna pantalla vuelva
+ * a deducirlo por su cuenta.
+ *
+ * El caso que la hizo falta: `refresh()` en `profile-context` hacía
+ * `catch { setState(EMPTY) }`, y `EMPTY` es `alias: null, walletAddress: null`.
+ * Como `authenticated` se calcula aparte y seguía en true, **un fallo al cargar
+ * el perfil quedaba indistinguible de "usuario nuevo sin nada"**. A un jugador
+ * con alias y wallet de siempre se le pedía alias, y de paso el guardián de pago
+ * se apagaba —`walletAddress` null se leía como "no tiene wallet anotada"—.
+ *
+ * Por eso `failed` entra aquí y sale como `loading`: no es que no tenga wallet,
+ * es que no lo sabemos. Y no saber nunca autoriza.
+ */
+export function canonicalFromProfile(p: {
+  ready: boolean;
+  loading: boolean;
+  failed: boolean;
+  authenticated: boolean;
+  walletAddress: string | null;
+}):
+  | { status: "loading" }
+  | { status: "none" }
+  | { status: "known"; address: string } {
+  if (!p.ready) return { status: "loading" };
+  if (p.authenticated && (p.loading || p.failed)) return { status: "loading" };
+  if (!p.authenticated) return { status: "none" };
+  return p.walletAddress
+    ? { status: "known", address: p.walletAddress }
+    : { status: "none" };
+}
+
 /** ¿Se puede firmar, pagar o cobrar con lo que hay ahora mismo? */
 export function mayTransact(verdict: WalletIdentityVerdict): boolean {
   return verdict.kind === "ok" || verdict.kind === "no_canonical";
