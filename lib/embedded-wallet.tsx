@@ -39,8 +39,20 @@ export const EMBEDDED_INFO = {
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23FFC20E'/%3E%3C/svg%3E",
 };
 
-/** Lo que Privy suele tardar en crear la wallet antes de que valga la pena empujar. */
-const CREATE_GRACE_MS = 6_000;
+/**
+ * Lo que se espera antes de crear la wallet.
+ *
+ * Eran 6 segundos, y tenían sentido cuando Privy creaba la wallet al entrar y
+ * esto era solo un empujón por si se atascaba: había que darle tiempo a llegar
+ * antes de pedir una segunda. Desde que `createOnLogin` está apagado, ese margen
+ * es tiempo muerto puro — nadie más va a crear nada, y el jugador se queda
+ * mirando "Preparando…" seis segundos por nada.
+ *
+ * Queda una espera corta y por otro motivo: `decideEmbeddedCreation` puede
+ * oscilar un instante mientras el perfil se recarga (`loading` sube y baja), y
+ * esto absorbe ese parpadeo sin que se note.
+ */
+const CREATE_GRACE_MS = 400;
 /** Entre intentos de conexión. Un bloque de Celo dura ~1 s; esto es de sobra. */
 const CONNECT_RETRY_MS = 4_000;
 /** A partir de aquí ya no es lentitud: se le ofrece al jugador reintentar. */
