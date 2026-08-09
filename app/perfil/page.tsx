@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { useDisconnect } from "wagmi";
 import { shortAddress, useActiveWallet, useWalletIdentity } from "@/lib/wallet";
+import { logoutEverything } from "@/lib/logout";
 import { USDT_DECIMALS } from "@/lib/contracts";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileStats from "@/components/profile/ProfileStats";
@@ -75,13 +76,26 @@ export default function PerfilPage() {
     Number(stats.totalWonUnits) / 10 ** USDT_DECIMALS
   ).toFixed(2);
 
+  /**
+   * Cerrar sesión de verdad: el navegador deja de ser nadie.
+   *
+   * Antes esto desconectaba, cerraba Privy y navegaba con `router.push`, que no
+   * recarga: la sesión sin firma seguía en `localStorage` —nadie llamaba nunca a
+   * `clearWalletSession`— y wagmi conservaba su conexión guardada para volver a
+   * engancharla al montar. O sea, media identidad sobrevivía al logout.
+   *
+   * Todo lo que borra y, sobre todo, lo que NO borra, está en `lib/logout.ts`.
+   */
   async function handleLogout() {
-    try {
-      if (isConnected) disconnect();
-      if (authenticated) await logout();
-    } finally {
-      router.push("/");
-    }
+    await logoutEverything({
+      privyLogout: logout,
+      disconnect,
+      storageKeys: () => Object.keys(window.localStorage),
+      removeKey: (k) => window.localStorage.removeItem(k),
+      // `replace` y no `assign`: el "atrás" del teléfono no puede devolver a la
+      // pantalla de un perfil del que se acaba de salir.
+      reload: () => window.location.replace("/"),
+    });
   }
 
   if (!ready) {
