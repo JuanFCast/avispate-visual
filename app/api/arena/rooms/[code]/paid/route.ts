@@ -127,6 +127,7 @@ export async function POST(req: Request, ctx: Ctx) {
       profileId: profile.id,
       address: check.player,
       txHash,
+      maxPlayers: room.max_players,
     });
 
     if (written.status === "conflict") {

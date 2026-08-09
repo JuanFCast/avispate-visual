@@ -141,6 +141,16 @@ export interface MatchStakes {
   /** `true` solo si la mesa cobra de verdad: tiene mesa en el contrato. */
   paid: boolean;
   /**
+   * La mesa en el contrato, o `null` en una gratis.
+   *
+   * La pantalla de partida lo necesita para una cosa concreta: el secreto de la
+   * silla se guarda POR MESA, y sin este dato no habría forma de encontrarlo
+   * para pedir una ficha nueva cuando la vieja vence a mitad de partida
+   * (`arena-seat-recovery.ts`). No revela nada: se deriva de datos que ya son
+   * públicos —código, entrada y sillas— y la sala ya lo manda.
+   */
+  tableId: string | null;
+  /**
    * El pago del premio. `null` mientras no se haya reclamado; con `txHash` en
    * `null`, reclamado pero todavía sin confirmar en la cadena. Los dos primeros
    * estados se le cuentan igual al ganador —"va en camino"—, pero se distinguen

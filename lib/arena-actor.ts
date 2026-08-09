@@ -1,77 +1,20 @@
 import { NextResponse } from "next/server";
 import { requireIdentity } from "./http";
 import { requireSeat } from "./arena-guard";
+import { decideActor, type ActorRefusal } from "./arena-seat";
 import { getRoomByCode, type RoomRow } from "./supabase/arena-rooms";
 import { seatProfileOf } from "./supabase/arena-escrow-db";
 import { ensureProfile } from "./supabase/profiles";
 
 /**
- * Quién está actuando sobre una sala, y por qué autoridad.
+ * Resolver quién actúa sobre una sala: la parte que habla HTTP y base de datos.
  *
- * ── La regla, acordada el 2026-08-08 ───────────────────────────────────────
- *
- * **En una mesa con entrada manda la wallet que probó la ficha de silla, no el
- * perfil de la sesión.** La silla la paga una dirección y la prueba un secreto
- * que solo su dueño tiene; la sesión no participa en ninguna de las dos cosas.
- *
- * Es la mitad que faltaba de la decisión de `/rooms/[code]/paid`. Registrar la
- * silla dejó de necesitar sesión, pero si JUGARLA seguía dependiendo de
- * `profile_id`, el problema solo se movía de sitio: un jugador de Privy cuyo
- * perfil no tuviera escrita la dirección con la que pagó acababa con la silla
- * en un perfil y la sesión en otro, registrado y sin poder tocar el botón de
- * listo. Pagó, y la aplicación no lo reconoce. Ese final es el que no puede
- * existir.
- *
- * Así que en una mesa con entrada el perfil sale de la SILLA: se busca la fila
- * cuya `wallet_address` es la que la ficha probó, y se actúa como ella. El
- * perfil pasa a ser lo que siempre debió ser aquí —una etiqueta para el alias y
- * las estadísticas— y deja de gobernar el permiso. Ni un fallo de Privy ni dos
- * perfiles de la misma persona pueden interponerse: ninguno de los dos entra en
- * la decisión.
- *
- * En una mesa gratis no hay ficha ni dirección que probar, así que manda la
- * sesión, exactamente como hasta hoy.
+ * **La regla vive en `arena-seat.ts` (`decideActor`), no aquí**, y esa
+ * separación es a propósito: este archivo importa `next/server`, así que todo
+ * lo que viva en él queda fuera del alcance de un `node scripts/verify-*.ts`.
+ * Una regla que decide quién puede jugar una silla pagada tiene que poder
+ * correrse sola, sin servidor. Aquí solo se juntan los ingredientes.
  */
-
-export type ActorRefusal =
-  /** Mesa gratis sin sesión válida. */
-  | "unauthorized"
-  /**
-   * Mesa con entrada: la ficha vale, pero de esa dirección no consta silla.
-   * Es "termina de registrar el pago", no "no tienes permiso" — y por eso es
-   * un 409 y no un 403: la respuesta es reintentar `/paid`, que no cobra nada.
-   */
-  | "seat_not_registered";
-
-export type ActorVerdict =
-  | { ok: true; profileId: string }
-  | { ok: false; error: ActorRefusal };
-
-/**
- * La decisión, sin red ni base de datos, para poder correrla entera desde
- * `scripts/verify-arena-actor.ts`.
- *
- * Lo que hay que leer aquí es lo que NO aparece: en el camino de una mesa con
- * entrada, `sessionProfileId` no se mira ni una vez. No es que se prefiera la
- * silla y se caiga a la sesión si falta — es que la sesión no puede decidir
- * quién juega una silla pagada, ni cuando existe ni cuando falta.
- */
-export function decideActor(check: {
-  /** ¿Esta sala cobra entrada? */
-  escrowed: boolean;
-  /** Perfil de la sesión, si vino y valía. Solo cuenta en mesas gratis. */
-  sessionProfileId: string | null;
-  /** Perfil dueño de la silla cuya dirección probó la ficha. */
-  seatProfileId: string | null;
-}): ActorVerdict {
-  if (check.escrowed) {
-    if (!check.seatProfileId) return { ok: false, error: "seat_not_registered" };
-    return { ok: true, profileId: check.seatProfileId };
-  }
-
-  if (!check.sessionProfileId) return { ok: false, error: "unauthorized" };
-  return { ok: true, profileId: check.sessionProfileId };
-}
 
 const STATUS: Record<ActorRefusal, number> = {
   unauthorized: 401,

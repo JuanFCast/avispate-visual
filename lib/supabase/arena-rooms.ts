@@ -22,6 +22,7 @@ import {
   type RoomView,
 } from "../arena-rooms";
 import { deckModeFor, isDealValid, type DeckMode } from "../arena-deck";
+import { decideRoomJoin } from "../arena-seating";
 import { seatIsDroppable } from "../arena-start";
 import { getSupabaseAdmin } from "./server";
 import { escrowConfigured, tableIdFor } from "../arena-escrow";
@@ -270,6 +271,12 @@ export async function createRoom(params: {
  *
  * Volver a entrar a la sala en la que ya estás no es un error: es lo que pasa
  * al recargar, y devuelve la misma silla.
+ *
+ * **En una mesa con entrada esto no sienta a nadie, nunca.** Ahí la silla la
+ * crea el pago verificado en la cadena y ninguna otra cosa; el porqué completo
+ * —y el ataque que lo hacía falta— está en `lib/arena-seating.ts`. Se rechaza
+ * antes de tocar la sala, para que ni un reintento ni una carrera puedan
+ * colarse por debajo.
  */
 export async function joinRoom(params: {
   profileId: string;
@@ -279,6 +286,10 @@ export async function joinRoom(params: {
   const room = await getRoomByCode(params.code);
   if (!room) return fail("room_not_found");
   if (!roomIsLive(room)) return fail("room_closed");
+  // La mesa paga se rechaza aquí arriba y no dentro del bucle: no depende de
+  // cuántos haya sentados ni de quién pregunte, así que no tiene por qué
+  // volver a mirarse en cada vuelta.
+  if (room.table_id) return fail("room_is_paid");
 
   for (let attempt = 0; attempt < 6; attempt++) {
     const players = await pruneAndListPlayers(room);
@@ -289,18 +300,20 @@ export async function joinRoom(params: {
     // Pudo cerrarse al caerse el anfitrión durante la limpieza.
     const fresh = await getRoomByCode(params.code);
     if (!fresh || !roomIsLive(fresh)) return fail("room_closed");
-    if (players.length >= room.max_players) return fail("room_full");
 
-    const taken = new Set(players.map((p) => p.seat));
-    let seat = 0;
-    while (taken.has(seat)) seat++;
+    const verdict = decideRoomJoin({
+      tableId: fresh.table_id ?? null,
+      taken: players.map((p) => p.seat),
+      maxPlayers: room.max_players,
+    });
+    if (!verdict.ok) return fail(verdict.error);
 
     await leaveAllRooms(params.profileId);
 
     const { error } = await db.from("arena_room_players").insert({
       room_id: room.id,
       profile_id: params.profileId,
-      seat,
+      seat: verdict.seat,
       is_host: false,
       is_ready: false,
     });

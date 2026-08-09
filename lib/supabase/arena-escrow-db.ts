@@ -1,5 +1,6 @@
 import { getSupabaseAdmin } from "./server";
 import { classifySeatWrite } from "../arena-idempotency";
+import { firstFreeSeat } from "../arena-seating";
 
 /**
  * El registro de que el dinero de la Arena se movió: pagos por silla,
@@ -109,11 +110,17 @@ export async function seatPaidPlayer(params: {
   profileId: string;
   address: string;
   txHash: string;
+  maxPlayers: number;
 }): Promise<EscrowWrite> {
   let last: EscrowWrite = { status: "conflict", reason: "seat_taken" };
 
   for (let attempt = 0; attempt < 6; attempt++) {
-    const seat = await nextFreeSeat(params.roomId);
+    const seat = await nextFreeSeat(params.roomId, params.maxPlayers);
+    // Sin asiento libre no se fuerza uno fuera de rango: eso reventaba contra
+    // el `check` de la base y salía como 500. Se dice que la mesa está llena,
+    // que es lo que pasa, y queda a la vista en vez de parecer una avería.
+    if (seat === null) return { status: "conflict", reason: "room_full" };
+
     last = await recordSeatPayment({ ...params, seat });
     if (last.status !== "conflict" || last.reason !== "seat_taken") return last;
   }
@@ -210,15 +217,31 @@ export async function settlementOf(tableId: string): Promise<{
   return data ?? null;
 }
 
-/** El siguiente asiento libre de una sala. La carrera la arbitra el índice único. */
-export async function nextFreeSeat(roomId: string): Promise<number> {
+/**
+ * El primer asiento libre de una sala, o `null` si no queda.
+ *
+ * Se leen TODOS los asientos y se busca el primer hueco, en vez de pedir el
+ * mayor y sumarle uno. Con `max + 1`, unos asientos {0, 1, 2, 3} daban 4 —que
+ * la base rechaza por `check (seat between 0 and 3)`— y ese rechazo no es un
+ * conflicto reintentable sino una excepción: en `/paid` salía como un 500
+ * permanente delante de alguien que ya había pagado su entrada. La regla vive
+ * en `firstFreeSeat` para poder probarla con huecos sin tocar la base.
+ *
+ * La carrera la sigue arbitrando el índice único `(room_id, seat)`: esto mira,
+ * y entre mirar y escribir cabe otro. Por eso quien llama reintenta.
+ */
+export async function nextFreeSeat(
+  roomId: string,
+  maxPlayers: number
+): Promise<number | null> {
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("arena_room_players")
     .select("seat")
-    .eq("room_id", roomId)
-    .order("seat", { ascending: false })
-    .limit(1);
+    .eq("room_id", roomId);
   if (error) throw error;
-  return data?.length ? Number(data[0].seat) + 1 : 0;
+  return firstFreeSeat(
+    (data ?? []).map((row) => Number(row.seat)),
+    maxPlayers
+  );
 }

@@ -7,9 +7,9 @@
 // caso que más importa aquí es el de la sesión ausente o ajena — los dos tienen
 // que dar exactamente el mismo resultado que la sesión correcta.
 //
-// Correr con:  npx tsx scripts/verify-arena-actor.ts
+// Correr: node scripts/verify-arena-actor.ts
 
-import { decideActor } from "../lib/arena-actor";
+import { decideActor } from "../lib/arena-seat.ts";
 
 let fallos = 0;
 

@@ -13,6 +13,9 @@ const STATUS: Record<string, number> = {
   room_not_found: 404,
   room_closed: 410,
   room_full: 409,
+  // La sala cobra: aquí no se sienta nadie. No es "no puedes", es "esta no es
+  // la puerta" — la silla la crea el pago (`lib/arena-seating.ts`).
+  room_is_paid: 409,
 };
 
 /**

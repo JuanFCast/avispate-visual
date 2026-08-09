@@ -314,6 +314,8 @@ export const en = {
   "room.error.seat_not_registered":
     "Your entry is paid, but the seat wasn't registered yet. Reload the room to finish — you won't be charged again.",
   "room.error.slow_down": "Too many attempts. Wait a moment and try again.",
+  "room.error.room_is_paid":
+    "This table charges an entry. Pay it to take your seat — there's no other way in.",
   "room.guest.waiting_host": "Everyone is ready. Waiting for the host to deal…",
   "room.start.cta": "Start the match",
   // Qué falta, con cifras: "Waiting for 1 player…" se entiende sin contar
@@ -1073,6 +1075,8 @@ export const es: Record<MessageKey, string> = {
   "room.error.seat_not_registered":
     "Tu entrada está pagada, pero la silla todavía no quedó registrada. Recarga la sala para terminar — no se te vuelve a cobrar.",
   "room.error.slow_down": "Demasiados intentos. Espera un momento y vuelve a probar.",
+  "room.error.room_is_paid":
+    "Esta mesa cobra entrada. Págala para tomar tu silla — no hay otra forma de entrar.",
   "room.guest.waiting_host":
     "Ya están todos listos. Esperando a que el anfitrión reparta…",
   "room.start.cta": "Iniciar partida",

@@ -77,6 +77,11 @@ export type RoomError =
   | "room_not_found"
   | "room_closed"
   | "room_full"
+  /**
+   * La sala cobra entrada: por la puerta de "entrar" no se crea silla. Se paga
+   * y la crea el pago. Ver `lib/arena-seating.ts`.
+   */
+  | "room_is_paid"
   | "not_in_room"
   | "not_host"
   | "unauthorized"

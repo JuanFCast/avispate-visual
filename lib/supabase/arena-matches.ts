@@ -456,6 +456,7 @@ async function stakesOf(
       entryUnits: terms ? terms.entryUnits.toString() : "0",
       prizeUnits: "0",
       paid: false,
+      tableId: null,
       payout: null,
     };
   }
@@ -465,6 +466,7 @@ async function stakesOf(
     entryUnits: terms.entryUnits.toString(),
     prizeUnits: prize.winnerUnits.toString(),
     paid: true,
+    tableId: terms.tableId,
     payout: match.finished_at ? await payoutOf(terms.tableId) : null,
   };
 }

@@ -29,6 +29,7 @@ const TEXTS: Record<string, MessageKey> = {
   room_not_found: "room.error.not_found",
   room_closed: "room.error.closed",
   room_full: "room.error.full",
+  room_is_paid: "room.error.room_is_paid",
   /**
    * Los rechazos de repartir. El de la mesa incompleta lleva además la frase
    * que hace falta en ese momento exacto: que la entrada sigue guardada. Quien
