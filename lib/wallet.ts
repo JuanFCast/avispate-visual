@@ -2,6 +2,13 @@
 
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAccount, type Connector } from "wagmi";
+import { useProfile } from "./profile-context";
+import {
+  decideWalletIdentity,
+  mayTransact,
+  walletToShow,
+  type WalletIdentityVerdict,
+} from "./wallet-identity";
 
 export interface EmbeddedWalletState {
   /** Privy terminó de hidratar el estado de sesión. */
@@ -69,6 +76,47 @@ export function useActiveWallet(): ActiveWalletState {
     connectorName: connector?.name ?? "",
     connector,
     chainId,
+  };
+}
+
+/**
+ * La identidad de wallet del jugador, ya resuelta: canónica contra conectada.
+ *
+ * Es el único sitio del que deberían salir "qué dirección enseño" y "puede
+ * operar". Antes cada pantalla elegía por su cuenta: las estadísticas venían del
+ * perfil del servidor y la tarjeta de cartera de wagmi, así que una embebida
+ * creada por accidente podía enseñar su saldo bajo el perfil de otra wallet.
+ * La regla y su porqué están en `wallet-identity.ts`, que es puro y probado.
+ */
+export function useWalletIdentity(): {
+  verdict: WalletIdentityVerdict;
+  /** La que debe mirar la pantalla: saldos, cartera, premios. */
+  shown: string | null;
+  /** ¿Se puede firmar, pagar o cobrar ahora mismo? */
+  canTransact: boolean;
+  /** La del perfil, la que cobra. */
+  canonical: string | null;
+  /** Lo que wagmi tiene puesto. */
+  connected: string | null;
+} {
+  const { walletAddress, ready: profileReady } = useProfile();
+  const { address, isConnected, reconnecting } = useActiveWallet();
+
+  // "Ya terminamos de mirar" es que el perfil llegó Y wagmi dejó de reengancharse.
+  // Adelantarse a cualquiera de las dos haría parpadear un aviso de "conecta tu
+  // cartera" a quien la tiene puesta.
+  const verdict = decideWalletIdentity({
+    canonical: walletAddress,
+    connected: isConnected ? address : null,
+    ready: profileReady && !reconnecting,
+  });
+
+  return {
+    verdict,
+    shown: walletToShow(verdict),
+    canTransact: mayTransact(verdict),
+    canonical: walletAddress,
+    connected: isConnected ? address : null,
   };
 }
 

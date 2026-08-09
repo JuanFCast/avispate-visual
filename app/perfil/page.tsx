@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { usePrivy } from "@privy-io/react-auth";
 import { useDisconnect } from "wagmi";
-import { useActiveWallet } from "@/lib/wallet";
+import { shortAddress, useActiveWallet, useWalletIdentity } from "@/lib/wallet";
 import { USDT_DECIMALS } from "@/lib/contracts";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileStats from "@/components/profile/ProfileStats";
@@ -35,6 +35,7 @@ export default function PerfilPage() {
   const router = useRouter();
   const { ready, authenticated, logout, getAccessToken } = usePrivy();
   const { address, isConnected } = useActiveWallet();
+  const { verdict, shown: shownWallet } = useWalletIdentity();
   const { disconnect } = useDisconnect();
 
   const loggedIn = authenticated || isConnected;
@@ -124,11 +125,33 @@ export default function PerfilPage() {
 
       <WonPrizes prizes={stats.prizes} loading={statsLoading} />
 
-      {address ? (
-        <>
-          <WalletCard address={address} />
+      {/* La cartera que se enseña es la del PERFIL, no la que wagmi tenga
+          conectada. Eran la misma hasta que una embebida creada por accidente
+          las separó: arriba salían las partidas y los premios de una wallet y
+          aquí abajo el saldo de otra, las dos con la misma pinta de oficiales.
+          Ahora mandan las dos cosas desde el mismo sitio (`wallet-identity.ts`).
 
-          <WalletTokens address={address} />
+          Y si la conectada no es la canónica se dice, sin cambiar de identidad
+          por su cuenta: la cartera sigue siendo la de siempre, lo que falta es
+          conectarla. */}
+      {verdict.kind === "connect_canonical" && (
+        <p className="room-warn" role="status">
+          {verdict.connected
+            ? t("profile.wallet.mismatch", {
+                connected: shortAddress(verdict.connected),
+                canonical: shortAddress(verdict.canonical),
+              })
+            : t("profile.wallet.disconnected", {
+                canonical: shortAddress(verdict.canonical),
+              })}
+        </p>
+      )}
+
+      {shownWallet ? (
+        <>
+          <WalletCard address={shownWallet} />
+
+          <WalletTokens address={shownWallet} />
         </>
       ) : (
         <p className="empty-note">{t("profile.creating_wallet")}</p>

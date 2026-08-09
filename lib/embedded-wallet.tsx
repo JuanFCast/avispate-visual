@@ -141,6 +141,19 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
     if (announcedRef.current === embeddedAddress) return;
     let cancelled = false;
 
+    /**
+     * El oyente se guarda para poder QUITARLO.
+     *
+     * Antes la limpieza solo marcaba `cancelled` y el `addEventListener` se
+     * quedaba puesto para siempre. Cada vez que este efecto volvía a correr
+     * dejaba otra closure viva, y cada una seguía agarrada a su `detail` — o
+     * sea a un proveedor viejo. En el siguiente `eip6963:requestProvider` se
+     * anunciaban TODOS, incluidos los muertos, y wagmi podía redescubrir y
+     * reconectar uno anterior. Con dos wallets en juego eso es exactamente la
+     * intermitencia que se veía: a veces salía una dirección y a veces otra.
+     */
+    let listener: (() => void) | null = null;
+
     (async () => {
       const provider = await embedded.getEthereumProvider();
       if (cancelled || !provider) return;
@@ -154,6 +167,7 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
         window.dispatchEvent(
           new CustomEvent("eip6963:announceProvider", { detail })
         );
+      listener = announce;
       // Responder tanto a peticiones futuras como anunciar de inmediato.
       window.addEventListener("eip6963:requestProvider", announce);
       announce();
@@ -161,6 +175,9 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true;
+      if (listener) {
+        window.removeEventListener("eip6963:requestProvider", listener);
+      }
     };
   }, [embedded, embeddedAddress]);
 
