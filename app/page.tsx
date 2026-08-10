@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import GameShell from "@/components/GameShell";
 import { getServerT } from "@/lib/i18n/server";
 
+const SOCIAL_TITLE = "Avíspate";
+const SOCIAL_DESCRIPTION =
+  "Avíspate! Find the symbol two cards have in common and burn through your deck at full speed.";
+
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getServerT();
   const title = t("meta.home.title");
@@ -14,25 +18,16 @@ export async function generateMetadata(): Promise<Metadata> {
       canonical: "/",
     },
     openGraph: {
-      title,
-      description,
+      title: SOCIAL_TITLE,
+      description: SOCIAL_DESCRIPTION,
       url: "/",
       siteName: "Avíspate",
       type: "website",
-      images: [
-        {
-          url: "/opengraph-image",
-          width: 1200,
-          height: 630,
-          alt: "Avíspate — juego de agilidad visual",
-        },
-      ],
     },
     twitter: {
       card: "summary_large_image",
-      title,
-      description,
-      images: ["/opengraph-image"],
+      title: SOCIAL_TITLE,
+      description: SOCIAL_DESCRIPTION,
     },
   };
 }

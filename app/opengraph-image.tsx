@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-export const alt = "Avíspate — juego de agilidad visual";
+export const alt = "Avíspate — visual speed game";
 export const size = {
   width: 1200,
   height: 630,
@@ -67,7 +67,7 @@ export default async function OpenGraphImage() {
                 lineHeight: 1,
               }}
             >
-              ¡Avíspate!
+              Avíspate!
             </div>
             <div
               style={{
@@ -77,7 +77,7 @@ export default async function OpenGraphImage() {
                 lineHeight: 1.2,
               }}
             >
-              Encuentra el símbolo común.
+              Find the common symbol.
             </div>
             <div
               style={{
@@ -87,7 +87,7 @@ export default async function OpenGraphImage() {
                 lineHeight: 1.2,
               }}
             >
-              Sé el más rápido.
+              Be the fastest.
             </div>
             <div
               style={{
@@ -101,7 +101,7 @@ export default async function OpenGraphImage() {
                 fontWeight: 700,
               }}
             >
-              Juego de agilidad visual
+              Visual speed game
             </div>
           </div>
         </div>
