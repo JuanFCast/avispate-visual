@@ -16,9 +16,13 @@ const nunito = Nunito({
 
 export async function generateMetadata(): Promise<Metadata> {
   const t = await getServerT();
+  const title = t("meta.home.title");
+  const description = t("meta.home.description");
+
   return {
-    title: t("meta.home.title"),
-    description: t("meta.home.description"),
+    metadataBase: new URL("https://avispate.fun"),
+    title,
+    description,
   };
 }
 
