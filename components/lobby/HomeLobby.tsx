@@ -1,6 +1,5 @@
 "use client";
 
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import { useProfile } from "@/lib/profile-context";
 import { useActiveWallet } from "@/lib/wallet";
 import { useEmbeddedWalletStatus } from "@/lib/embedded-wallet";
@@ -16,6 +15,13 @@ import DailyChallengeCard, { type CtaState } from "./DailyChallengeCard";
 import LeaderboardPreview from "./LeaderboardPreview";
 
 interface Props {
+  /**
+   * Viene de `ConnectModalBridge` vía `GameShell`, no de `useConnectModal()`
+   * directo: así el lobby no arrastra RainbowKit por su cuenta. `null` hasta
+   * que el puente esté listo (o siempre, dentro de MiniPay) — se usa igual
+   * que antes: como valor truthy/callable, nunca se distingue el motivo.
+   */
+  openConnectModal: (() => void) | null;
   deckSize: number;
   onDeckChange: (deck: number) => void;
   freeByDeck: Record<number, boolean>;
@@ -46,6 +52,7 @@ interface Props {
  * el CTA reflejan la sesión.
  */
 export default function HomeLobby({
+  openConnectModal,
   deckSize,
   onDeckChange,
   freeByDeck,
@@ -67,7 +74,6 @@ export default function HomeLobby({
   const wallet = useActiveWallet();
   const embeddedWallet = useEmbeddedWalletStatus();
   const inMiniPay = useIsMiniPay();
-  const { openConnectModal } = useConnectModal();
   // El precio sale del contrato configurado, no de una frase escrita a mano:
   // el día que la entrada cambie, el botón cambia con ella.
   const fee = fmtUsdt(FEE_AMOUNT);

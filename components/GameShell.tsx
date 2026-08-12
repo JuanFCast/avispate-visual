@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { useQueryClient } from "@tanstack/react-query";
-import { useConnectModal } from "@rainbow-me/rainbowkit";
 import {
   computeAccuracy,
   generateFirstCard,
@@ -44,11 +44,31 @@ import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
 import { HowToPlay, useHowToPlay } from "./HowToPlay";
 import HomeLobby from "./lobby/HomeLobby";
-import StartAccessModal from "./lobby/StartAccessModal";
 import ProfileBottomNav from "./profile/ProfileBottomNav";
 import CardView from "./CardView";
 import GameHUD from "./GameHUD";
 import ResultsPanel from "./ResultsPanel";
+
+/**
+ * Los dos únicos puntos de la portada que arrastran RainbowKit, cargados bajo
+ * demanda para que ese peso no viaje en la carga inicial de nadie:
+ *
+ * - `StartAccessModal` solo existe una vez que alguien toca el CTA de acceso
+ *   (`accessOpen`) — nunca antes.
+ * - `ConnectModalBridge` es el único lugar que llama a `useConnectModal`; se
+ *   monta solo fuera de MiniPay (ver más abajo), donde ese botón no existe.
+ *
+ * Ninguno de los dos cambia CÓMO se decide identidad o pago — `pay-guard.ts`,
+ * `wallet-identity.ts` y `resolveFeeCurrency` siguen intactos. Solo cambia
+ * CUÁNDO se pide el código de RainbowKit.
+ */
+const StartAccessModal = dynamic(() => import("./lobby/StartAccessModal"), {
+  ssr: false,
+});
+const ConnectModalBridge = dynamic(
+  () => import("./wallet/ConnectModalBridge"),
+  { ssr: false }
+);
 
 /**
  * No hay fase de "pagando": la jugada se procesa sobre la pantalla en la que
@@ -192,7 +212,18 @@ export default function GameShell() {
   // de dejarlo pasar, que es lo que hacía cuando esto era `string | null`.
   const canonical = useCanonicalWallet();
   const inMiniPay = useIsMiniPay();
-  const { openConnectModal } = useConnectModal();
+  /**
+   * Antes venía directo de `useConnectModal()`. Ahora la entrega
+   * `ConnectModalBridge`, montado más abajo solo fuera de MiniPay — así el
+   * botón se comporta exactamente igual (empieza en `null`, pasa a la función
+   * real en cuanto RainbowKit está listo) sin que su código viaje aquí.
+   */
+  const [openConnectModal, setOpenConnectModal] = useState<(() => void) | null>(
+    null
+  );
+  const onConnectModalReady = useCallback((open: () => void) => {
+    setOpenConnectModal(() => open);
+  }, []);
   const queryClient = useQueryClient();
   const { playForDeck, canPlay } = usePayToPlay();
 
@@ -759,9 +790,14 @@ export default function GameShell() {
         <HowToPlay onClose={howTo.close} />
       )}
 
+      {/* Fuera de MiniPay solamente: es el único lugar que pide el modal de
+          RainbowKit. Dentro de MiniPay ni se monta ni se descarga. */}
+      {!inMiniPay && <ConnectModalBridge onReady={onConnectModalReady} />}
+
       {phase === "setup" && howTo.resolved && (
         <>
           <HomeLobby
+            openConnectModal={openConnectModal}
             payBlock={payBlock}
             onReconnect={reconnectWallet}
             onPickAnotherName={() => {
