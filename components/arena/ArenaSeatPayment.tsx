@@ -4,8 +4,13 @@ import { useState } from "react";
 import { useArenaJoin, type JoinStage } from "@/lib/arena-join";
 import { seatPaymentFor, seatTokenFor } from "@/lib/seat-token-client";
 import { ARENA_COMMISSION_BPS, fmtEntry } from "@/lib/arena";
+import { useIsMiniPay } from "@/lib/minipay";
+import { MINIPAY_ADD_CASH } from "@/lib/tokens";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
+
+/** Igual que en el reto individual: el único error que se arregla recargando. */
+const FUNDS_ERROR: MessageKey = "pay.error.insufficient";
 
 const STAGE_KEY: Record<JoinStage, MessageKey> = {
   checking: "arena.pay.stage.checking",
@@ -44,6 +49,7 @@ export default function ArenaSeatPayment({
   onSeated,
 }: Props) {
   const t = useT();
+  const inMiniPay = useIsMiniPay();
   const { stage, error, payAndSit, finishPending } = useArenaJoin();
   /**
    * ¿Hay un pago hecho en este dispositivo que el servidor no aceptó todavía?
@@ -121,6 +127,18 @@ export default function ArenaSeatPayment({
       {error && (
         <p className="alias-error" aria-live="polite">
           {t(error, { entry })}
+          {/* Faltó USDT: el camino de recarga va pegado al aviso, igual que en
+              el reto individual. Solo dentro de MiniPay — fuera de ahí la
+              cartera del perfil ya trae bridge/swap, y aquí no hay sitio
+              para repetir esas tres opciones. */}
+          {error === FUNDS_ERROR && inMiniPay && (
+            <>
+              {" "}
+              <a className="lobby-addcash" href={MINIPAY_ADD_CASH}>
+                {t("lobby.addcash")}
+              </a>
+            </>
+          )}
         </p>
       )}
     </div>

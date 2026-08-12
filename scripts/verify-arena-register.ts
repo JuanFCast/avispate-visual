@@ -243,20 +243,22 @@ console.log("\n— La regla de oro: ningún final malo manda a pagar otra vez �
   );
 }
 
-console.log("\n— El orden en el código: la sesión, después del recibo —");
+console.log("\n— El orden en el código: la sesión, después de intentar el recibo —");
 {
   const src = readFileSync(join(ROOT, "lib/arena-join.ts"), "utf8");
-  // Las dos líneas exactas del pago, no la primera coincidencia parecida: el
-  // recibo del `approve` y el `ensureWalletSession` que arma `registerSeat`
-  // también casan con una búsqueda floja, y con ellas el cheque diría cualquier
-  // cosa. Se busca el recibo DE ESTA transacción y la llamada esperada.
-  const recibo = src.indexOf("waitForTransactionReceipt({ hash: txHash })");
+  // El recibo de `join` ahora se espera DENTRO de `submitJoin`
+  // (`lib/arena-pay-sequence.ts`, probado aparte en
+  // `verify-arena-fee-currency.ts`): un timeout ahí ya no lanza, así que lo
+  // que este cheque puede seguir viendo desde aquí es que `ensureWalletSession`
+  // se pide DESPUÉS de que `submitJoin` haya terminado su intento — no antes,
+  // suelto, en cuanto existe el hash.
+  const submit = src.indexOf("await submitJoin(");
   const sesion = src.indexOf("await ensureWalletSession(account, txHash)");
 
-  check("los dos siguen ahí", recibo > -1 && sesion > -1, true);
+  check("los dos siguen ahí", submit > -1 && sesion > -1, true);
   check(
-    "y la sesión se pide DESPUÉS de que la transacción esté minada",
-    recibo < sesion,
+    "y la sesión se pide DESPUÉS del intento de recibo de `join`",
+    submit < sesion,
     true
   );
   check(

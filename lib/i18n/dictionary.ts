@@ -138,6 +138,8 @@ export const en = {
     "You paid, but we couldn't hand you your seat yet. Do not pay again — try again in a moment.",
   "arena.pay.no_storage":
     "We can't save your seat key on this device, so we won't take your money. Turn off private browsing or free up storage and try again.",
+  "arena.pay.approve_pending":
+    "Your USDT approval is still confirming on Celo. You have not been charged — wait a moment and try again.",
   "pay.action.connect": "Change or connect wallet",
   "pay.action.retry": "Try again",
   "pay.action.another_name": "Use a different name",
@@ -925,6 +927,8 @@ export const es: Record<MessageKey, string> = {
     "Pagaste, pero todavía no pudimos entregarte tu silla. No vuelvas a pagar: inténtalo de nuevo en un momento.",
   "arena.pay.no_storage":
     "No podemos guardar la llave de tu silla en este dispositivo, así que no te cobramos. Desactiva la navegación privada o libera espacio e inténtalo otra vez.",
+  "arena.pay.approve_pending":
+    "Tu autorización de USDT sigue confirmándose en Celo. No te hemos cobrado — espera un momento e inténtalo de nuevo.",
   "pay.action.connect": "Cambiar o conectar billetera",
   "pay.action.retry": "Reintentar",
   "pay.action.another_name": "Usar otro nombre",

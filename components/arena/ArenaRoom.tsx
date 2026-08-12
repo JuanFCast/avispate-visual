@@ -11,11 +11,13 @@ import { roomErrorText } from "@/lib/arena-room-errors";
 import {
   roomActionsFor,
   roomIsFull,
+  seatEntryGateFor,
   startHintFor,
   startHintMessage,
   type RoomPlayerView,
 } from "@/lib/arena-rooms";
 import { useProfile } from "@/lib/profile-context";
+import { useIsMiniPay } from "@/lib/minipay";
 import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n";
 import ArenaHeader from "./ArenaHeader";
@@ -64,6 +66,7 @@ export default function ArenaRoom({ code }: { code: string }) {
   const t = useT();
   const router = useRouter();
   const { ready, authenticated } = useProfile();
+  const inMiniPay = useIsMiniPay();
   const {
     room,
     error,
@@ -202,6 +205,17 @@ export default function ArenaRoom({ code }: { code: string }) {
   // Qué falta para poder repartir. Se decide fuera del JSX, en una función pura
   // que `scripts/verify-arena-ready.ts` recorre entera.
   const hintText = startHintMessage(startHintFor(room), Boolean(you?.isHost));
+  // Qué pantalla le toca a quien no tiene silla. Puro, por lo mismo que el
+  // aviso de arriba — `scripts/verify-arena-fee-currency.ts` recorre el caso
+  // MiniPay sin necesitar un navegador.
+  const entryGate = seatEntryGateFor({
+    seated: Boolean(you),
+    full,
+    ready,
+    authenticated,
+    inMiniPay,
+    hasTableId: Boolean(room.tableId),
+  });
 
   return (
     <>
@@ -301,18 +315,22 @@ export default function ArenaRoom({ code }: { code: string }) {
         )}
 
         {!you ? (
-          /* Llegó por el enlace y todavía no se sentó. */
-          full ? (
+          /* Llegó por el enlace y todavía no se sentó. Qué le toca ver lo
+             decide `seatEntryGateFor` (`lib/arena-rooms.ts`), no esta rama:
+             la única excepción a "sin sesión, primero AccessCard" es MiniPay
+             + mesa de pago, donde pagar la silla ES la forma de abrir sesión
+             (`arena-join.ts` canjea el propio txHash). Mandarlo por
+             AccessCard ahí solo lo empujaría al reto individual sin
+             necesidad — el rodeo que `onchain.ts` ya dejó de exigir en el
+             servidor. Fuera de MiniPay, o en una mesa gratis, no cambia. */
+          entryGate === "full" ? (
             <p className="room-warn">{t("room.error.full")}</p>
-          ) : ready && !authenticated ? (
-            /* Llegó por el enlace de un amigo y no tiene sesión. Aquí mismo se
-               resuelve —wallet o correo— en vez de mandarlo a otra pantalla y
-               que vuelva a buscar el código. */
+          ) : entryGate === "needs_login" ? (
             <>
               <p className="room-warn">{t("room.join_this.login")}</p>
               <AccessCard />
             </>
-          ) : room.tableId ? (
+          ) : entryGate === "pay_seat" && room.tableId ? (
             /* Mesa con entrada: aquí no se "entra", se paga. La silla la crea
                la transacción, no este botón, y por eso vale igual para el
                anfitrión —que con escrow tampoco se sentó al crear la sala—. */

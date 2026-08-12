@@ -5,7 +5,9 @@ import { formatUnits, isAddress, parseUnits } from "viem";
 import { celo } from "viem/chains";
 import { usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
 import { ERC20_ABI } from "@/lib/contracts";
-import { GAS_MARGIN_USDT, resolveFeeCurrency } from "@/lib/pay";
+import { GAS_MARGIN_USDT } from "@/lib/pay";
+import { resolveFeeCurrency } from "@/lib/celo-tx";
+import { isMiniPay } from "@/lib/minipay";
 import { formatBalance, type TokenInfo } from "@/lib/tokens";
 import { useI18n } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -65,7 +67,11 @@ export default function SendModal({
   useEffect(() => {
     let alive = true;
     if (!publicClient) return;
-    resolveFeeCurrency(publicClient, from as `0x${string}`)
+    // Mismo gas de referencia que usaba esta llamada antes de que
+    // `resolveFeeCurrency` pidiera el límite explícito (`lib/celo-tx.ts`):
+    // el de una jugada del reto diario, con holgura de sobra para un
+    // `transfer()` de ERC-20, que gasta menos.
+    resolveFeeCurrency(publicClient, from as `0x${string}`, 150_000n, isMiniPay())
       .then((o) => {
         if (alive) setGasInUsdt(Boolean(o.feeCurrency));
       })
@@ -122,7 +128,9 @@ export default function SendModal({
     try {
       const feeCurrency = await resolveFeeCurrency(
         publicClient,
-        from as `0x${string}`
+        from as `0x${string}`,
+        150_000n,
+        isMiniPay()
       );
       // Firmar siempre en Celo: si la wallet está en otra red, se cambia.
       await switchChainAsync({ chainId: celo.id }).catch(() => {

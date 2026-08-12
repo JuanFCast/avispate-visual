@@ -360,6 +360,50 @@ export function startHintMessage(
   }
 }
 
+/**
+ * Qué pantalla le corresponde a quien todavía no tiene silla.
+ *
+ * Puro y aparte del JSX por la misma razón que `roomActionsFor`: es la
+ * decisión que `scripts/verify-arena-fee-currency.ts` recorre para
+ * comprobar el caso MiniPay sin repetir un navegador entero.
+ *
+ * La única excepción a "sin sesión, primero AccessCard" es MiniPay + mesa de
+ * pago: ahí pagar la silla ES la forma de abrir sesión (`arena-join.ts`
+ * canjea el propio txHash), así que mandar por AccessCard solo lo empujaría
+ * al reto individual sin necesidad — el rodeo que `verifyWalletControl`
+ * (`lib/onchain.ts`) ya dejó de exigir en el servidor. Fuera de MiniPay, o en
+ * una mesa gratis, el camino no cambia.
+ */
+export type SeatEntryGate =
+  /** Ya tiene silla: esta función no decide nada más para él. */
+  | "seated"
+  | "full"
+  /** Sin sesión y sin la excepción de MiniPay+pago: resolver con AccessCard. */
+  | "needs_login"
+  /** Mesa con entrada: se paga con `ArenaSeatPayment`. */
+  | "pay_seat"
+  /** Mesa gratis: el botón de unirse de siempre. */
+  | "free_join";
+
+export function seatEntryGateFor(input: {
+  seated: boolean;
+  full: boolean;
+  /** El perfil ya contestó si hay sesión o no (evita el parpadeo de carga). */
+  ready: boolean;
+  authenticated: boolean;
+  inMiniPay: boolean;
+  hasTableId: boolean;
+}): SeatEntryGate {
+  if (input.seated) return "seated";
+  if (input.full) return "full";
+
+  const skipsLoginInMiniPay = input.inMiniPay && input.hasTableId;
+  if (input.ready && !input.authenticated && !skipsLoginInMiniPay) {
+    return "needs_login";
+  }
+  return input.hasTableId ? "pay_seat" : "free_join";
+}
+
 /** Nombre del canal de Realtime de una sala. Mismo en los dos lados. */
 export function roomChannelName(code: string): string {
   return `arena-room:${code}`;

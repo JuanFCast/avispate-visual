@@ -4,6 +4,9 @@ import { useCallback, useState } from "react";
 import { useAccount, useWriteContract, usePublicClient, useSwitchChain } from "wagmi";
 import { celo } from "viem/chains";
 import { ERC20_ABI, USDT_CELO_ADDRESS } from "./contracts";
+import { resolveFeeCurrency, RECEIPT_TIMEOUT_MS } from "./celo-tx";
+import { ensureAllowance, submitJoin } from "./arena-pay-sequence";
+import { isMiniPay } from "./minipay";
 import { decidePlayStart, confirmBeforeSigning } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
 import { useCanonicalWallet } from "./wallet";
@@ -55,6 +58,17 @@ const ARENA_ABI = [
   },
 ] as const;
 
+/**
+ * Gas de la transacción más cara de este archivo (`join`, que además de
+ * transferir escribe el estado de la mesa y el compromiso de la silla),
+ * con holgura. Sin medir todavía con `scripts/gas-cost.mjs` — a propósito
+ * más alto que el `PLAY_GAS_LIMIT` de `pay.ts` (150.000, medido para
+ * `play()`) mientras no haya un número real: una cota prudente de más
+ * solo hace que alguien con CELO justo pague el gas en USDT, que es
+ * seguro; una de menos dejaría firmar en CELO a quien no le alcanza.
+ */
+const ARENA_TX_GAS_LIMIT = 220_000n;
+
 export type JoinStage =
   | "checking"
   | "approving"
@@ -62,6 +76,20 @@ export type JoinStage =
   | "confirming"
   | "registering"
   | "claiming";
+
+/**
+ * El recibo del `approve` no apareció a tiempo y, al comprobar la cadena
+ * directamente, el permiso TODAVÍA no está. No es un rechazo: nada se firmó
+ * mal, el nodo solo va lento. No hay nada que cobrar de nuevo —`approve` no
+ * mueve USDT, solo autoriza— así que la salida es esperar y volver a
+ * intentar, no repetir la firma a ciegas.
+ */
+class ApprovePendingError extends Error {
+  constructor(readonly approveHash: string) {
+    super("approve_pending");
+    this.name = "ApprovePendingError";
+  }
+}
 
 export interface ArenaJoinApi {
   stage: JoinStage | null;
@@ -246,25 +274,50 @@ export function useArenaJoin(): ArenaJoinApi {
 
         if (chainId !== celo.id) await switchChainAsync({ chainId: celo.id });
 
-        // 3. Permiso de USDT, solo si falta.
-        const allowance = (await publicClient.readContract({
-          address: USDT_CELO_ADDRESS as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: "allowance",
-          args: [account, ARENA_ESCROW_ADDRESS],
-        })) as bigint;
+        // Con qué se paga el gas de TODO lo que sigue —approve y join—, en
+        // una sola lectura para los dos. Misma política que el reto diario
+        // (`lib/celo-tx.ts`): dentro de MiniPay siempre USDT, porque el
+        // jugador tiene 0 CELO por diseño.
+        const feeCurrency = await resolveFeeCurrency(
+          publicClient,
+          account,
+          ARENA_TX_GAS_LIMIT,
+          isMiniPay()
+        );
 
-        if (allowance < entryUnits) {
-          setStage("approving");
-          const approveHash = await writeContractAsync({
-            account,
-            address: USDT_CELO_ADDRESS as `0x${string}`,
-            abi: ERC20_ABI,
-            functionName: "approve",
-            args: [ARENA_ESCROW_ADDRESS, entryUnits * 4n],
-            chainId: celo.id,
-          });
-          await publicClient.waitForTransactionReceipt({ hash: approveHash });
+        // 3. Permiso de USDT, solo si falta. La secuencia (leer, aprobar,
+        //    esperar y recuperarse de un recibo lento) es la misma función
+        //    pura que recorre `scripts/verify-arena-fee-currency.ts`.
+        const allowanceResult = await ensureAllowance({
+          entryUnits,
+          feeCurrency,
+          onApproving: () => setStage("approving"),
+          readAllowance: () =>
+            publicClient.readContract({
+              address: USDT_CELO_ADDRESS as `0x${string}`,
+              abi: ERC20_ABI,
+              functionName: "allowance",
+              args: [account, ARENA_ESCROW_ADDRESS],
+            }) as Promise<bigint>,
+          approve: (fee) =>
+            writeContractAsync({
+              account,
+              address: USDT_CELO_ADDRESS as `0x${string}`,
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [ARENA_ESCROW_ADDRESS, entryUnits * 4n],
+              chainId: celo.id,
+              ...fee,
+            }),
+          waitApproveReceipt: async (hash) => {
+            await publicClient.waitForTransactionReceipt({
+              hash: hash as `0x${string}`,
+              timeout: RECEIPT_TIMEOUT_MS,
+            });
+          },
+        });
+        if (allowanceResult.kind === "approve_pending") {
+          throw new ApprovePendingError(allowanceResult.approveHash);
         }
 
         // 4. El pago. Última comprobación pegada a la firma.
@@ -283,22 +336,35 @@ export function useArenaJoin(): ArenaJoinApi {
           return false;
         }
         setStage("confirm");
-        const txHash = await writeContractAsync({
-          account,
-          address: ARENA_ESCROW_ADDRESS,
-          abi: ARENA_ABI,
-          functionName: "join",
-          args: [tableId, entryUnits, maxPlayers, seat.commitment],
-          chainId: celo.id,
+        const txHash = await submitJoin({
+          feeCurrency,
+          join: (fee) =>
+            writeContractAsync({
+              account,
+              address: ARENA_ESCROW_ADDRESS,
+              abi: ARENA_ABI,
+              functionName: "join",
+              args: [tableId, entryUnits, maxPlayers, seat.commitment],
+              chainId: celo.id,
+              ...fee,
+            }),
+          waitJoinReceipt: async (hash) => {
+            await publicClient.waitForTransactionReceipt({
+              hash: hash as `0x${string}`,
+              timeout: RECEIPT_TIMEOUT_MS,
+            });
+          },
+          // El hash existe: el dinero ya salió. Se guarda ANTES de esperar su
+          // recibo, por lo mismo que la bandeja del reto diario — cerrar la
+          // pestaña aquí no puede dejar una silla pagada sin forma de
+          // reclamarla. Un timeout después de esto YA no repite la firma:
+          // `submitJoin` sigue con el hash, igual que el reto diario — el
+          // registro que viene abajo (`registerAndClaim`) no depende de que
+          // el recibo haya llegado, porque `registerSeat` ya reintenta
+          // `recoverSession` en cada 401 si el nodo del servidor todavía no
+          // ve la transacción minada.
+          onJoinHash: (hash) => rememberSeatPayment(code, { txHash: hash, address: account }),
         });
-
-        // El hash existe: el dinero ya salió. Se guarda ANTES de esperar nada,
-        // por lo mismo que la bandeja del reto diario — cerrar la pestaña aquí
-        // no puede dejar una silla pagada sin forma de reclamarla.
-        rememberSeatPayment(code, { txHash, address: account });
-
-        setStage("confirming");
-        await publicClient.waitForTransactionReceipt({ hash: txHash });
 
         /**
          * Esta transacción también prueba quién eres.
@@ -342,13 +408,15 @@ export function useArenaJoin(): ArenaJoinApi {
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setError(
-          /seat_store_unavailable/.test(msg)
-            ? "arena.pay.no_storage"
-            : /reject|denied|cancel/i.test(msg)
-              ? "pay.error.rejected"
-              : /insufficient|exceeds balance|transfer amount/i.test(msg)
-                ? "pay.error.insufficient"
-                : "pay.error.generic"
+          e instanceof ApprovePendingError
+            ? "arena.pay.approve_pending"
+            : /seat_store_unavailable/.test(msg)
+              ? "arena.pay.no_storage"
+              : /reject|denied|cancel/i.test(msg)
+                ? "pay.error.rejected"
+                : /insufficient|exceeds balance|transfer amount/i.test(msg)
+                  ? "pay.error.insufficient"
+                  : "pay.error.generic"
         );
         setStage(null);
         return false;
