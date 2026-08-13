@@ -4709,8 +4709,16 @@ body {
  * `--chip-w` no depende de `--card-d` a propósito —a diferencia del intento
  * anterior—: un alias y "27 cartas" necesitan un ancho mínimo para leerse
  * bien sea cual sea el tamaño de la carta, no una fracción de su diámetro.
+ *
+ * Y en la Arena casi siempre manda el ANCHO, no el alto —las dos columnas se
+ * lo comen antes de que el alto llegue a pesar—, así que sobra alto de
+ * verdad: el `min()` de abajo no lo gasta. Sin `justify-content` ese sobrante
+ * se amontona entero debajo de "Abandonar la partida" como un hueco muerto —
+ * la pantalla se ve mal aprovechada porque literalmente lo está. Centrado, el
+ * mismo sobrante se reparte arriba y abajo del tablero.
  */
 .shell.playing.match-shell {
+  justify-content: center;
   --chip-w: clamp(48px, 13vw, 72px);
   --chip-gap: 8px;
 
