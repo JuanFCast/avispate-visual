@@ -9,7 +9,7 @@ import { useT } from "@/lib/i18n/client";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import CardView from "../CardView";
 import ArenaMatchOver from "./ArenaMatchOver";
-import ArenaMatchPlayers, { RailChip, railsOf } from "./ArenaMatchPlayers";
+import ArenaMatchPlayers, { RailChip, matchSlots } from "./ArenaMatchPlayers";
 
 /** Lo que tarda la carta vieja en salir de cuadro. Igual que en el individual. */
 const EXIT_MS = 600;
@@ -352,7 +352,7 @@ export default function ArenaMatch({ code }: { code: string }) {
   }
 
   const cardsLeft = view.you?.cardsLeft ?? 0;
-  const rails = railsOf(view.you, view.rivals);
+  const slots = matchSlots(view.you, view.rivals);
 
   return (
     <MatchShell phase="playing">
@@ -363,34 +363,22 @@ export default function ArenaMatch({ code }: { code: string }) {
       )}
 
       {/*
-        Los rieles van DENTRO del tablero, no encima de él.
-        `justify-content: space-between` sobre un riel tan alto como las dos
-        cartas reparte solo: el primer jugador arriba, el segundo en la costura
-        entre carta y carta, y los indicadores abajo. Los tres sitios son el
-        hueco que dejan los círculos en las esquinas, así que la carta se queda
-        con todo el ancho de la pantalla.
+        Cada jugador se ancla a una esquina real de `chain-area`, no a un
+        riel de altura completa. BASE ocupa la mitad de arriba de la caja y TU
+        CARTA la de abajo, así que "junto a BASE" es la esquina superior y
+        "junto a TU CARTA" la inferior — mismo triángulo libre de siempre, las
+        cuatro esquinas de un círculo inscrito miden lo mismo por simetría, así
+        que la carta no paga nada por usar las cuatro en vez de dos.
       */}
       <div className="play-board match-board">
-        <aside className="match-rail rail-left">
-          {rails.left.length === 0 && (
-            <span className="rail-spacer" aria-hidden="true" />
-          )}
-          {rails.left.map((p) => (
-            <RailChip key={p.profileId} player={p} />
-          ))}
-          {/* UNO por esquina, y nada más. El hueco que deja un círculo en la
-              esquina de su caja es un triángulo pequeño: apilando dos cosas, la
-              de arriba llega a la mitad del círculo, que es donde más ancho es.
-              El botón de silencio se fue abajo, con el de abandonar — no es
-              información de la partida y no compite por este sitio. */}
-          <div className="rail-stats">
-            <div className="stat-pill">
-              <span className="sp-emoji">⏱️</span>
-              <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
-              <span className="sp-label">{t("game.stat.time")}</span>
-            </div>
+        <div className="corner-col corner-col-left">
+          <div className="corner corner-base-left">
+            {slots.baseLeft && <RailChip key={slots.baseLeft.profileId} player={slots.baseLeft} />}
           </div>
-        </aside>
+          <div className="corner corner-mine-left">
+            {slots.mineLeft && <RailChip key={slots.mineLeft.profileId} player={slots.mineLeft} />}
+          </div>
+        </div>
 
         <div className="chain-area">
           <span className="slot-tag slot-tag-base">{t("game.slot.base")}</span>
@@ -427,25 +415,29 @@ export default function ArenaMatch({ code }: { code: string }) {
           ))}
         </div>
 
-        <aside className="match-rail rail-right">
-          {rails.right.length === 0 && (
-            <span className="rail-spacer" aria-hidden="true" />
-          )}
-          {rails.right.map((p) => (
-            <RailChip key={p.profileId} player={p} />
-          ))}
-          {/* La píldora de CARTAS se cayó, y no por sitio: decía el mismo
-              número que tu propia ficha, arriba a la izquierda. Dos sitios para
-              una cifra son dos sitios donde mirar, y encima costaba la esquina
-              que hacía falta para no pisar la carta. */}
-          <div className="rail-stats">
-            <div className="stat-pill">
-              <span className="sp-emoji">🧱</span>
-              <span className="sp-value">{view.you?.penalties ?? 0}</span>
-              <span className="sp-label">{t("match.stat.penalties")}</span>
-            </div>
+        <div className="corner-col corner-col-right">
+          <div className="corner corner-base-right">
+            {slots.baseRight && <RailChip key={slots.baseRight.profileId} player={slots.baseRight} />}
           </div>
-        </aside>
+          <div className="corner corner-mine-right">
+            {slots.mineRight && <RailChip key={slots.mineRight.profileId} player={slots.mineRight} />}
+          </div>
+        </div>
+      </div>
+
+      {/* Indicadores secundarios, fuera del tablero: no le quitan sitio a la
+          carta ni compiten por sus esquinas. */}
+      <div className="match-stats-row">
+        <div className="stat-pill">
+          <span className="sp-emoji">⏱️</span>
+          <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
+          <span className="sp-label">{t("game.stat.time")}</span>
+        </div>
+        <div className="stat-pill">
+          <span className="sp-emoji">🧱</span>
+          <span className="sp-value">{view.you?.penalties ?? 0}</span>
+          <span className="sp-label">{t("match.stat.penalties")}</span>
+        </div>
       </div>
 
       {/* Lo que no es partida vive fuera del tablero. */}

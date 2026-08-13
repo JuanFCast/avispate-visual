@@ -4523,35 +4523,17 @@ body {
 }
 
 /*
- * El riel: tan alto como el tablero y repartido con `space-between`.
+ * La columna de esquinas: un envoltorio "tonto", sin posición propia.
  *
- * De ahí salen solas las tres posiciones —arriba, costura, abajo— sin una sola
- * medida escrita a mano, y sin que cambie nada al pasar de 2 a 4 jugadores:
- * con un chip quedan chip arriba e indicadores abajo; con dos, el segundo cae
- * exactamente en el hueco entre las dos cartas.
+ * `position: absolute` en un hijo escapa del flujo y busca el ancestro
+ * posicionado más cercano —`.match-board`— sea cual sea el `display` de este
+ * envoltorio intermedio. Así que en vertical no hace falta ningún truco: basta
+ * con NO ponerle `position` a `.corner-col` para que sus dos esquinas caigan
+ * donde `.corner-base-*`/`.corner-mine-*` digan. En horizontal, más abajo, se
+ * le da flex de verdad y ahí sí manda como columna.
  */
-.match-rail {
+.corner-col {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  width: var(--rail-w, 44px);
-  align-self: stretch;
-}
-
-.rail-stats {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-/* Sin jugadores que poner, el hueco de arriba se reserva igual para que los
-   indicadores no se suban a la esquina de la carta. */
-.rail-spacer {
-  display: block;
 }
 
 /*
@@ -4564,18 +4546,19 @@ body {
  * hasta que se notaba en un teléfono. `verify-match-board-fit.ts` comprueba la
  * separación con estos números.
  */
-.match-shell .match-board .stat-pill {
-  width: var(--rail-w);
-  height: var(--rail-pill-h);
-  justify-content: center;
-  padding: 0 2px;
-}
-
-.match-shell .match-board .rail-chip {
+.match-shell .match-board .corner .rail-chip {
   width: var(--rail-w);
   height: var(--rail-chip-h);
   justify-content: center;
   padding: 0 2px;
+}
+
+/* La palabra "cartas" solo se enseña donde de verdad sobra alto: en la
+   antesala (fila horizontal) y en escritorio. En la esquina del tablero móvil
+   el número solo ya dice lo que hace falta — meter una línea más ahí es
+   justo lo que rompía el presupuesto de `--rail-chip-h`. */
+.match-shell .match-board .corner .rail-chip-cards-label {
+  display: none;
 }
 
 /*
@@ -4597,9 +4580,10 @@ body {
   background: var(--white);
 }
 
-/* El tuyo se distingue sin gritar: mismo tamaño, borde de marca. */
+/* El tuyo se distingue sin gritar: mismo tamaño, acento cian — el mismo color
+   del borde de TU CARTA, para que se lea como el mismo jugador. */
 .rail-chip.is-you {
-  border-color: var(--ink);
+  border-color: var(--cyan);
   background: var(--yellow-faint);
 }
 
@@ -4644,12 +4628,39 @@ body {
   line-height: 1;
 }
 
+/* La insignia de "eres tú": va sobre el avatar, no en vez del alias — el
+   nombre de abajo sigue siendo el tuyo, completo. */
+.rail-chip-you {
+  position: absolute;
+  left: -8px;
+  top: -6px;
+  font-size: 0.42rem;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: var(--white);
+  background: var(--cyan);
+  border-radius: 999px;
+  padding: 2px 4px;
+}
+
 .rail-chip-cards {
   font-family: var(--font-title);
   font-size: 1.05rem;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+}
+
+.rail-chip-cards-label {
+  font-size: 0.42rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gray);
+  line-height: 1;
 }
 
 .rail-chip-name {
@@ -4710,27 +4721,41 @@ body {
   margin-inline: calc(-1 * var(--board-bleed));
 }
 
-.match-shell .match-board .match-rail {
+/*
+ * Cada esquina se ancla a la mitad de `chain-area` que le toca: las dos de
+ * arriba (`top: 0`) caen en la caja de BASE, las dos de abajo (`bottom: 0`) en
+ * la de TU CARTA. Por simetría del círculo, las cuatro esquinas de una caja
+ * dejan el mismo triángulo libre, así que esto no cambia ni un píxel la cuenta
+ * que ya validaba `verify-match-board-fit.ts` para "arriba".
+ *
+ * No son botones: dejarlas "tocables" taparía la parte del símbolo que se sale
+ * del círculo, cuya área de toque tiene 44 px de mínimo y llega hasta la
+ * orilla.
+ */
+.match-shell .match-board .corner {
   position: absolute;
-  top: 0;
-  bottom: 0;
   z-index: 4;
+  width: var(--rail-w, 44px);
   pointer-events: none;
 }
 
-/* Solo el silencio recupera el toque. Los chips y los indicadores no son
-   botones, y dejarlos "tocables" taparía la parte del símbolo que se sale del
-   círculo: el área de toque de un símbolo tiene 44 px de mínimo y los de la
-   orilla se pasan del borde. */
-.match-shell .match-board .match-rail .mute-btn {
-  pointer-events: auto;
+.match-shell .match-board .corner-base-left,
+.match-shell .match-board .corner-base-right {
+  top: 0;
 }
 
-.match-shell .match-board .rail-left {
+.match-shell .match-board .corner-mine-left,
+.match-shell .match-board .corner-mine-right {
+  bottom: 0;
+}
+
+.match-shell .match-board .corner-base-left,
+.match-shell .match-board .corner-mine-left {
   left: 0;
 }
 
-.match-shell .match-board .rail-right {
+.match-shell .match-board .corner-base-right,
+.match-shell .match-board .corner-mine-right {
   right: 0;
 }
 
@@ -4798,9 +4823,15 @@ body {
      y el indicador está a tamaño completo de todos modos. */
   --rail-out: 30px;
 
+  /*
+   * 78 pasó a 98: los 20 px de más son la fila de Tiempo/Castigos, que ahora
+   * vive en el flujo (fuera de las esquinas) y antes no costaba nada de alto.
+   * Es la misma cuenta que ya traía 20 px de más de colchón para el aviso de
+   * desconexión — este 20 nuevo se suma al mismo tipo de margen.
+   */
   --card-d: min(
     calc(100vw - 32px + 2 * var(--board-bleed) - 2 * var(--rail-out)),
-    calc(50dvh - 78px),
+    calc(50dvh - 98px),
     340px
   );
 
@@ -4819,13 +4850,12 @@ body {
    */
   --rail-w: clamp(28px, calc(var(--card-d) * 0.15), 44px);
   --rail-chip-h: clamp(30px, calc(var(--card-d) * 0.165), 48px);
-  --rail-pill-h: clamp(28px, calc(var(--card-d) * 0.15), 44px);
 }
 
 /* Pantalla corta: en un indicador de 30 px no cabe "CASTIGOS", y el emoji con
    la cifra ya dicen lo mismo. La etiqueta es lo primero que sobra. */
 @media (max-height: 640px) {
-  .match-shell .match-board .sp-label,
+  .match-stats-row .sp-label,
   .match-shell .match-board .rail-chip-name {
     display: none;
   }
@@ -4836,13 +4866,27 @@ body {
  * los rieles vuelven al flujo: hay ancho de sobra y superponerlos solo pondría
  * un chip encima de un símbolo. La cuenta del alto sí mejora —ya no hay franja
  * arriba— y por eso se restan 104 px donde antes eran 156.
+ *
+ * "Arriba"/"abajo" tampoco significan nada aquí —las cartas van lado a lado,
+ * no apiladas—, así que las cuatro esquinas se agrupan en dos columnas
+ * corrientes: la de BASE y la de TU CARTA de cada lado, una encima de la otra.
  */
 @media (min-width: 760px), (orientation: landscape) {
   .shell.playing.match-shell {
-    --card-d: min(calc(50vw - 150px), calc(100dvh - 104px), 420px);
+    /* 104 pasó a 140: la fila de Tiempo/Castigos ahora vive en el flujo, bajo
+       el tablero, y no dentro de un riel que no contaba para el alto. Son sus
+       ~26px más el gap nuevo que la separa del tablero y del pie. */
+    --card-d: min(calc(50vw - 150px), calc(100dvh - 140px), 420px);
   }
 
-  .match-shell .match-board .match-rail {
+  .match-shell .match-board .corner-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .match-shell .match-board .corner {
     position: static;
     pointer-events: auto;
   }
@@ -4851,6 +4895,40 @@ body {
     --card-gap: clamp(32px, 6vw, 72px);
     margin-bottom: 8px;
   }
+}
+
+/* Indicadores secundarios bajo el tablero: no son información de la partida
+   en el sentido de las cartas, así que viven fuera de ella y no le cuestan ni
+   un píxel de esquina. Tiempo a la izquierda, castigos a la derecha, como en
+   el reto diario. */
+.match-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: calc(var(--card-d, 340px) + 2 * var(--rail-w, 44px) + 16px);
+  margin: 0 auto;
+  padding: 0 2px;
+}
+
+/*
+ * En una línea, no apilado: emoji, cifra y etiqueta van seguidos. Es lo que
+ * mantiene esta fila en ~26px de alto —fijo, no lo que salga del texto—,
+ * que es justo el número que restan `--card-d`/`--chrome-v` para dejarle
+ * sitio sin robárselo a la carta. Si esto crece, esas cuentas se quedan
+ * cortas y algo se sale de la pantalla.
+ */
+.match-stats-row .stat-pill {
+  flex-direction: row;
+  width: auto;
+  height: 26px;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 999px;
+}
+
+.match-stats-row .stat-pill .sp-label {
+  margin-left: -1px;
 }
 
 /* El pie del tablero: silencio y abandonar. Ninguna de las dos es información
@@ -5187,15 +5265,17 @@ body {
   }
 
   /*
-   * La Arena ya no carga la franja de jugadores —se fue a los rieles—, así que
-   * de los 200 px que se reservaban solo quedan los del enlace de abandonar.
+   * La Arena ya no carga la franja de jugadores —se fue a las esquinas—, así
+   * que de los 200 px que se reservaban solo quedan los del enlace de
+   * abandonar y, ahora, la fila de Tiempo/Castigos (148 → 185: sus ~26px más
+   * el gap que la separa de tablero y pie).
    *
    * La fórmula se repite entera en vez de heredarse: el `--card-d` de la Arena
    * se declara con un selector de tres clases para ganarle al de móvil, y eso
    * mismo le ganaría aquí al de `.shell.playing` si no se volviera a poner.
    */
   .shell.playing.match-shell {
-    --chrome-v: 148px;
+    --chrome-v: 185px;
     gap: 8px;
 
     --card-d: clamp(
@@ -5281,11 +5361,6 @@ body {
 
   /* Los chips crecen con el riel, igual que los indicadores: en un monitor,
      52 px de columna al lado de una carta de 580 se ven como una errata. */
-  .match-rail {
-    width: auto;
-    gap: 12px;
-  }
-
   .rail-chip {
     width: calc(var(--rail) - var(--board-gap));
     padding: 8px 4px 6px;
@@ -5306,12 +5381,6 @@ body {
     font-size: 0.6rem;
   }
 
-  .match-board .rail-stats .mute-btn {
-    width: 48px;
-    height: 48px;
-    font-size: 1.2rem;
-  }
-
   .match-quit {
     margin-top: 0;
     font-size: 0.9rem;
@@ -5323,12 +5392,6 @@ body {
 @media (orientation: landscape) and (max-height: 520px) {
   .rail-chip-name {
     display: none;
-  }
-
-  .match-board .rail-stats .mute-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 0.9rem;
   }
 }
 

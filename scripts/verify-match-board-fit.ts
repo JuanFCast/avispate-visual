@@ -79,7 +79,6 @@ const RAIL_OUT = px("rail-out");
 const BLEED = px("board-bleed");
 const railW = escalada("rail-w");
 const chipH = escalada("rail-chip-h");
-const pillH = escalada("rail-pill-h");
 
 /** Los tres términos del `min()` del diámetro, tal como están escritos. */
 const formula = /--card-d:\s*min\(([\s\S]*?)\);/.exec(bloque)?.[1] ?? "";
@@ -145,26 +144,20 @@ const PANTALLAS: [string, number, number][] = [
 /** El aire mínimo que se considera "separado" y no "pegado". */
 const AIRE_MIN = 8;
 
-console.log("— Separación entre los indicadores y el círculo —\n");
-console.log("  pantalla                       carta   ficha   pastilla");
+console.log("— Separación entre las fichas de jugador y el círculo —\n");
+console.log("  pantalla                       carta   ficha");
 
 for (const [nombre, vw, vh] of PANTALLAS) {
   const d = diametro(vw, vh);
   const aFicha = aire(d, chipH(d));
-  const aPastilla = aire(d, pillH(d));
   console.log(
     `  ${nombre.padEnd(30)} ${String(Math.round(d)).padStart(4)}px  ` +
-      `${aFicha.toFixed(1).padStart(5)}  ${aPastilla.toFixed(1).padStart(7)}`
+      `${aFicha.toFixed(1).padStart(5)}`
   );
   ok(
     `    ${nombre}: la ficha de jugador no toca la carta`,
     aFicha >= AIRE_MIN,
     `solo ${aFicha.toFixed(1)}px de aire (mínimo ${AIRE_MIN})`
-  );
-  ok(
-    `    ${nombre}: la pastilla no toca la carta`,
-    aPastilla >= AIRE_MIN,
-    `solo ${aPastilla.toFixed(1)}px de aire (mínimo ${AIRE_MIN})`
   );
 }
 
@@ -196,32 +189,95 @@ for (const [nombre, vw, vh] of PANTALLAS) {
   );
 }
 
-/* ── Un indicador por esquina ────────────────────────────────────────────── */
+/* ── Un jugador por esquina, y los indicadores fuera del tablero ─────────── */
 
 console.log("\n— Y solo cabe uno por esquina —\n");
 
 {
   const src = readFileSync(join(ROOT, "components/arena/ArenaMatch.tsx"), "utf8");
-  const grupos = [...src.matchAll(/<div className="rail-stats">([\s\S]*?)<\/div>\s*<\/aside>/g)];
-  ok("hay dos grupos de indicadores, uno por riel", grupos.length === 2, `${grupos.length}`);
-  for (const [i, g] of grupos.entries()) {
-    const pastillas = [...g[1].matchAll(/className="stat-pill"/g)].length;
-    ok(
-      `    riel ${i + 1}: exactamente un indicador`,
-      pastillas === 1,
-      `${pastillas} pastillas apiladas — la de arriba llega al centro del círculo`
-    );
+
+  /** El trozo del código entre dos marcas literales, o `null` si no las encuentra. */
+  function entre(desde: string, hasta: string): string | null {
+    const i = src.indexOf(desde);
+    if (i === -1) return null;
+    const j = src.indexOf(hasta, i + desde.length);
+    if (j === -1) return null;
+    return src.slice(i + desde.length, j);
   }
+
+  const board = entre(
+    '<div className="play-board match-board">',
+    '{/* Indicadores secundarios'
+  );
+  ok("encuentro el cuerpo de .match-board", board !== null, "cambió el marcado del tablero");
+
+  for (const esquina of [
+    "corner-base-left",
+    "corner-base-right",
+    "corner-mine-left",
+    "corner-mine-right",
+  ]) {
+    const veces = [...(board ?? "").matchAll(new RegExp(`className="corner ${esquina}"`, "g"))]
+      .length;
+    ok(`    hay exactamente una esquina "${esquina}"`, veces === 1, `${veces}`);
+  }
+
+  ok(
+    "ningún indicador vive dentro del tablero",
+    !/stat-pill/.test(board ?? "no encontrado"),
+    "un stat-pill volvió a meterse en una esquina — eso es lo que rompía la geometría"
+  );
+
   ok(
     "el botón de silencio no vive en el tablero",
-    !/rail-stats[\s\S]{0,400}mute-btn/.test(src),
-    "volvió a apilarse con el tiempo en la esquina"
+    !/mute-btn/.test(board ?? ""),
+    "el silencio se metió otra vez en una esquina en vez de en el pie"
   );
+
+  const filaStats = entre('<div className="match-stats-row">', '{/* Lo que no es partida');
+  ok("hay una fila de indicadores fuera del tablero", filaStats !== null, "no encuentro .match-stats-row");
+  const pastillas = [...(filaStats ?? "").matchAll(/className="stat-pill"/g)].length;
+  ok(
+    "    la fila trae Tiempo y Castigos, ni uno más ni uno menos",
+    pastillas === 2,
+    `${pastillas} pastillas`
+  );
+
   ok(
     "y la cifra de cartas no se repite: ya la lleva tu ficha",
     !/sp-emoji">🃏/.test(src),
     "la píldora CARTAS dice el mismo número que el chip del jugador"
   );
+}
+
+/* ── El presupuesto vertical alcanza para todo, no solo para la carta ────── */
+
+console.log("\n— La pantalla entera cabe en 100dvh, sin scroll —\n");
+
+{
+  /*
+   * Lo mismo que calcula `--card-d`, pero al revés: si esta cuenta no da el
+   * mismo número que el CSS, es que alguien cambió una fórmula sin la otra y
+   * algo se va a salir por abajo. Los tres números fijos (línea de stats,
+   * gap del shell, pie) tienen que existir también como CSS real y no solo
+   * aquí — por eso viven con su propio comentario en globals.css.
+   */
+  const SHELL_PAD_V = 32; // .shell { padding: 16px } arriba + abajo
+  const SHELL_GAP = 10; // .match-shell { gap: 10px }
+  const STATS_ROW_H = 26; // .match-stats-row .stat-pill { height: 26px }
+  const FOOT_H = 42; // .match-foot .mute-btn 40px + margin-top 2px
+  const CARD_GAP = 32; // .shell.playing.match-shell .chain-area { --card-gap: 32px }
+
+  for (const [nombre, vw, vh] of PANTALLAS) {
+    const d = diametro(vw, vh);
+    // board + fila de stats + pie, con sus dos gaps del shell entre los tres.
+    const usado = SHELL_PAD_V + 2 * SHELL_GAP + STATS_ROW_H + FOOT_H + 2 * d + CARD_GAP;
+    ok(
+      `    ${nombre}: tablero + stats + pie caben en el alto disponible`,
+      usado <= vh,
+      `usa ${Math.round(usado)}px de ${vh}px — se pasa por ${Math.round(usado - vh)}px`
+    );
+  }
 }
 
 console.log(

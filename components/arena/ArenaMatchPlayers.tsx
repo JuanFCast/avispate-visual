@@ -5,7 +5,7 @@ import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n";
 
 /**
- * Los jugadores durante la partida, en los rieles laterales.
+ * Los jugadores durante la partida, en las cuatro esquinas del tablero.
  *
  * Antes esto era una franja horizontal encima del tablero. Funcionaba con un
  * rival y se caía con tres: cuatro chips completos en 375 px dejan 85 px por
@@ -13,37 +13,44 @@ import type { Translate } from "@/lib/i18n";
  * de verdad hay que mirar. En un juego que se gana viendo un símbolo entre
  * ocho, la carta es la pantalla; todo lo demás es borde.
  *
- * Así que los jugadores se fueron a los laterales, incluido TÚ. No es simetría
+ * Así que los jugadores se fueron a las esquinas, incluido TÚ. No es simetría
  * porque sí: cualquier excepción para el propio jugador vuelve a meter una
  * banda en el centro, y la regla tiene que aguantar igual con 2, 3 y 4.
  *
- * Dónde caen exactamente lo decide el CSS con `space-between` sobre un riel tan
- * alto como el tablero: el primer chip queda en la esquina de arriba, el
- * segundo justo en la costura entre las dos cartas, y los indicadores abajo.
- * Los tres sitios son hueco muerto —las cartas son círculos y no llegan a las
- * esquinas—, así que nada de esto le quita un píxel a la carta.
+ * Un círculo inscrito en su caja deja libre un triángulo en cada una de las
+ * CUATRO esquinas de esa caja, y por simetría los cuatro miden lo mismo. Eso es
+ * lo que hace posible anclar un chip a cada lado de BASE (sus dos esquinas de
+ * arriba) y uno a cada lado de TU CARTA (sus dos esquinas de abajo) sin tocar
+ * ningún círculo y sin repetir la cuenta de `verify-match-board-fit.ts`.
  */
 
 /**
- * Quién va en qué riel.
+ * Quién va en qué esquina.
  *
- * Tú encabezas siempre el izquierdo, para que tu chip esté donde tu pulgar no
- * lo tapa y siempre en el mismo sitio partida tras partida. Los rivales se
- * reparten alternando y empezando por la derecha, que es lo que mantiene los
- * dos lados parejos en las cuatro mesas posibles:
+ * Tú y el primer rival flanquean TU CARTA —es tu jugada, es donde miras—; el
+ * segundo y el tercer rival flanquean BASE. Con menos de tres rivales las
+ * esquinas de BASE simplemente se quedan vacías, así que la misma regla vale
+ * para 2, 3 y 4 mesas sin ramificar el layout:
  *
- *   2 jugadores → tú | r1
- *   3 jugadores → tú, r2 | r1
- *   4 jugadores → tú, r2 | r1, r3
+ *   2 jugadores → mineLeft: tú, mineRight: r1
+ *   3 jugadores → + baseLeft: r2
+ *   4 jugadores → + baseRight: r3
  */
-export function railsOf(
+export function matchSlots(
   you: MatchPlayerView | null,
   rivals: MatchPlayerView[]
-): { left: MatchPlayerView[]; right: MatchPlayerView[] } {
-  const left = you ? [you] : [];
-  const right: MatchPlayerView[] = [];
-  rivals.forEach((r, i) => (i % 2 === 0 ? right : left).push(r));
-  return { left, right };
+): {
+  baseLeft: MatchPlayerView | null;
+  baseRight: MatchPlayerView | null;
+  mineLeft: MatchPlayerView | null;
+  mineRight: MatchPlayerView | null;
+} {
+  return {
+    mineLeft: you,
+    mineRight: rivals[0] ?? null,
+    baseLeft: rivals[1] ?? null,
+    baseRight: rivals[2] ?? null,
+  };
 }
 
 export function stateOf(player: MatchPlayerView, t: Translate): string {
@@ -54,14 +61,15 @@ export function stateOf(player: MatchPlayerView, t: Translate): string {
 }
 
 /**
- * Un jugador en el riel: inicial, cartas que le quedan y su nombre en pequeño.
+ * Un jugador en la esquina: inicial, cartas que le quedan y su alias real.
  *
  * El número es lo más grande del chip porque es la carrera: es la única cifra
- * que se mira de reojo sin soltar la partida. El nombre va debajo y recortado
- * —a 52 px caben unas siete letras— y no por descuido: sirve para saber cuál de
- * los tres rivales va ganando, no para leerlo entero. El estado no se escribe,
- * se pinta (apagado, bandera, puerta), y viaja completo en el `title` y en el
- * `aria-label` para quien no puede verlo.
+ * que se mira de reojo sin soltar la partida. El alias va debajo, recortado
+ * con `…` solo cuando de verdad no cabe —nunca se sustituye por la inicial, ni
+ * el tuyo por "TÚ": esa insignia va aparte, sobre el avatar, para no borrar tu
+ * propio nombre de la mesa. El estado no se escribe, se pinta (apagado,
+ * bandera, puerta), y viaja completo en el `title` y en el `aria-label` para
+ * quien no puede verlo.
  */
 export function RailChip({ player }: { player: MatchPlayerView | null }) {
   const t = useT();
@@ -90,6 +98,7 @@ export function RailChip({ player }: { player: MatchPlayerView | null }) {
     >
       <span className="rail-chip-avatar" aria-hidden="true">
         {player.initial}
+        {player.isYou && <em className="rail-chip-you">{t("match.you")}</em>}
         {player.finished && <em className="rail-chip-flag">🏁</em>}
         {player.left && !player.finished && <em className="rail-chip-flag">🚪</em>}
       </span>
@@ -102,9 +111,10 @@ export function RailChip({ player }: { player: MatchPlayerView | null }) {
       >
         {player.cardsLeft}
       </strong>
-      <small className="rail-chip-name">
-        {player.isYou ? t("match.you") : name}
-      </small>
+      <span className="rail-chip-cards-label" aria-hidden="true">
+        {t("match.cards")}
+      </span>
+      <small className="rail-chip-name">{name}</small>
     </div>
   );
 }
