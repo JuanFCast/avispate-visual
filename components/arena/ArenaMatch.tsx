@@ -24,10 +24,18 @@ import ArenaMatchPlayers, { RailChip, matchSlots } from "./ArenaMatchPlayers";
  * `--card-d` en CSS, no JS: ver el porqué en `lib/use-viewport-size.ts`.
  */
 const CIRCLE_GAP = 4;
-const CORNER_H = 40;
-const CORNER_BLEED = 16;
-const CORNER_MIN_W = 56;
-const CORNER_MAX_W = 100;
+/*
+ * El chip de jugador vive DENTRO de la caja del círculo, nunca fuera de
+ * ella: `CORNER_BLEED = 0` es a propósito. Un presupuesto de sangrado hacia
+ * afuera de la caja asume margen que puede no existir —el shell solo separa
+ * 4px del borde real— y ese fue exactamente el bug: el chip se salía por
+ * arriba/abajo del viewport en vez de quedarse en el hueco muerto que la
+ * curvatura ya deja adentro.
+ */
+const CORNER_H = 28;
+const CORNER_BLEED = 0;
+const CORNER_MIN_W = 44;
+const CORNER_MAX_W = 90;
 const WAIST_H = 32;
 const WAIST_MIN_W = 56;
 const WAIST_MAX_W = 110;
@@ -429,7 +437,6 @@ export default function ArenaMatch({ code }: { code: string }) {
   const overlayVars = {
     "--corner-w": `${cornerW}px`,
     "--corner-h": `${CORNER_H}px`,
-    "--board-bleed": `${CORNER_BLEED}px`,
     "--waist-offset": `${waistOff}px`,
     "--waist-max-w": `${waistMaxW}px`,
   } as CSSProperties;
@@ -539,7 +546,7 @@ export default function ArenaMatch({ code }: { code: string }) {
             onClick={() => setQuitConfirm(true)}
             aria-label={t("match.quit")}
           >
-            🚪
+            🏳️
           </button>
         </div>
       </div>

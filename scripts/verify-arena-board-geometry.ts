@@ -24,10 +24,10 @@ function ok(name: string, condition: boolean, detail = "") {
 
 const SHELL_PAD = 4; // padding mínimo del shell (4px, o el área segura si es mayor)
 const CIRCLE_GAP = 4; // separación entre BASE y TU CARTA — casi tangentes
-const CORNER_H = 40;
-const CORNER_BLEED = 16;
-const CORNER_MIN_W = 56;
-const CORNER_MAX_W = 100;
+const CORNER_H = 28;
+const CORNER_BLEED = 0; // el chip vive DENTRO de la caja, nunca sangra hacia afuera
+const CORNER_MIN_W = 44;
+const CORNER_MAX_W = 90;
 const WAIST_H = 32;
 const AIR_MIN = 4;
 

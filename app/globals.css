@@ -4601,35 +4601,38 @@ body {
  * Las cuatro esquinas — posición FIJA por asiento, no por cuántos jugadores
  * haya. `--corner-w` lo calcula `cornerMaxWidth` en JS con el MISMO
  * `boardDiameter` que usa este archivo, así que nunca es más ancho de lo
- * que la trigonometría del círculo permite; `--board-bleed` es lo que la
- * esquina puede robarle al padding del shell saliendo hacia el borde real
- * de la pantalla, para no depender solo del triángulo muerto interno.
+ * que la trigonometría del círculo permite. La esquina se apoya EN LA CAJA
+ * del círculo (`top/left/right/bottom: 0`), nunca fuera de ella: sangrar
+ * hacia afuera asume un margen que puede no existir —el shell solo separa
+ * 4px del borde real— y ese margen inventado es justo lo que hacía que el
+ * chip quedara cortado por el borde del viewport en vez de vivir en el
+ * hueco muerto que la curvatura ya deja adentro de la caja.
  */
 .corner {
   position: absolute;
-  width: var(--corner-w, 80px);
-  height: var(--corner-h, 40px);
+  width: var(--corner-w, 70px);
+  height: var(--corner-h, 28px);
   z-index: 4;
 }
 
 .corner-base-left {
-  top: calc(-1 * var(--board-bleed, 16px));
-  left: calc(-1 * var(--board-bleed, 16px));
+  top: 0;
+  left: 0;
 }
 
 .corner-base-right {
-  top: calc(-1 * var(--board-bleed, 16px));
-  right: calc(-1 * var(--board-bleed, 16px));
+  top: 0;
+  right: 0;
 }
 
 .corner-mine-left {
-  bottom: calc(-1 * var(--board-bleed, 16px));
-  left: calc(-1 * var(--board-bleed, 16px));
+  bottom: 0;
+  left: 0;
 }
 
 .corner-mine-right {
-  bottom: calc(-1 * var(--board-bleed, 16px));
-  right: calc(-1 * var(--board-bleed, 16px));
+  bottom: 0;
+  right: 0;
 }
 
 /*
@@ -4645,10 +4648,10 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 2px;
-  padding: 4px 6px;
+  gap: 1px;
+  padding: 1px 4px;
   border: 1px solid var(--gray-soft);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--white);
   overflow: hidden;
 }
@@ -4682,8 +4685,8 @@ body {
 }
 
 .corner-module-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--seat-color, var(--yellow));
   flex-shrink: 0;
@@ -4695,28 +4698,28 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.64rem;
+  font-size: 0.58rem;
   font-weight: 700;
   color: var(--ink);
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .corner-module-flag {
   flex-shrink: 0;
-  font-size: 0.6rem;
+  font-size: 0.54rem;
   font-style: normal;
   line-height: 1;
 }
 
 .corner-module-deck {
   flex-shrink: 0;
-  font-size: 0.62rem;
+  font-size: 0.54rem;
   line-height: 1;
 }
 
 .corner-module-count {
   font-family: var(--font-title);
-  font-size: 0.7rem;
+  font-size: 0.62rem;
   font-weight: 700;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
@@ -4868,10 +4871,10 @@ body {
   max-width: calc(100% - 16px);
 }
 
-/* Pantalla corta: la etiqueta es lo primero que sobra, el punto de color y
-   la cifra ya dicen lo que hace falta. */
+/* Pantalla corta: en la cintura la etiqueta es lo primero que sobra —el
+   emoji y la cifra ya dicen lo que hace falta—. El chip de jugador ya es
+   tan compacto (28px) que el alias entra sin necesidad de ocultarlo. */
 @media (max-height: 640px) {
-  .corner-module-name,
   .waist-pill .sp-label {
     display: none;
   }
