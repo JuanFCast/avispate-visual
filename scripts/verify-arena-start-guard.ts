@@ -324,8 +324,8 @@ check(
   "partida empezada y uno se va → gana el otro, no se devuelve",
   decideMatchOutcome(
     [
-      { address: ANF, cleared: false, left: true, lastSeenAt: AHORA },
-      { address: INV, cleared: false, left: false, lastSeenAt: AHORA },
+      { id: ANF, cleared: false, left: true, lastSeenAt: AHORA },
+      { id: INV, cleared: false, left: false, lastSeenAt: AHORA },
     ],
     AHORA,
     90_000

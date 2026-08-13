@@ -119,13 +119,17 @@ export function seatAddressFor(req: Request, tableId: string | null): string | n
 }
 
 /**
- * Levantarse de una mesa con entrada NO puede ser un botón.
+ * Levantarse del LOBBY de una mesa con entrada, antes de que arranque la
+ * partida, sigue sin ser un botón.
  *
- * El contrato le paga al que se queda, así que "irse" es regalar la entrada. Un
- * botón que regala dinero es exactamente lo que no puede estar al alcance de
- * una sesión robada. Ausentarse sigue siendo posible —basta con dejar de
- * aparecer, y el servidor lo declara pasado el tiempo de gracia—, pero eso no
- * lo puede provocar un tercero desde fuera.
+ * Ojo: esto ya NO se usa para abandonar una partida en curso — ese camino
+ * ahora es `leaveMatch` con `resolveActor` (misma ficha de silla que exige
+ * `move`), porque la pregunta "¿quién puede irse?" tiene la misma respuesta
+ * que "¿quién puede jugar?" y no hace falta un interruptor aparte. Aquí, en
+ * el lobby, la partida ni empezó: no hay mazo, ni mano, ni forma de que
+ * `closeIfAbandoned` reparta la silla vacía entre los que quedan, así que
+ * sigue sin haber una salida limpia que no sea "espera a que la mesa venza o
+ * se anule".
  */
 export async function forfeitBlocked(
   code: string

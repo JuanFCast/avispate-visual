@@ -169,17 +169,3 @@ export function decideActor(check: {
   if (!check.sessionProfileId) return { ok: false, error: "unauthorized" };
   return { ok: true, profileId: check.sessionProfileId };
 }
-
-/**
- * ¿Esta acción puede hacer perder dinero a alguien?
- *
- * Se usa para decidir qué se cierra en una mesa con entrada. Levantarse de una
- * mesa pagada NO es una acción que deba existir por API: el contrato paga al
- * que se queda, así que "irse" es regalar la entrada, y una sesión robada no
- * puede tener a mano un botón que regala el dinero de otro. Ausentarse sigue
- * siendo posible —basta con dejar de aparecer—, pero eso no lo puede provocar
- * un tercero desde fuera.
- */
-export function isForfeitAction(action: string): boolean {
-  return action === "leave";
-}

@@ -3339,6 +3339,22 @@ body {
   text-decoration: underline;
 }
 
+/* La opción de irse de verdad: mismo hueco que "más tarde", pero en rojo y
+   sin restarle opacidad — es una decisión, no un enlace de escape casual. El
+   botón que SÍ queda en la mesa (`.arena-cta`) es el llamativo a propósito:
+   quedarse es la salida por defecto de este cuadro. */
+.match-quit-confirm-go {
+  align-self: center;
+  min-height: 44px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-title);
+  font-weight: 700;
+  color: var(--bad);
+  text-decoration: underline;
+}
+
 /* AliasGate/WalletAliasForm dentro del modal: sin doble tarjeta. */
 .lobby-modal .panel {
   border: none;

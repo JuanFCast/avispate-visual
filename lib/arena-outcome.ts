@@ -21,8 +21,15 @@
  */
 
 export interface SeatState {
-  /** Dirección que pagó la silla. Es a quien puede pagarle el contrato. */
-  address: string;
+  /**
+   * Quién ocupa la silla. La función es agnóstica de qué tipo de
+   * identificador es —`profile_id` en la base de datos, dirección on-chain
+   * si algún día se llama directo desde la cadena— y lo devuelve tal cual en
+   * el veredicto: quien llama decide cómo traducirlo a "a quién le paga el
+   * contrato" (hoy, `settleFinishedMatch` resuelve la dirección a partir del
+   * `profile_id` ganador).
+   */
+  id: string;
   /** Se quedó sin cartas: ganó jugando. */
   cleared: boolean;
   /** Se levantó explícitamente. */
@@ -56,7 +63,7 @@ export function decideMatchOutcome(
   // su mazo y en ese mismo instante otro se desconecta, ganó el que terminó, no
   // el que se quedó — y sin esta prioridad podría resolverse al revés.
   const cleared = seats.find((s) => s.cleared);
-  if (cleared) return { kind: "settle", winner: cleared.address, reason: "cleared" };
+  if (cleared) return { kind: "settle", winner: cleared.id, reason: "cleared" };
 
   const present = seats.filter(
     (s) => !s.left && now - s.lastSeenAt <= graceMs
@@ -64,7 +71,7 @@ export function decideMatchOutcome(
 
   // Queda uno solo: los demás se fueron o no volvieron. Cobra el que aguantó.
   if (present.length === 1) {
-    return { kind: "settle", winner: present[0].address, reason: "abandoned" };
+    return { kind: "settle", winner: present[0].id, reason: "abandoned" };
   }
 
   // No queda nadie a quien pagarle.

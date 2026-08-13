@@ -36,6 +36,7 @@ import {
 } from "../arena-match";
 import { arenaPrize } from "../arena";
 import { decideMatchStart } from "../arena-start";
+import { decideMatchOutcome } from "../arena-outcome";
 import { paidPlayersOf } from "../arena-escrow";
 import { initialOf, shortWallet } from "../arena-rooms";
 import { getRoomByCode, roomIsLive } from "./arena-rooms";
@@ -285,9 +286,17 @@ function toPlayerView(
 }
 
 /**
- * Cierra la partida cuando uno de los dos ya no volvió. Se comprueba al leer
- * porque no hay nadie más a quien preguntarle: el que se fue no va a avisar, y
- * el que se quedó merece un final en vez de una espera infinita.
+ * Cierra la partida cuando ya no queda más de un jugador de pie. Se comprueba
+ * al leer porque no hay nadie más a quien preguntarle: el que se fue no va a
+ * avisar, y el que se quedó merece un final en vez de una espera infinita.
+ *
+ * La regla de quién gana y cuándo vive en `decideMatchOutcome`
+ * (`lib/arena-outcome.ts`), no aquí — esta función solo traduce las filas de
+ * la base a `SeatState` y ejecuta el veredicto. Antes esta lógica estaba
+ * repetida (mal) en las dos partes: una copia aquí, con SQL de verdad, y otra
+ * en `arena-outcome.ts`, pura y verificada por
+ * `scripts/verify-arena-outcome.ts` pero sin conectar a nada. Una sola mesa de
+ * cuatro dejaba dos sitios que podían discrepar sobre cuándo termina.
  */
 async function closeIfAbandoned(
   match: MatchRow,
@@ -304,24 +313,33 @@ async function closeIfAbandoned(
   if (match.finished_at) return match;
   if (now < new Date(match.starts_at).getTime()) return match;
 
-  const isGone = (p: MatchPlayerRow) =>
-    p.left_at !== null || now - new Date(p.last_seen_at).getTime() > graceMs;
+  const outcome = decideMatchOutcome(
+    players.map((p) => ({
+      id: p.profile_id,
+      cleared: p.finished_at !== null,
+      left: p.left_at !== null,
+      lastSeenAt: new Date(p.last_seen_at).getTime(),
+    })),
+    now,
+    graceMs
+  );
 
-  const standing = players.filter((p) => !isGone(p) && p.finished_at === null);
-
-  // Con gente de sobra la partida sigue: que uno se caiga de una mesa de cuatro
-  // no es motivo para cerrarla a los otros tres. Solo cuando queda uno solo hay
-  // que dar un final, porque no le queda contra quién correr.
-  if (standing.length > 1) return match;
-  if (standing.length === players.length) return match;
+  if (outcome.kind === "playing") return match;
 
   const db = getSupabaseAdmin();
   const { data, error } = await db
     .from("arena_matches")
     .update({
       finished_at: new Date().toISOString(),
-      winner_profile_id: standing[0]?.profile_id ?? null,
-      end_reason: "abandoned",
+      // "void" (se fueron todos) no tiene ganador: `settleFinishedMatch` lee
+      // `winner_profile_id: null` como la señal de anular y devolver, no de
+      // pagar a nadie. El `reason` de un `cleared` aquí sería en la práctica
+      // inalcanzable —esta función ya cortó arriba si `match.finished_at`
+      // estaba puesto, y el RPC pone los dos a la vez— pero se respeta el que
+      // diga el veredicto en vez de fijarlo a mano, para no mentir si algún
+      // día deja de serlo.
+      winner_profile_id: outcome.kind === "settle" ? outcome.winner : null,
+      end_reason: outcome.kind === "settle" ? outcome.reason : "abandoned",
     })
     .eq("id", match.id)
     .is("finished_at", null)

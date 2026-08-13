@@ -5,11 +5,7 @@
 // Correr: node scripts/verify-arena-seat.ts
 //
 // Sin dependencias: Node 22+ ejecuta TypeScript quitando los tipos.
-import {
-  decideSeatAccess,
-  isForfeitAction,
-  type SeatAction,
-} from "../lib/arena-seat.ts";
+import { decideSeatAccess, type SeatAction } from "../lib/arena-seat.ts";
 
 let failed = 0;
 
@@ -114,12 +110,6 @@ check(
   mesa({ seat: ficha(ALICE.toUpperCase()) }),
   { ok: true }
 );
-
-console.log("\n— Levantarse no puede ser un botón en una mesa pagada —");
-
-check("irse es una acción que regala dinero", isForfeitAction("leave"), true);
-check("mover no", isForfeitAction("move"), false);
-check("decir listo no", isForfeitAction("ready"), false);
 
 console.log(
   failed === 0 ? "\nTodo bien.\n" : `\n${failed} comprobación(es) fallaron.\n`

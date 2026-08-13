@@ -247,10 +247,12 @@ export function useArenaMatch(code: string): ArenaMatchApi {
   );
 
   /**
-   * Irse. El servidor puede negarse —una mesa con premio no se abandona por
-   * botón, ver `forfeitBlocked`— y la pantalla necesita saber por qué para no
-   * parecer un botón roto: devuelve si funcionó y, si no, el motivo que dio
-   * el servidor.
+   * Irse. Funciona igual en mesa gratis o con premio: `authHeaders` ya manda
+   * la ficha de silla si la hay, que es lo mismo que manda `play`, así que el
+   * servidor sabe que eres tú y no necesita una firma nueva para esto.
+   *
+   * Puede fallar igual que cualquier request (red, ficha vencida) — la
+   * pantalla necesita saber si funcionó para no parecer un botón roto.
    */
   const leave = useCallback(async (): Promise<{ ok: boolean; reason?: string }> => {
     try {

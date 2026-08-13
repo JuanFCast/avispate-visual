@@ -25,12 +25,13 @@ function check(name: string, actual: unknown, expected: unknown) {
 const ALICE = "0x46d5f9fe98461928dbad7a22b95bade5fa178c18";
 const BOB = "0xfd43f6003484579ca068313736632eea8c651477";
 const CAROL = "0x1246294f454710670deccf9ec6545c4241d40202";
+const DAVE = "0x92a1e6b6d9c2d0e0f4f0a2e6c8b4d6e0f2a4c6e8";
 
 const AHORA = 1_770_000_000_000;
 const GRACIA = 90_000; // 90 s
 
-const silla = (address: string, o: Partial<SeatState> = {}): SeatState => ({
-  address,
+const silla = (id: string, o: Partial<SeatState> = {}): SeatState => ({
+  id,
   cleared: false,
   left: false,
   lastSeenAt: AHORA,
@@ -90,6 +91,36 @@ check(
     silla(CAROL),
   ]),
   { kind: "settle", winner: CAROL, reason: "abandoned" }
+);
+
+console.log("\n— Lo mismo en una mesa de cuatro —");
+
+check(
+  "4 jugadores, se va uno → siguen los otros tres",
+  fin([silla(ALICE, { left: true }), silla(BOB), silla(CAROL), silla(DAVE)]),
+  { kind: "playing" }
+);
+
+check(
+  "4 jugadores, se van dos → siguen los otros dos",
+  fin([
+    silla(ALICE, { left: true }),
+    silla(BOB, { left: true }),
+    silla(CAROL),
+    silla(DAVE),
+  ]),
+  { kind: "playing" }
+);
+
+check(
+  "4 jugadores, se van tres → cobra el último de pie",
+  fin([
+    silla(ALICE, { left: true }),
+    silla(BOB, { left: true }),
+    silla(CAROL, { left: true }),
+    silla(DAVE),
+  ]),
+  { kind: "settle", winner: DAVE, reason: "abandoned" }
 );
 
 console.log("\n— Desconectarse NO es una forma de recuperar la entrada —");

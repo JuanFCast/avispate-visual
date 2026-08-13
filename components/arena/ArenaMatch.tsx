@@ -100,8 +100,10 @@ export default function ArenaMatch({ code }: { code: string }) {
   const [penaltyKey, setPenaltyKey] = useState(0);
   const [lateKey, setLateKey] = useState(0);
   const [muted, setMutedState] = useState(false);
-  /** Por qué no se pudo abandonar, si el servidor lo negó. `null` = botón normal. */
-  const [quitBlocked, setQuitBlocked] = useState<"blocked" | "failed" | null>(null);
+  /** El cuadro de "¿seguro?" antes de abandonar. Se puede cancelar. */
+  const [quitConfirm, setQuitConfirm] = useState(false);
+  /** El intento de abandonar falló (red, ficha vencida) — no es lo normal. */
+  const [quitFailed, setQuitFailed] = useState(false);
 
   const shown = useRef<{ base: number | null; mine: number | null }>({
     base: null,
@@ -122,15 +124,15 @@ export default function ArenaMatch({ code }: { code: string }) {
   }
 
   /**
-   * El botón no puede quedarse mudo cuando el servidor dice que no: una mesa
-   * con premio no se abandona por botón (ver `forfeitBlocked`), y sin este
-   * aviso eso se lee como un botón roto en vez de una regla del dinero.
+   * Se confirma antes de tocar la red: "no podrás volver" es cierto e
+   * irreversible, y un toque de más no puede costar la silla.
    */
   async function handleQuit() {
+    setQuitConfirm(false);
     const result = await leave();
     if (!result.ok) {
-      setQuitBlocked(result.reason === "forfeit_not_allowed_on_paid_table" ? "blocked" : "failed");
-      setTimeout(() => setQuitBlocked(null), 3200);
+      setQuitFailed(true);
+      setTimeout(() => setQuitFailed(false), 3200);
     }
   }
 
@@ -352,6 +354,27 @@ export default function ArenaMatch({ code }: { code: string }) {
     );
   }
 
+  /*
+   * Abandonaste, pero la mesa tenía más gente: la partida no se acaba por ti
+   * solo, sigue entre los demás. No hay tablero que enseñarte —no puedes
+   * tocar nada, ya te fuiste— así que aquí termina tu pantalla, no la suya.
+   * Si la mesa era de dos, esto nunca se pinta: ahí abandonar SÍ termina la
+   * partida y `phase` ya llegó como `"finished"`, arriba.
+   */
+  if (view.you?.left) {
+    return (
+      <MatchShell phase={null}>
+        <section className="arena-card arena-hero room-state">
+          <h1 className="arena-hero-title">{t("match.left.title")}</h1>
+          <p className="arena-hero-text">{t("match.left.text")}</p>
+          <Link className="arena-cta" href="/arena">
+            {t("room.error.cta")}
+          </Link>
+        </section>
+      </MatchShell>
+    );
+  }
+
   if (phase === "countdown") {
     return (
       <MatchShell phase="countdown">
@@ -479,12 +502,37 @@ export default function ArenaMatch({ code }: { code: string }) {
         </button>
         <button
           type="button"
-          className={`match-quit${quitBlocked ? " is-blocked" : ""}`}
-          onClick={handleQuit}
+          className={`match-quit${quitFailed ? " is-blocked" : ""}`}
+          onClick={() => setQuitConfirm(true)}
         >
-          {quitBlocked ? t(`match.quit.${quitBlocked}`) : t("match.quit")}
+          {quitFailed ? t("match.quit.failed") : t("match.quit")}
         </button>
       </div>
+
+      {/* "No podrás volver" es cierto e irreversible, así que se confirma
+          aparte del tablero — un toque de más aquí no puede costar la silla. */}
+      {quitConfirm && (
+        <div className="lobby-modal-backdrop" onClick={() => setQuitConfirm(false)}>
+          <div
+            className="lobby-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="quit-confirm-title"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="quit-confirm-title" className="lobby-modal-title">
+              {t("match.quit.confirm.title")}
+            </h2>
+            <p className="lobby-modal-text">{t("match.quit.confirm.text")}</p>
+            <button type="button" className="arena-cta" onClick={() => setQuitConfirm(false)}>
+              {t("match.quit.confirm.stay")}
+            </button>
+            <button type="button" className="match-quit-confirm-go" onClick={handleQuit}>
+              {t("match.quit.confirm.go")}
+            </button>
+          </div>
+        </div>
+      )}
     </MatchShell>
   );
 }
