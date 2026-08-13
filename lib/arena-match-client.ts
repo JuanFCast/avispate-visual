@@ -47,7 +47,7 @@ export interface ArenaMatchApi extends ArenaMatchState {
   serverNow: () => number;
   refresh: () => Promise<void>;
   play: (symbolId: string) => Promise<PlayResult | null>;
-  leave: () => Promise<void>;
+  leave: () => Promise<{ ok: boolean; reason?: string }>;
 }
 
 export function useArenaMatch(code: string): ArenaMatchApi {
@@ -246,18 +246,30 @@ export function useArenaMatch(code: string): ArenaMatchApi {
     [state.view, code, authHeaders, absorb, notify, claimSeat]
   );
 
-  const leave = useCallback(async () => {
+  /**
+   * Irse. El servidor puede negarse —una mesa con premio no se abandona por
+   * botón, ver `forfeitBlocked`— y la pantalla necesita saber por qué para no
+   * parecer un botón roto: devuelve si funcionó y, si no, el motivo que dio
+   * el servidor.
+   */
+  const leave = useCallback(async (): Promise<{ ok: boolean; reason?: string }> => {
     try {
       const res = await fetch(
         `/api/arena/matches/${encodeURIComponent(code)}/leave`,
         { method: "POST", headers: await authHeaders() }
       );
       const data = await res.json().catch(() => null);
-      if (res.ok && data) absorb(data as MatchView);
+      if (res.ok && data) {
+        absorb(data as MatchView);
+        notify();
+        return { ok: true };
+      }
       notify();
+      return { ok: false, reason: (data as { error?: string } | null)?.error };
     } catch {
-      // Irse no puede fallar: si el aviso no llega, el otro gana igual cuando
-      // el servidor note que este jugador dejó de latir.
+      // El latido sigue corriendo aunque esto falle: si el aviso no llega, el
+      // otro gana igual cuando el servidor note que este jugador dejó de latir.
+      return { ok: false };
     }
   }, [code, authHeaders, absorb, notify]);
 

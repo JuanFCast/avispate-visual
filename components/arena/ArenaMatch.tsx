@@ -100,6 +100,8 @@ export default function ArenaMatch({ code }: { code: string }) {
   const [penaltyKey, setPenaltyKey] = useState(0);
   const [lateKey, setLateKey] = useState(0);
   const [muted, setMutedState] = useState(false);
+  /** Por qué no se pudo abandonar, si el servidor lo negó. `null` = botón normal. */
+  const [quitBlocked, setQuitBlocked] = useState<"blocked" | "failed" | null>(null);
 
   const shown = useRef<{ base: number | null; mine: number | null }>({
     base: null,
@@ -117,6 +119,19 @@ export default function ArenaMatch({ code }: { code: string }) {
     setMuted(next);
     setMutedState(next);
     if (!next) unlockAudio();
+  }
+
+  /**
+   * El botón no puede quedarse mudo cuando el servidor dice que no: una mesa
+   * con premio no se abandona por botón (ver `forfeitBlocked`), y sin este
+   * aviso eso se lee como un botón roto en vez de una regla del dinero.
+   */
+  async function handleQuit() {
+    const result = await leave();
+    if (!result.ok) {
+      setQuitBlocked(result.reason === "forfeit_not_allowed_on_paid_table" ? "blocked" : "failed");
+      setTimeout(() => setQuitBlocked(null), 3200);
+    }
   }
 
   // Un repintado corto y constante: el reloj sube y la cuenta regresiva baja
@@ -388,9 +403,9 @@ export default function ArenaMatch({ code }: { code: string }) {
             )}
           </div>
           <div className="stat-pill">
-            <span className="sp-emoji">⏱️</span>
-            <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
-            <span className="sp-label">{t("game.stat.time")}</span>
+            <span className="sp-emoji">✋</span>
+            <span className="sp-value">{view.you?.correct ?? 0}</span>
+            <span className="sp-label">{t("match.stat.taken")}</span>
           </div>
         </div>
 
@@ -462,8 +477,12 @@ export default function ArenaMatch({ code }: { code: string }) {
         >
           {muted ? "🔇" : "🔊"}
         </button>
-        <button type="button" className="match-quit" onClick={leave}>
-          {t("match.quit")}
+        <button
+          type="button"
+          className={`match-quit${quitBlocked ? " is-blocked" : ""}`}
+          onClick={handleQuit}
+        >
+          {quitBlocked ? t(`match.quit.${quitBlocked}`) : t("match.quit")}
         </button>
       </div>
     </MatchShell>

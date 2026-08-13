@@ -385,6 +385,7 @@ export const en = {
   "match.cards": "cards",
   "match.penalty": "+1 card",
   "match.late": "They beat you to it",
+  "match.stat.taken": "taken",
   "match.stat.penalties": "penalties",
   "match.state.playing": "Playing",
   "match.state.finished": "Out of cards",
@@ -392,6 +393,8 @@ export const en = {
   "match.state.left": "Left",
   "match.state.waiting": "Waiting…",
   "match.quit": "Quit the match",
+  "match.quit.blocked": "Can't leave — prize is live",
+  "match.quit.failed": "Couldn't leave — try again",
   "match.you_offline":
     "We lost the connection. What you see may be out of date — reconnecting…",
   "match.gone.title": "This match isn't here",
@@ -1159,6 +1162,7 @@ export const es: Record<MessageKey, string> = {
   "match.cards": "cartas",
   "match.penalty": "+1 carta",
   "match.late": "Te ganaron de mano",
+  "match.stat.taken": "tomadas",
   "match.stat.penalties": "castigos",
   "match.state.playing": "Jugando",
   "match.state.finished": "Sin cartas",
@@ -1166,6 +1170,8 @@ export const es: Record<MessageKey, string> = {
   "match.state.left": "Se fue",
   "match.state.waiting": "Esperando…",
   "match.quit": "Abandonar la partida",
+  "match.quit.blocked": "No puedes irte: hay premio en juego",
+  "match.quit.failed": "No se pudo salir — intenta de nuevo",
   "match.you_offline":
     "Se perdió la conexión. Lo que ves puede estar desactualizado; reconectando…",
   "match.gone.title": "Esta partida no está",

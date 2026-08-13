@@ -4567,7 +4567,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px 4px 7px;
+  padding: 6px 3px 6px;
   border: 2px solid var(--gray-soft);
   border-radius: 16px;
   background: var(--white);
@@ -4598,8 +4598,8 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   border: 2px solid var(--ink);
   background: var(--yellow);
@@ -4695,8 +4695,8 @@ body {
  * bien sea cual sea el tamaño de la carta, no una fracción de su diámetro.
  */
 .shell.playing.match-shell {
-  --chip-w: clamp(52px, 15vw, 78px);
-  --chip-gap: 10px;
+  --chip-w: clamp(48px, 13vw, 72px);
+  --chip-gap: 8px;
 
   --card-d: min(
     calc(100vw - 32px - 2 * var(--chip-w) - 2 * var(--chip-gap)),
@@ -4775,6 +4775,12 @@ body {
   color: var(--gray);
   text-decoration: underline;
   cursor: pointer;
+}
+
+/* El servidor dijo que no: el enlace se pone rojo un momento y dice por qué,
+   en vez de quedarse mudo como si el toque no hubiera hecho nada. */
+.match-quit.is-blocked {
+  color: var(--bad);
 }
 
 /* --- Final de la partida --- */
