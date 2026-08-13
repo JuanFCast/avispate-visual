@@ -1,41 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { placeMatchCard, sharedSymbol } from "@/lib/arena-deck";
 import { useArenaMatch } from "@/lib/arena-match-client";
 import { countdownNumber, matchShellClass, type MatchPhase } from "@/lib/arena-match";
-import { boardDiameter, cornerMaxWidth } from "@/lib/arena-board-geometry";
-import { useStageSize } from "@/lib/use-stage-size";
 import { useT } from "@/lib/i18n/client";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import CardView from "../CardView";
 import ArenaMatchOver from "./ArenaMatchOver";
 import ArenaMatchPlayers, { RailChip, matchSlots } from "./ArenaMatchPlayers";
-import ExitHold from "./ExitHold";
-
-/**
- * Geometría del tablero — ver `lib/arena-board-geometry.ts` y
- * `scripts/verify-arena-board-geometry.ts` para el porqué de estos números
- * exactos, no aproximados:
- *
- *   · `BOARD_GAP` (68px) es el hueco entre BASE y TU CARTA. Es más que los
- *     10px "de separación" que pediría la fórmula desnuda porque ahí adentro
- *     viven Tomadas, Castigos, silencio y la salida accesible — y esa franja
- *     es hueco muerto por construcción, así que meter algo ahí no le cuesta
- *     nada al diámetro.
- *   · `CORNER_BLEED` (16px) es lo que un módulo de esquina puede robarle al
- *     padding del shell, saliéndose hacia el borde de la pantalla.
- *   · El ancho de esquina NO es fijo en 86px: se recalcula por pantalla con
- *     `cornerMaxWidth`, que nunca deja que el módulo pise el círculo. En un
- *     círculo chico eso significa un módulo más angosto que 86px — nunca uno
- *     que se superponga.
- */
-const BOARD_GAP = 68;
-const CORNER_BLEED = 16;
-const CORNER_H = 40;
-const CORNER_MIN_W = 60;
-const CORNER_MAX_W = 86;
 
 /** Lo que tarda la carta vieja en salir de cuadro. Igual que en el individual. */
 const EXIT_MS = 600;
@@ -126,16 +100,10 @@ export default function ArenaMatch({ code }: { code: string }) {
   const [penaltyKey, setPenaltyKey] = useState(0);
   const [lateKey, setLateKey] = useState(0);
   const [muted, setMutedState] = useState(false);
-  /**
-   * El cuadro de "¿seguro?" ya NO lo abre el gesto sostenido —sostener 2.5s
-   * YA ES la confirmación, pedir otra encima sería redundante—: lo reserva
-   * la salida accesible (el `✕` del intersticio), para quien no puede
-   * sostener un gesto cronometrado.
-   */
+  /** El cuadro de "¿seguro?" antes de abandonar. Se puede cancelar. */
   const [quitConfirm, setQuitConfirm] = useState(false);
   /** El intento de abandonar falló (red, ficha vencida) — no es lo normal. */
   const [quitFailed, setQuitFailed] = useState(false);
-  const [stageRef, stageSize] = useStageSize<HTMLDivElement>();
 
   const shown = useRef<{ base: number | null; mine: number | null }>({
     base: null,
@@ -156,11 +124,8 @@ export default function ArenaMatch({ code }: { code: string }) {
   }
 
   /**
-   * El punto de salida único, sea cual sea el camino que llevó hasta acá:
-   * sostener 2.5s en el tablero, o confirmar en el cuadro de la salida
-   * accesible. Los dos YA vienen confirmados a su manera —el gesto por ser
-   * deliberado y cronometrado, el cuadro por su propio botón— así que
-   * ninguno de los dos pide nada más antes de llamar.
+   * Se confirma antes de tocar la red: "no podrás volver" es cierto e
+   * irreversible, y un toque de más no puede costar la silla.
    */
   async function handleQuit() {
     setQuitConfirm(false);
@@ -427,30 +392,6 @@ export default function ArenaMatch({ code }: { code: string }) {
   const cardsLeft = view.you?.cardsLeft ?? 0;
   const slots = matchSlots(view.you, view.rivals);
 
-  // `250` de arranque: un valor razonable para el primer cuadro, antes de
-  // que `useStageSize` mida de verdad (que pasa ANTES de pintar, gracias a
-  // `useLayoutEffect` — esto casi nunca llega a pintarse tal cual).
-  const boardD =
-    stageSize.width > 0 && stageSize.height > 0
-      ? boardDiameter(stageSize.width, stageSize.height, BOARD_GAP)
-      : 250;
-  const boardR = boardD / 2;
-  const cornerW = cornerMaxWidth(boardR, CORNER_H, CORNER_BLEED, CORNER_MIN_W, CORNER_MAX_W);
-
-  const stageVars = {
-    "--card-d": `${boardD}px`,
-    "--card-gap": `${BOARD_GAP}px`,
-    "--corner-w": `${cornerW}px`,
-    "--corner-h": `${CORNER_H}px`,
-    "--board-bleed": `${CORNER_BLEED}px`,
-    // Lo que usan `--board-top`/`--board-left` en CSS para centrar
-    // `.chain-area` y anclar las esquinas — el mismo tamaño que ya midió
-    // `useStageSize`, o el mismo valor de arranque que `boardD` mientras
-    // todavía no midió.
-    "--stage-w": `${stageSize.width > 0 ? stageSize.width : boardD}px`,
-    "--stage-h": `${stageSize.height > 0 ? stageSize.height : 2 * boardD + BOARD_GAP}px`,
-  } as CSSProperties;
-
   return (
     <MatchShell phase="playing">
       {failures >= OFFLINE_AFTER && (
@@ -458,24 +399,41 @@ export default function ArenaMatch({ code }: { code: string }) {
           {t("match.you_offline")}
         </p>
       )}
-      {quitFailed && (
-        <p className="room-warn" role="status">
-          {t("match.quit.failed")}
-        </p>
-      )}
 
       {/*
-        Todo el HUD vive en absoluto sobre `.match-stage`: ninguna fila
-        propia le resta alto a las cartas. `d = min(W, (H-gap)/2)` — medido
-        de verdad con `useStageSize`, no supuesto de `dvh` — así que el
-        círculo es igual de grande con 2, 3 o 4 jugadores.
+        Columnas de verdad a los lados, no superpuestas al círculo: el chip de
+        jugador necesita alias legible y "N cartas" enteros, y eso no cabe en
+        el triángulo muerto de una esquina. Cada columna tiene dos puestos —
+        junto a BASE, junto a TU CARTA— y el que no tiene jugador se queda
+        como hueco vacío en vez de dejar que el otro suba: así "junto a TU
+        CARTA" cae siempre en la misma esquina, tengas 2, 3 o 4 en la mesa.
+
+        Tiempo y Castigos ya no viven en la columna: se fueron al intersticio
+        entre las dos cartas, que es hueco muerto por construcción —ninguna de
+        las dos cartas llega ahí, midan lo que midan— así que no le cuesta ni
+        un píxel a la carta ni compite por ancho con el alias del jugador.
       */}
-      <div className="match-stage" ref={stageRef} style={stageVars}>
+      <div className="play-board match-board">
+        <div className="corner-col corner-col-left">
+          <div className="corner corner-base-left">
+            {slots.baseLeft ? (
+              <RailChip key={slots.baseLeft.profileId} player={slots.baseLeft} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
+          </div>
+          <div className="corner corner-mine-left">
+            {slots.mineLeft ? (
+              <RailChip key={slots.mineLeft.profileId} player={slots.mineLeft} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
+          </div>
+        </div>
+
         <div className="chain-area">
-          {/* Sin píldoras: texto chico, dentro del borde, espejado hacia
-              afuera para dejar libre el punto donde se tocan las cartas. */}
-          <span className="chain-label chain-label-base">{t("game.slot.base")}</span>
-          <span className="chain-label chain-label-mine">{t("game.slot.mine")}</span>
+          <span className="slot-tag slot-tag-base">{t("game.slot.base")}</span>
+          <span className="slot-tag slot-tag-mine">{t("game.slot.mine")}</span>
           {cardsLeft > 1 && <div className="deck-stack" />}
           {penaltyKey > 0 && (
             <span key={penaltyKey} className="penalty-float">
@@ -489,6 +447,18 @@ export default function ArenaMatch({ code }: { code: string }) {
               {t("match.late")}
             </span>
           )}
+          <div className="chain-gap-stats">
+            <div className="stat-pill">
+              <span className="sp-emoji">✋</span>
+              <span className="sp-value">{view.you?.correct ?? 0}</span>
+              <span className="sp-label">{t("match.stat.taken")}</span>
+            </div>
+            <div className="stat-pill">
+              <span className="sp-emoji">🧱</span>
+              <span className="sp-value">{view.you?.penalties ?? 0}</span>
+              <span className="sp-label">{t("match.stat.penalties")}</span>
+            </div>
+          </div>
           {visual.map((vc) => (
             <div
               key={vc.key}
@@ -508,64 +478,45 @@ export default function ArenaMatch({ code }: { code: string }) {
           ))}
         </div>
 
-        {/* Cuatro esquinas, posición fija por silla: rival 1 arriba-izq,
-            rival 2 arriba-der, rival 3 abajo-izq, tú siempre abajo-der. */}
-        <div className="corner corner-base-left">
-          {slots.baseLeft && <RailChip key={slots.baseLeft.profileId} player={slots.baseLeft} />}
-        </div>
-        <div className="corner corner-base-right">
-          {slots.baseRight && <RailChip key={slots.baseRight.profileId} player={slots.baseRight} />}
-        </div>
-        <div className="corner corner-mine-left">
-          {slots.mineLeft && <RailChip key={slots.mineLeft.profileId} player={slots.mineLeft} />}
-        </div>
-        <div className="corner corner-mine-right">
-          {slots.mineRight && <RailChip key={slots.mineRight.profileId} player={slots.mineRight} />}
-        </div>
-
-        {/*
-          El intersticio: hueco muerto por construcción, así que aloja todo
-          lo que no es ni carta ni jugador — silencio, Tomadas, la salida
-          sostenida, Castigos, y la salida accesible — sin que le cueste un
-          píxel al círculo. Es a propósito la zona más ancha de la pantalla.
-        */}
-        <div className="chain-gap-row">
-          <button
-            type="button"
-            className="gap-util-btn"
-            onClick={toggleMuted}
-            aria-label={muted ? t("sound.unmute") : t("sound.mute")}
-          >
-            {muted ? "🔇" : "🔊"}
-          </button>
-          <div className="gap-module">
-            <strong className="gap-module-value">{view.you?.correct ?? 0}</strong>
-            <small className="gap-module-label">{t("match.stat.taken")}</small>
+        <div className="corner-col corner-col-right">
+          <div className="corner corner-base-right">
+            {slots.baseRight ? (
+              <RailChip key={slots.baseRight.profileId} player={slots.baseRight} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
           </div>
-          <ExitHold onComplete={handleQuit} label={t("match.quit")} />
-          <div className="gap-module">
-            <strong className="gap-module-value">{view.you?.penalties ?? 0}</strong>
-            <small className="gap-module-label">{t("match.stat.penalties")}</small>
+          <div className="corner corner-mine-right">
+            {slots.mineRight ? (
+              <RailChip key={slots.mineRight.profileId} player={slots.mineRight} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
           </div>
-          {/*
-            La salida accesible: MiniPay ya muestra su propia "✕" arriba de
-            todo, pero es chrome del host — nuestra página no puede
-            escuchar ese toque ni interceptarlo. Este botón es el
-            reemplazo que SÍ vive en nuestro DOM: mismo cuadro de
-            confirmación, sin gesto cronometrado, para quien no puede
-            sostener 2.5s.
-          */}
-          <button
-            type="button"
-            className="gap-util-btn"
-            onClick={() => setQuitConfirm(true)}
-            aria-label={t("match.quit.accessible")}
-          >
-            ✕
-          </button>
         </div>
       </div>
 
+      {/* Lo que no es partida vive fuera del tablero. */}
+      <div className="match-foot">
+        <button
+          type="button"
+          className="mute-btn"
+          onClick={toggleMuted}
+          aria-label={muted ? t("sound.unmute") : t("sound.mute")}
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
+        <button
+          type="button"
+          className={`match-quit${quitFailed ? " is-blocked" : ""}`}
+          onClick={() => setQuitConfirm(true)}
+        >
+          {quitFailed ? t("match.quit.failed") : t("match.quit")}
+        </button>
+      </div>
+
+      {/* "No podrás volver" es cierto e irreversible, así que se confirma
+          aparte del tablero — un toque de más aquí no puede costar la silla. */}
       {quitConfirm && (
         <div className="lobby-modal-backdrop" onClick={() => setQuitConfirm(false)}>
           <div
