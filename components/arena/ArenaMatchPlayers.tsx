@@ -1,40 +1,26 @@
 "use client";
 
 import type { MatchPlayerView } from "@/lib/arena-match";
+import { seatColor } from "@/lib/arena-seat-color";
 import { useT } from "@/lib/i18n/client";
 import type { Translate } from "@/lib/i18n";
 
 /**
- * Los jugadores durante la partida, en las cuatro esquinas del tablero.
- *
- * Antes esto era una franja horizontal encima del tablero. Funcionaba con un
- * rival y se caía con tres: cuatro chips completos en 375 px dejan 85 px por
- * cabeza —donde el alias no cabe— y, sobre todo, le robaban alto a lo único que
- * de verdad hay que mirar. En un juego que se gana viendo un símbolo entre
- * ocho, la carta es la pantalla; todo lo demás es borde.
- *
- * Así que los jugadores se fueron a las esquinas, incluido TÚ. No es simetría
- * porque sí: cualquier excepción para el propio jugador vuelve a meter una
- * banda en el centro, y la regla tiene que aguantar igual con 2, 3 y 4.
- *
- * Un círculo inscrito en su caja deja libre un triángulo en cada una de las
- * CUATRO esquinas de esa caja, y por simetría los cuatro miden lo mismo. Eso es
- * lo que hace posible anclar un chip a cada lado de BASE (sus dos esquinas de
- * arriba) y uno a cada lado de TU CARTA (sus dos esquinas de abajo) sin tocar
- * ningún círculo y sin repetir la cuenta de `verify-match-board-fit.ts`.
+ * Los jugadores durante la partida, en las cuatro esquinas curvas del
+ * tablero — overlays sobre el hueco muerto que deja el círculo en la caja,
+ * nunca layout: no reservan ancho ni alto, y el diámetro de la carta no
+ * sabe que existen. Ver `lib/arena-board-geometry.ts` para la cuenta.
  */
 
 /**
- * Quién va en qué esquina.
+ * Quién va en qué esquina — posición FIJA por asiento, no por cuántos haya
+ * en la mesa. Tú siempre abajo-derecha; los rivales llenan arriba-izq,
+ * arriba-der, abajo-izq en ese orden. Con menos de tres rivales las esquinas
+ * sobrantes se quedan vacías — no se recentra ni se redistribuye nada:
  *
- * Tú y el primer rival flanquean TU CARTA —es tu jugada, es donde miras—; el
- * segundo y el tercer rival flanquean BASE. Con menos de tres rivales las
- * esquinas de BASE simplemente se quedan vacías, así que la misma regla vale
- * para 2, 3 y 4 mesas sin ramificar el layout:
- *
- *   2 jugadores → mineLeft: tú, mineRight: r1
- *   3 jugadores → + baseLeft: r2
- *   4 jugadores → + baseRight: r3
+ *   2 jugadores → baseLeft: rival, mineRight: tú
+ *   3 jugadores → + baseRight: rival
+ *   4 jugadores → + mineLeft: rival
  */
 export function matchSlots(
   you: MatchPlayerView | null,
@@ -46,10 +32,10 @@ export function matchSlots(
   mineRight: MatchPlayerView | null;
 } {
   return {
-    mineLeft: you,
-    mineRight: rivals[0] ?? null,
-    baseLeft: rivals[1] ?? null,
-    baseRight: rivals[2] ?? null,
+    baseLeft: rivals[0] ?? null,
+    baseRight: rivals[1] ?? null,
+    mineLeft: rivals[2] ?? null,
+    mineRight: you,
   };
 }
 
@@ -61,27 +47,21 @@ export function stateOf(player: MatchPlayerView, t: Translate): string {
 }
 
 /**
- * Un jugador en la esquina: avatar, alias real y cuántas cartas le quedan.
- *
- * El alias manda —es una mesa con gente, no una tabla de números— y va en
- * negrita justo bajo el avatar, recortado con `…` solo cuando de verdad no
- * cabe. Nunca se sustituye por la inicial, ni el tuyo por "TÚ": esa insignia
- * va aparte, sobre el avatar, para no borrar tu propio nombre de la mesa. La
- * cuenta de cartas es la leyenda chica de abajo, no el número gigante: se mira
- * de reojo, no se corre detrás de ella. El estado no se escribe, se pinta
- * (apagado, bandera, puerta), y viaja completo en el `title` y en el
- * `aria-label` para quien no puede verlo.
+ * Un jugador en la esquina: dos líneas, nada más. Punto de color + alias
+ * arriba, mazo + cuántas cartas le quedan abajo. `min-width: 0` en la fila y
+ * `flex: 1 1 0` en el nombre son los que de verdad recortan con `…` — sin
+ * `min-width: 0` un flex item nunca baja de su contenido y el módulo se
+ * desborda en vez de truncar, sea cual sea el ancho del nombre.
  */
 export function RailChip({ player }: { player: MatchPlayerView | null }) {
   const t = useT();
 
   if (!player) {
     return (
-      <div className="rail-chip rail-chip-empty">
-        <span className="rail-chip-avatar" aria-hidden="true">
-          ?
-        </span>
-        <small className="rail-chip-name">{t("match.state.waiting")}</small>
+      <div className="corner-module corner-module-empty">
+        <div className="corner-module-row">
+          <small className="corner-module-name">{t("match.state.waiting")}</small>
+        </div>
       </div>
     );
   }
@@ -92,35 +72,45 @@ export function RailChip({ player }: { player: MatchPlayerView | null }) {
 
   return (
     <div
-      className={`rail-chip${player.isYou ? " is-you" : ""}${
+      className={`corner-module${player.isYou ? " is-you" : ""}${
         !player.online && !out ? " is-offline" : ""
       }${out ? " is-out" : ""}`}
+      style={{ "--seat-color": seatColor(player.seat) } as React.CSSProperties}
       title={`${name} · ${state}`}
     >
-      <span className="rail-chip-avatar" aria-hidden="true">
-        {player.initial}
-        {player.finished && <em className="rail-chip-flag">🏁</em>}
-        {player.left && !player.finished && <em className="rail-chip-flag">🚪</em>}
-      </span>
-      {player.isYou && <em className="rail-chip-you">{t("match.you")}</em>}
-      <strong className="rail-chip-name">{name}</strong>
-      {/* Solo se anuncia el del rival: el tuyo ya lo canta la píldora del mazo,
-          y dos regiones vivas diciendo números a la vez se pisan. */}
-      <small
-        className="rail-chip-cards"
-        aria-live={player.isYou ? "off" : "polite"}
-        aria-label={`${name}: ${player.cardsLeft} ${t("match.cards")} · ${state}`}
-      >
-        {player.cardsLeft} {t("match.cards")}
-      </small>
+      <div className="corner-module-row">
+        <span className="corner-module-dot" aria-hidden="true" />
+        <span className="corner-module-name">{name}</span>
+        {player.finished && (
+          <em className="corner-module-flag" aria-hidden="true">
+            🏁
+          </em>
+        )}
+        {player.left && !player.finished && (
+          <em className="corner-module-flag" aria-hidden="true">
+            🚪
+          </em>
+        )}
+      </div>
+      <div className="corner-module-row">
+        <span className="corner-module-deck" aria-hidden="true">
+          🎴
+        </span>
+        <span
+          className="corner-module-count"
+          aria-live={player.isYou ? "off" : "polite"}
+          aria-label={`${name}: ${player.cardsLeft} ${t("match.cards")} · ${state}`}
+        >
+          {player.cardsLeft}
+        </span>
+      </div>
     </div>
   );
 }
 
 /**
  * La cuenta regresiva sí puede enseñarlos en fila: todavía no hay tablero al
- * que quitarle sitio, y es el único momento en que mirar contra quién juegas
- * importa más que mirar una carta.
+ * que quitarle sitio.
  */
 export default function ArenaMatchPlayers({
   you,

@@ -4526,160 +4526,205 @@ body {
 /*
  * El tablero es el del reto diario —mismo `.chain-area`, mismas animaciones—
  * pero la Arena tiene que meter algo que el individual no tiene: hasta tres
- * rivales. La regla es que la carta siga siendo lo más grande de la pantalla,
- * pero eso no significa exprimir hasta el último triángulo muerto de la
- * esquina: un chip con el alias tachado a cuatro letras y sin la cuenta de
- * cartas se lee peor de lo que ahorra en diámetro.
+ * rivales. Acá la prioridad es absoluta: el diámetro de la carta es lo
+ * primero que se calcula, y NADA de lo que sigue —jugadores, Tomadas,
+ * Castigos, la salida— puede reducirlo. Todo eso vive en `position:
+ * absolute` DENTRO de `.chain-area`, en el hueco muerto que deja la
+ * curvatura del círculo: las cuatro esquinas de la caja, y la franja lateral
+ * que se abre justo donde BASE y TU CARTA casi se tocan.
  *
- * Así que los jugadores viven en dos columnas de verdad a los lados del
- * tablero —no superpuestas al círculo—, cada una tan alta como las dos
- * cartas juntas y con tres puestos fijos: junto a BASE arriba, junto a TU
- * CARTA en medio, el indicador (Tiempo/Castigos) abajo.
+ * `--card-d` es un `calc()` de CSS, no un valor medido en JS: un
+ * `ResizeObserver` puede no disparar a tiempo dentro de un WebView
+ * embebido, y el síntoma de eso es exactamente lo que no puede volver a
+ * pasar — la carta pegada a un tamaño de arranque chico con medio viewport
+ * vacío alrededor. `lib/use-viewport-size.ts` solo deriva, en JS, cuánto
+ * pueden medir los OVERLAYS sin pisar el círculo — nunca el círculo mismo.
  */
 .match-shell {
-  gap: 10px;
+  gap: 0;
 }
 
-.match-shell .match-board {
-  /* `.play-board` centra sus hijos en cruz por defecto; aquí hace falta que
-     las columnas se estiren al alto del tablero, no que floten centradas. */
-  align-items: stretch;
+/* El mínimo técnico de siempre (16px) se reemplaza por el mínimo real: 4px,
+   o el área seguridad del dispositivo si es mayor. Sin esto, el notch o la
+   barra de gestos recortarían contenido en vez de sumarse aparte. */
+.shell.playing.match-shell {
+  padding-top: max(4px, env(safe-area-inset-top));
+  padding-right: max(4px, env(safe-area-inset-right));
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+  padding-left: max(4px, env(safe-area-inset-left));
+
+  /* El hueco entre BASE y TU CARTA: casi tangentes a propósito. No es una
+     fila para meter UI — es el mínimo real para que las dos cartas se lean
+     como dos círculos separados y no un óvalo. Tomadas/Castigos/salir usan
+     el espacio LATERAL que la curvatura deja libre en esa misma altura, no
+     alto extra. Si algún día algo no entra ahí, se hace más compacto ese
+     algo — nunca se toca este número. */
+  --circle-gap: 4px;
+
+  /*
+   * `D = min(ancho útil, (alto útil − gap) / 2)`. El ancho útil y el alto
+   * útil restan EXACTAMENTE el padding de arriba —nunca una columna de
+   * jugador, nunca una fila de indicadores— así que el jugador no participa
+   * en absoluto de esta cuenta. `scripts/verify-arena-board-geometry.ts`
+   * repite esta fórmula con los viewports de aceptación.
+   */
+  --card-d: min(
+    calc(100vw - max(4px, env(safe-area-inset-left)) - max(4px, env(safe-area-inset-right))),
+    calc(
+      (
+          100dvh - max(4px, env(safe-area-inset-top)) - max(4px, env(safe-area-inset-bottom)) -
+            var(--circle-gap)
+        ) / 2
+    ),
+    420px
+  );
 }
 
-/*
- * La columna: tan alta como `.chain-area` porque `align-items: stretch` del
- * tablero se encarga, y con sus tres puestos repartidos por
- * `justify-content: space-between` sin una sola medida escrita a mano. El
- * puesto vacío deja un hueco (`.corner-spacer`) en vez de que los de abajo
- * suban: así "junto a TU CARTA" cae siempre a la misma altura, tengas 2, 3 o
- * 4 jugadores en la mesa.
- */
-.corner-col {
-  flex: none;
-  width: var(--chip-w);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: stretch;
-  gap: 10px;
-}
-
-.corner,
-.corner-spacer {
-  display: block;
-}
-
-/*
- * El chip de jugador: avatar, su alias completo y, chico, cuántas cartas le
- * quedan. El alias manda porque esto es una mesa con gente, no un marcador —
- * el número grande se quedó en la versión anterior y era ilegible a este
- * tamaño. `is-you` se distingue con el mismo cian que el borde de TU CARTA,
- * para que se lea como el mismo jugador.
- */
-.rail-chip {
-  position: relative;
+.match-stage {
+  flex: 1 1 auto;
+  min-height: 0;
   width: 100%;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.shell.playing.match-shell .chain-area {
+  --card-gap: var(--circle-gap);
+  margin-bottom: 0;
+  user-select: none;
+}
+
+/*
+ * Las cuatro esquinas — posición FIJA por asiento, no por cuántos jugadores
+ * haya. `--corner-w` lo calcula `cornerMaxWidth` en JS con el MISMO
+ * `boardDiameter` que usa este archivo, así que nunca es más ancho de lo
+ * que la trigonometría del círculo permite; `--board-bleed` es lo que la
+ * esquina puede robarle al padding del shell saliendo hacia el borde real
+ * de la pantalla, para no depender solo del triángulo muerto interno.
+ */
+.corner {
+  position: absolute;
+  width: var(--corner-w, 80px);
+  height: var(--corner-h, 40px);
+  z-index: 4;
+}
+
+.corner-base-left {
+  top: calc(-1 * var(--board-bleed, 16px));
+  left: calc(-1 * var(--board-bleed, 16px));
+}
+
+.corner-base-right {
+  top: calc(-1 * var(--board-bleed, 16px));
+  right: calc(-1 * var(--board-bleed, 16px));
+}
+
+.corner-mine-left {
+  bottom: calc(-1 * var(--board-bleed, 16px));
+  left: calc(-1 * var(--board-bleed, 16px));
+}
+
+.corner-mine-right {
+  bottom: calc(-1 * var(--board-bleed, 16px));
+  right: calc(-1 * var(--board-bleed, 16px));
+}
+
+/*
+ * El módulo de jugador: dos líneas y nada más. `min-width: 0` en la fila y
+ * `flex: 1 1 0` en el nombre son los que de verdad recortan con `…` — sin
+ * `min-width: 0` un flex item nunca baja de su contenido y el módulo se
+ * desborda en vez de truncar.
+ */
+.corner-module {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   gap: 2px;
-  padding: 6px 3px 6px;
-  border: 2px solid var(--gray-soft);
-  border-radius: 16px;
+  padding: 4px 6px;
+  border: 1px solid var(--gray-soft);
+  border-radius: 10px;
   background: var(--white);
+  overflow: hidden;
 }
 
-.rail-chip.is-you {
-  border-color: var(--cyan);
-  background: var(--yellow-faint);
+/* El acento de "sos vos": borde del color de tu silla — nunca el único
+   distintivo, el nombre sigue estando. */
+.corner-module.is-you {
+  border: 2px solid var(--seat-color, var(--cyan));
 }
 
-.rail-chip.is-offline {
-  opacity: 0.5;
+.corner-module.is-offline {
+  opacity: 0.55;
 }
 
-/* Quien terminó o se fue ya no corre: se apaga del todo y su bandera lo dice. */
-.rail-chip.is-out {
+.corner-module.is-out {
   opacity: 0.65;
   border-style: dashed;
 }
 
-.rail-chip-empty {
+.corner-module-empty {
   border-style: dashed;
   color: var(--gray);
+  align-items: center;
 }
 
-.rail-chip-avatar {
-  position: relative;
+.corner-module-row {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 4px;
+  min-width: 0;
+}
+
+.corner-module-dot {
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
-  border: 2px solid var(--ink);
-  background: var(--yellow);
-  font-family: var(--font-title);
-  font-size: 0.95rem;
-  font-weight: 600;
-  line-height: 1;
+  background: var(--seat-color, var(--yellow));
   flex-shrink: 0;
 }
 
-/* La bandera se monta en la esquina del avatar: no cabe una fila más. */
-.rail-chip-flag {
-  position: absolute;
-  right: -7px;
-  bottom: -5px;
-  font-size: 0.68rem;
-  font-style: normal;
-  line-height: 1;
-}
-
-/* La insignia de "eres tú": flota sobre el borde de arriba del chip entero,
-   no sobre el avatar — así no tapa la inicial y se lee como una etiqueta de
-   la tarjeta, no un parche encima de la cara. */
-.rail-chip-you {
-  position: absolute;
-  left: 10px;
-  top: -9px;
-  font-size: 0.5rem;
-  font-style: normal;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  line-height: 1;
-  color: var(--white);
-  background: var(--cyan);
-  border-radius: 999px;
-  padding: 3px 7px;
-}
-
-/* El alias manda: negrita, tamaño de lectura, recortado con `…` solo cuando
-   de verdad no cabe. Nunca crece el ancho del chip para acomodarlo. */
-.rail-chip-name {
-  max-width: 100%;
-  font-size: 0.72rem;
-  font-weight: 800;
-  color: var(--ink);
-  line-height: 1.15;
+.corner-module-name {
+  flex: 1 1 0;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* La cuenta de cartas es la leyenda chica, no el número gigante de antes:
-   se mira de reojo, no compite con el alias. */
-.rail-chip-cards {
-  font-size: 0.58rem;
+  font-size: 0.64rem;
   font-weight: 700;
-  color: var(--gray);
-  font-variant-numeric: tabular-nums;
-  line-height: 1.1;
+  color: var(--ink);
+  line-height: 1.2;
 }
 
-/* En la cuenta regresiva todavía no hay tablero que proteger, así que ahí sí
-   caben todos en fila y centrados. */
+.corner-module-flag {
+  flex-shrink: 0;
+  font-size: 0.6rem;
+  font-style: normal;
+  line-height: 1;
+}
+
+.corner-module-deck {
+  flex-shrink: 0;
+  font-size: 0.62rem;
+  line-height: 1;
+}
+
+.corner-module-count {
+  font-family: var(--font-title);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+/* En la cuenta regresiva todavía no hay tablero que proteger: los módulos
+   vuelven al flujo normal, en fila y centrados. */
 .match-countdown-players {
   display: flex;
   flex-wrap: wrap;
@@ -4687,170 +4732,149 @@ body {
   gap: 8px;
 }
 
-/*
- * El hueco entre cartas sube de 24 a 44: ahí adentro viven ahora Tiempo y
- * Castigos. Es hueco muerto por construcción —ninguna de las dos cartas
- * llega ahí, midan lo que midan— así que meter algo ahí no le cuesta a la
- * carta ni un píxel de diámetro. En la mayoría de los teléfonos ese costo ni
- * se nota: sobraba alto de sobra (ver el porqué en `--card-d` más abajo).
- */
-.shell.playing.match-shell .chain-area {
-  --card-gap: 44px;
-  margin-bottom: 0;
+.match-countdown-players .corner-module {
+  position: static;
+  width: 86px;
+  height: 40px;
 }
 
 /*
- * Tiempo y Castigos, flotando en el intersticio entre BASE y TU CARTA.
- *
- * `top` los centra en la franja del hueco (`--card-gap`), no en la carta:
- * las dos cartas ocupan `0..card-d` y `card-d+gap..2*card-d+gap`, así que
- * cualquier punto entre esas dos franjas está garantizado fuera de las dos,
- * sin necesidad de la trigonometría de esquina que hacía falta para un chip
- * de jugador. Por eso esto SÍ puede vivir centrado, y el chip de jugador no.
+ * La cintura: el hueco lateral que la curvatura deja libre justo donde BASE
+ * y TU CARTA casi se tocan. `top` los centra en el punto de tangencia
+ * (`card-d + gap/2`), y `--waist-offset` —calculado por `waistOffset` en JS
+ * con la MISMA fórmula que la esquina, solo que apoyada en el borde en vez
+ * de en la esquina— es a qué distancia del eje central puede arrancar el
+ * módulo sin pisar ninguno de los dos círculos.
  */
-.chain-gap-stats {
+.waist {
   position: absolute;
-  top: calc(var(--card-d) + var(--card-gap) / 2);
-  left: 0;
-  right: 0;
+  top: calc(var(--card-d) + var(--circle-gap) / 2);
   transform: translateY(-50%);
   z-index: 4;
+  max-width: var(--waist-max-w, 90px);
+}
+
+.waist-left {
+  right: calc(50% + var(--waist-offset, 60px));
+}
+
+.waist-right {
+  left: calc(50% + var(--waist-offset, 60px));
+}
+
+.waist-pill {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: 100%;
+  height: 28px;
+  padding: 0 8px;
+  border: 2px solid var(--gray-soft);
+  border-radius: 999px;
+  background: var(--white);
+  box-sizing: border-box;
+}
+
+.waist-pill .sp-emoji {
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.waist-pill .sp-value {
+  font-family: var(--font-title);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.waist-pill .sp-label {
+  font-size: 0.55rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/*
+ * El botón de salir: mínimo, en el punto exacto donde las dos cartas casi
+ * se tocan. Un toque abre el modal de confirmación reusado — nada de texto,
+ * nada de gesto sostenido. Es tan chico que un pelo de solape visual sobre
+ * el borde de la carta (no sobre ningún símbolo — los símbolos viven bien
+ * adentro del radio) es aceptable.
+ */
+.waist-exit {
+  position: absolute;
+  top: calc(var(--card-d) + var(--circle-gap) / 2);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 5;
+  width: 26px;
+  height: 26px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 0 0 2px var(--gray-soft);
+  font-size: 13px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.7;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Sin píldoras: texto chico y mudo, adentro del borde de cada círculo,
+   espejado hacia afuera —"base" pegado arriba, "tu carta" pegado abajo—
+   para dejar libre el punto donde se tocan. */
+.chain-label {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--gray);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   pointer-events: none;
 }
 
-.chain-gap-stats .stat-pill {
-  flex-direction: row;
-  width: auto;
-  height: 26px;
-  gap: 5px;
-  padding: 0 10px;
-  border-radius: 999px;
+.chain-label-base {
+  top: 8px;
 }
 
-.chain-gap-stats .stat-pill .sp-label {
-  margin-left: -1px;
+.chain-label-mine {
+  bottom: 8px;
 }
 
-/*
- * El tamaño de carta de la Arena.
- *
- * El ancho ya no se pelea por el triángulo muerto de una esquina: se resta
- * lo que las dos columnas de verdad necesitan —`--chip-w` cada una, más el
- * aire que las separa de la carta— del ancho de la columna de la app. El
- * alto sigue siendo la cuenta de siempre del reto diario: `50dvh − 78px`
- * reparte la pantalla completa entre las dos cartas apiladas con el colchón
- * de siempre para el aviso de "te quedaste sin conexión".
- *
- * `--chip-w` no depende de `--card-d` a propósito —a diferencia del intento
- * anterior—: un alias y "27 cartas" necesitan un ancho mínimo para leerse
- * bien sea cual sea el tamaño de la carta, no una fracción de su diámetro.
- *
- * Y en la Arena casi siempre manda el ANCHO, no el alto —las dos columnas se
- * lo comen antes de que el alto llegue a pesar—, así que sobra alto de
- * verdad: el `min()` de abajo no lo gasta. Sin `justify-content` ese sobrante
- * se amontona entero debajo de "Abandonar la partida" como un hueco muerto —
- * la pantalla se ve mal aprovechada porque literalmente lo está. Centrado, el
- * mismo sobrante se reparte arriba y abajo del tablero.
- */
-.shell.playing.match-shell {
-  justify-content: center;
-  --chip-w: clamp(48px, 13vw, 72px);
-  --chip-gap: 8px;
-
-  --card-d: min(
-    calc(100vw - 32px - 2 * var(--chip-w) - 2 * var(--chip-gap)),
-    calc(50dvh - 78px),
-    340px
-  );
+/* Avisos que NO pueden restarle alto al tablero: fijos arriba de todo,
+   flotando sobre lo que haya, nunca en el flujo. */
+.room-warn-overlay {
+  position: absolute;
+  top: max(4px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  margin: 0;
+  max-width: calc(100% - 16px);
 }
 
-.match-shell .match-board {
-  gap: var(--chip-gap);
-}
-
-/* Pantalla corta: la etiqueta de los indicadores es lo primero que sobra. */
+/* Pantalla corta: la etiqueta es lo primero que sobra, el punto de color y
+   la cifra ya dicen lo que hace falta. */
 @media (max-height: 640px) {
-  .chain-gap-stats .sp-label,
-  .rail-chip-name {
+  .corner-module-name,
+  .waist-pill .sp-label {
     display: none;
   }
-}
-
-/*
- * En horizontal las cartas van lado a lado, así que "junto a BASE" y "junto a
- * TU CARTA" dejan de significar algo dentro de una misma columna vertical —
- * las dos cartas ya no están una encima de la otra. Las columnas se quedan
- * como decoración de lado, centradas, sin el puesto de en medio fijo. Y el
- * intersticio pasa de ser una franja horizontal a una vertical entre las dos
- * cartas, así que Tiempo/Castigos se apilan ahí en vez de repartirse a los
- * lados.
- */
-@media (min-width: 760px), (orientation: landscape) {
-  .shell.playing.match-shell {
-    --card-d: min(calc(50vw - 150px), calc(100dvh - 104px), 420px);
-  }
-
-  .match-shell .match-board {
-    align-items: center;
-  }
-
-  .corner-col {
-    justify-content: center;
-  }
-
-  .shell.playing.match-shell .chain-area {
-    --card-gap: clamp(32px, 6vw, 72px);
-    margin-bottom: 8px;
-  }
-
-  .chain-gap-stats {
-    top: 0;
-    bottom: 0;
-    left: calc(var(--card-d) + var(--card-gap) / 2);
-    right: auto;
-    transform: translateX(-50%);
-    flex-direction: column;
-  }
-}
-
-/* El pie del tablero: silencio y abandonar. Ninguna de las dos es información
-   de la partida, así que ninguna de las dos merece una esquina de la carta. */
-.match-foot {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 14px;
-  margin-top: 2px;
-}
-
-.match-foot .mute-btn {
-  width: 40px;
-  height: 40px;
-  font-size: 1rem;
-  flex: none;
-}
-
-.match-quit {
-  align-self: center;
-  margin-top: 2px;
-  padding: 6px 10px;
-  background: none;
-  border: none;
-  font-family: var(--font-body);
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--gray);
-  text-decoration: underline;
-  cursor: pointer;
-}
-
-/* El servidor dijo que no: el enlace se pone rojo un momento y dice por qué,
-   en vez de quedarse mudo como si el toque no hubiera hecho nada. */
-.match-quit.is-blocked {
-  color: var(--bad);
 }
 
 /* --- Final de la partida --- */
@@ -5250,39 +5274,14 @@ body {
     padding: 3px 16px;
   }
 
-  /* Los chips crecen con el riel, igual que los indicadores: en un monitor,
-     52 px de columna al lado de una carta de 580 se ven como una errata. */
-  .rail-chip {
-    width: calc(var(--rail) - var(--board-gap));
-    padding: 8px 4px 6px;
-    border-radius: 18px;
+  /* Los módulos de esquina de la Arena crecen un poco en un monitor —ahí
+     sobra espacio de sobra, la trigonometría exacta importa menos. */
+  .corner-module {
+    padding: 6px 8px;
   }
 
-  .rail-chip-avatar {
-    width: 34px;
-    height: 34px;
-    font-size: 1rem;
-  }
-
-  .rail-chip-cards {
-    font-size: 1.35rem;
-  }
-
-  .rail-chip-name {
-    font-size: 0.6rem;
-  }
-
-  .match-quit {
-    margin-top: 0;
-    font-size: 0.9rem;
-  }
-}
-
-/* En horizontal y bajito el riel se queda sin alto: el nombre es lo primero
-   que sobra, porque el avatar ya dice quién es y el número es el dato. */
-@media (orientation: landscape) and (max-height: 520px) {
-  .rail-chip-name {
-    display: none;
+  .corner-module-name {
+    font-size: 0.75rem;
   }
 }
 

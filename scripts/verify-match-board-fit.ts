@@ -1,22 +1,13 @@
-// Verifica que el tablero de la Arena quepa entero en 100dvh y que las
-// columnas de jugador dejen un diámetro de carta razonable, en los tamaños
-// reales de pantalla del WebView de MiniPay.
+// Verifica que la pantalla de partida de la Arena esté armada como se
+// pidió: cuatro esquinas de posición fija dentro de `.chain-area`, la
+// cintura con Tomadas/Castigos/salir en vez de una fila que le reste alto,
+// y un botón de salida mínimo con tap (no gesto sostenido) que abre el
+// modal de confirmación reusado.
 //
-// ── La vuelta atrás que explica este archivo ─────────────────────────────
-//
-// La versión anterior metía los chips en el triángulo muerto de la esquina
-// de la carta para exprimir cada píxel de diámetro. Se veía horrible: el
-// alias se recortaba a cuatro letras, la cuenta de cartas no cabía y el chip
-// entero quedaba del tamaño de una uña. La referencia real pedía lo
-// contrario — tarjetas legibles, con el alias completo y "N cartas" debajo —
-// así que los jugadores volvieron a vivir en columnas de verdad a los lados
-// del tablero, no superpuestas al círculo.
-//
-// Eso cambia lo que hay que comprobar. Ya no hace falta trigonometría: si el
-// chip nunca entra en la caja de la carta, nunca la toca, punto. Lo que sí
-// hay que vigilar es que la carta no se quede diminuta por culpa de las
-// columnas, y que todo —tablero, columnas, pie— quepa en el alto real sin
-// scroll.
+// La geometría en NÚMEROS —diámetro por viewport, que nada pise el
+// círculo— la verifica `scripts/verify-arena-board-geometry.ts` sobre
+// `lib/arena-board-geometry.ts`. Esto de acá es estructural: que el marcado
+// real siga usando esas piezas.
 //
 // Correr: node scripts/verify-match-board-fit.ts
 import { readFileSync } from "node:fs";
@@ -34,192 +25,94 @@ function ok(name: string, condition: boolean, detail = "") {
   );
 }
 
-/* ── Los números, leídos del CSS ─────────────────────────────────────────── */
-
-const css = readFileSync(join(ROOT, "app/globals.css"), "utf8").replace(
-  /\/\*[\s\S]*?\*\//g,
-  ""
+// Normalizado a LF: en Windows el archivo puede quedar en CRLF.
+const src = readFileSync(join(ROOT, "components/arena/ArenaMatch.tsx"), "utf8").replace(
+  /\r\n/g,
+  "\n"
 );
 
-/** El bloque de `.shell.playing.match-shell` que declara la geometría. */
-const bloque = (() => {
-  const i = css.indexOf(".shell.playing.match-shell {");
-  if (i === -1) throw new Error("no encuentro el bloque de geometría del tablero");
-  return css.slice(i, css.indexOf("}", i));
+console.log("\n— Las cuatro esquinas, dentro de .chain-area, posición fija por silla —\n");
+
+const chainArea = (() => {
+  const i = src.indexOf('<div className="chain-area"');
+  return i === -1 ? null : src.slice(i);
 })();
 
-function px(nombre: string): number {
-  const m = new RegExp(`--${nombre}:\\s*(-?[\\d.]+)px`).exec(bloque);
-  if (!m) throw new Error(`falta --${nombre} en .shell.playing.match-shell`);
-  return Number(m[1]);
+for (const esquina of [
+  "corner-base-left",
+  "corner-base-right",
+  "corner-mine-left",
+  "corner-mine-right",
+]) {
+  const veces = [...src.matchAll(new RegExp(`className="corner ${esquina}"`, "g"))].length;
+  ok(`hay exactamente una esquina "${esquina}"`, veces === 1, `${veces}`);
 }
-
-/** `clamp(<mín>px, <k>vw, <máx>px)`, tal como lo escribe el CSS. */
-function clampVw(nombre: string): (vw: number) => number {
-  const m = new RegExp(
-    `--${nombre}:\\s*clamp\\(\\s*([\\d.]+)px\\s*,\\s*([\\d.]+)vw\\s*,\\s*([\\d.]+)px\\s*\\)`
-  ).exec(bloque);
-  if (!m) throw new Error(`--${nombre} debería ser un clamp(px, vw, px)`);
-  const [, min, k, max] = m.map(Number);
-  return (vw) => Math.min(Math.max((vw * k) / 100, min), max);
-}
-
-const chipW = clampVw("chip-w");
-const CHIP_GAP = px("chip-gap");
-
-/** Los tres términos del `min()` del diámetro, tal como están escritos. */
-const formula = /--card-d:\s*min\(([\s\S]*?)\);/.exec(bloque)?.[1] ?? "";
-const TOPE = Number(/(\d+)px\s*$/.exec(formula.trim())?.[1] ?? 0);
-const ALTO_RESTA = Number(/50dvh\s*-\s*(\d+)px/.exec(formula)?.[1] ?? 0);
-
-console.log(`\nColchón por columna: gap ${CHIP_GAP}px, tope de carta ${TOPE}px\n`);
 
 ok(
-  "la fórmula del diámetro sigue restando las dos columnas y el alto",
-  TOPE > 0 && ALTO_RESTA > 0 && /100vw/.test(formula) && /chip-w/.test(formula),
-  formula.replace(/\s+/g, " ").trim()
+  "las esquinas viven DENTRO de .chain-area, no en columnas laterales aparte",
+  chainArea !== null && /corner-base-left/.test(chainArea) && !/corner-col|match-board/.test(src),
+  "las columnas de altura completa eran el diseño anterior — ahora todo overlay va dentro de .chain-area"
 );
 
-/** Diámetro de carta que resultaría en esta pantalla. */
-function diametro(vw: number, vh: number): number {
-  const ancho = vw - 32 - 2 * chipW(vw) - 2 * CHIP_GAP;
-  const alto = vh / 2 - ALTO_RESTA;
-  return Math.min(ancho, alto, TOPE);
-}
-
-/**
- * Pantallas reales, ya descontado el cromo de MiniPay.
- *
- * El alto NO es el de la pantalla: el WebView pierde arriba la barra del Mini
- * App (la de "Mini App Test" con la X y el desplegable) y abajo la de gestos.
- * En la captura del iPhone del 2026-08-08 el alto útil medido era ~745 CSS px
- * sobre una pantalla de 852, y de ahí salen las demás restas.
- */
-const PANTALLAS: [string, number, number][] = [
-  ["iPhone 15 Pro · MiniPay", 393, 745],
-  ["iPhone 15 Pro Max · MiniPay", 430, 825],
-  ["iPhone SE · MiniPay", 375, 560],
-  ["Android típico · MiniPay", 360, 705],
-  ["Android pequeño · MiniPay", 360, 545],
-  ["Pixel · MiniPay", 412, 720],
-  ["Muy estrecho", 320, 480],
-  ["Estrecho y muy alto", 320, 900],
-];
-
-/** Por debajo de esto el círculo deja de sentirse "grande" en la pantalla. */
-const DIAMETRO_MIN = 150;
-
-console.log("— El diámetro de carta que deja cada pantalla —\n");
-console.log("  pantalla                       columna  carta");
-
-for (const [nombre, vw, vh] of PANTALLAS) {
-  const d = diametro(vw, vh);
-  console.log(
-    `  ${nombre.padEnd(30)} ${String(Math.round(chipW(vw))).padStart(5)}px  ${String(
-      Math.round(d)
-    ).padStart(4)}px`
-  );
-  ok(
-    `    ${nombre}: la carta no se queda diminuta`,
-    d >= DIAMETRO_MIN,
-    `${d.toFixed(1)}px de diámetro (mínimo ${DIAMETRO_MIN})`
-  );
-}
-
-/* ── Un jugador por esquina, y los indicadores en el intersticio ─────────── */
-
-console.log("\n— Cuatro puestos de jugador y dos indicadores, ni uno más ─\n");
+console.log("\n— matchSlots: posición fija por asiento, tú siempre abajo-derecha —\n");
 
 {
-  // Normalizado a LF: Windows (`core.autocrlf`) puede dejar el archivo en
-  // CRLF, y un delimitador escrito con `\n` no encontraría nada aunque el
-  // texto esté ahí.
-  const src = readFileSync(join(ROOT, "components/arena/ArenaMatch.tsx"), "utf8").replace(
-    /\r\n/g,
-    "\n"
+  const playersSrc = readFileSync(
+    join(ROOT, "components/arena/ArenaMatchPlayers.tsx"),
+    "utf8"
+  ).replace(/\r\n/g, "\n");
+  const fn = playersSrc.slice(
+    playersSrc.indexOf("export function matchSlots"),
+    playersSrc.indexOf("export function stateOf")
   );
-
-  /** El trozo del código entre dos marcas literales, o `null` si no las encuentra. */
-  function entre(desde: string, hasta: string): string | null {
-    const i = src.indexOf(desde);
-    if (i === -1) return null;
-    const j = src.indexOf(hasta, i + desde.length);
-    if (j === -1) return null;
-    return src.slice(i + desde.length, j);
-  }
-
-  const board = entre('<div className="play-board match-board">', "\n      {/* Lo que no es partida");
-  ok("encuentro el cuerpo de .match-board", board !== null, "cambió el marcado del tablero");
-
-  for (const esquina of [
-    "corner-base-left",
-    "corner-base-right",
-    "corner-mine-left",
-    "corner-mine-right",
-  ]) {
-    const veces = [...(board ?? "").matchAll(new RegExp(`className="corner ${esquina}"`, "g"))]
-      .length;
-    ok(`    hay exactamente una esquina "${esquina}"`, veces === 1, `${veces}`);
-  }
-
-  // Cada esquina trae UN puesto, no más: el chip de jugador y nada de
-  // indicadores compitiendo por su ancho.
+  ok("mineRight (abajo-derecha) es `you`, no un rival", /mineRight:\s*you\s*,/.test(fn));
   ok(
-    "ninguna esquina trae un indicador — Tiempo/Castigos ya no compiten por su ancho",
-    !/className="corner [\s\S]{0,200}stat-pill/.test(board ?? ""),
-    "un stat-pill volvió a colarse en una columna"
-  );
-
-  const gapStats = entre('<div className="chain-gap-stats">', "</div>\n          {visual.map");
-  ok("hay una franja de indicadores en el intersticio entre las dos cartas", gapStats !== null, "no encuentro .chain-gap-stats");
-  const pastillas = [...(gapStats ?? "").matchAll(/className="stat-pill"/g)].length;
-  ok(
-    "    trae Tiempo y Castigos, ni uno más ni uno menos",
-    pastillas === 2,
-    `${pastillas} pastillas`
-  );
-
-  ok(
-    "el botón de silencio no vive en el tablero",
-    !/mute-btn/.test(board ?? ""),
-    "el silencio se metió otra vez en el tablero en vez de en el pie"
-  );
-
-  ok(
-    "y la cifra de cartas no se repite: ya la lleva tu ficha",
-    !/sp-emoji">🃏/.test(src),
-    "la píldora CARTAS dice el mismo número que el chip del jugador"
+    "baseLeft/baseRight/mineLeft son rivals[0..2], en ese orden",
+    /baseLeft:\s*rivals\[0\]/.test(fn) &&
+      /baseRight:\s*rivals\[1\]/.test(fn) &&
+      /mineLeft:\s*rivals\[2\]/.test(fn)
   );
 }
 
-/* ── El presupuesto vertical alcanza para todo, no solo para la carta ────── */
-
-console.log("\n— La pantalla entera cabe en 100dvh, sin scroll —\n");
+console.log("\n— La cintura: Tomadas, Castigos y salir, ni un elemento más —\n");
 
 {
-  /*
-   * Las columnas de jugador ya no cuestan alto de flujo —son tan altas como
-   * el tablero, `align-items: stretch` se encarga— así que lo único que hay
-   * que sumar aparte del tablero es el pie (silencio + abandonar).
-   */
-  const SHELL_PAD_V = 32; // .shell { padding: 16px } arriba + abajo
-  const SHELL_GAP = 10; // .match-shell { gap: 10px }, un solo hueco: tablero → pie
-  const FOOT_H = 42; // .match-foot .mute-btn 40px + margin-top 2px
-  // .shell.playing.match-shell .chain-area { --card-gap: 44px } — el
-  // intersticio donde ahora viven Tiempo y Castigos, así que sí cuenta para
-  // el presupuesto vertical aunque no le cueste nada al DIÁMETRO de la carta.
-  const CARD_GAP = 44;
+  const waistLeft = [...src.matchAll(/className="waist waist-left"/g)].length;
+  const waistRight = [...src.matchAll(/className="waist waist-right"/g)].length;
+  ok("hay exactamente una cintura izquierda (Tomadas)", waistLeft === 1, `${waistLeft}`);
+  ok("hay exactamente una cintura derecha (Castigos)", waistRight === 1, `${waistRight}`);
 
-  for (const [nombre, vw, vh] of PANTALLAS) {
-    const d = diametro(vw, vh);
-    const usado = SHELL_PAD_V + SHELL_GAP + FOOT_H + 2 * d + CARD_GAP;
-    ok(
-      `    ${nombre}: tablero + pie caben en el alto disponible`,
-      usado <= vh,
-      `usa ${Math.round(usado)}px de ${vh}px — se pasa por ${Math.round(usado - vh)}px`
-    );
-  }
+  ok(
+    "el botón de salir vive en la cintura, no en un pie aparte",
+    /className="waist-exit"/.test(src) && !/match-foot/.test(src),
+    "ya no hay .match-foot — el pie con silencio+abandonar era el diseño anterior"
+  );
+
+  ok(
+    "el botón de salir es un tap simple: abre el modal, no llama a leave() directo",
+    /className="waist-exit"[\s\S]{0,120}onClick=\{\(\) => setQuitConfirm\(true\)\}/.test(src),
+    "un solo toque tiene que confirmar, no abandonar de una — y sin ExitHold/anillo"
+  );
+
+  ok(
+    "no hay gesto sostenido (ExitHold) ni texto largo de abandonar",
+    !/ExitHold|EXIT_HOLD_MS/.test(src) && !/"match-quit"/.test(src),
+    "el spec pide tap, no hold — y el botón no lleva texto \"Abandonar la partida\""
+  );
+
+  ok(
+    "el modal de confirmación SIGUE existiendo (se reusa, no se borró)",
+    /lobby-modal-backdrop/.test(src) && /match\.quit\.confirm\.title/.test(src)
+  );
 }
+
+console.log("\n— Nada le resta alto al tablero —\n");
+
+ok(
+  "los avisos (offline / no se pudo salir) son overlays, no elementos en flujo",
+  !/<p className="room-warn"[^>]*>/.test(src) && /room-warn-overlay/.test(src),
+  "un aviso en flujo normal empujaría el tablero y achicaría el círculo"
+);
 
 console.log(
   failed === 0 ? "\nTodo bien.\n" : `\n${failed} comprobación(es) fallaron.\n`

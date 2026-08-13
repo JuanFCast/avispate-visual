@@ -1,15 +1,36 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { placeMatchCard, sharedSymbol } from "@/lib/arena-deck";
 import { useArenaMatch } from "@/lib/arena-match-client";
 import { countdownNumber, matchShellClass, type MatchPhase } from "@/lib/arena-match";
+import { boardDiameter, cornerMaxWidth, waistOffset } from "@/lib/arena-board-geometry";
+import { useViewportSize } from "@/lib/use-viewport-size";
 import { useT } from "@/lib/i18n/client";
-import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
+import { sound, unlockAudio } from "@/lib/sound";
 import CardView from "../CardView";
 import ArenaMatchOver from "./ArenaMatchOver";
 import ArenaMatchPlayers, { RailChip, matchSlots } from "./ArenaMatchPlayers";
+
+/**
+ * Geometría del tablero — ver `lib/arena-board-geometry.ts` y
+ * `scripts/verify-arena-board-geometry.ts`.
+ *
+ * `SHELL_PAD`/`CIRCLE_GAP` son el mínimo técnico, no una fila para meter UI:
+ * los jugadores viven en las esquinas curvas y Tomadas/Castigos en el hueco
+ * lateral que deja la tangente entre las dos cartas — ninguno de los dos
+ * reserva layout. El diámetro real de la carta lo decide el `calc()` de
+ * `--card-d` en CSS, no JS: ver el porqué en `lib/use-viewport-size.ts`.
+ */
+const CIRCLE_GAP = 4;
+const CORNER_H = 40;
+const CORNER_BLEED = 16;
+const CORNER_MIN_W = 56;
+const CORNER_MAX_W = 100;
+const WAIST_H = 32;
+const WAIST_MIN_W = 56;
+const WAIST_MAX_W = 110;
 
 /** Lo que tarda la carta vieja en salir de cuadro. Igual que en el individual. */
 const EXIT_MS = 600;
@@ -99,11 +120,13 @@ export default function ArenaMatch({ code }: { code: string }) {
   const [shake, setShake] = useState(false);
   const [penaltyKey, setPenaltyKey] = useState(0);
   const [lateKey, setLateKey] = useState(0);
-  const [muted, setMutedState] = useState(false);
   /** El cuadro de "¿seguro?" antes de abandonar. Se puede cancelar. */
   const [quitConfirm, setQuitConfirm] = useState(false);
   /** El intento de abandonar falló (red, ficha vencida) — no es lo normal. */
   const [quitFailed, setQuitFailed] = useState(false);
+  /** Solo para derivar el ancho seguro de los overlays — el diámetro de la
+      carta no depende de esto, ver el comentario junto a las constantes. */
+  const viewport = useViewportSize();
 
   const shown = useRef<{ base: number | null; mine: number | null }>({
     base: null,
@@ -111,17 +134,6 @@ export default function ArenaMatch({ code }: { code: string }) {
   });
   const instance = useRef(0);
   const lastCount = useRef<number | null>(null);
-
-  useEffect(() => {
-    setMutedState(isMuted());
-  }, []);
-
-  function toggleMuted() {
-    const next = !muted;
-    setMuted(next);
-    setMutedState(next);
-    if (!next) unlockAudio();
-  }
 
   /**
    * Se confirma antes de tocar la red: "no podrás volver" es cierto e
@@ -392,48 +404,67 @@ export default function ArenaMatch({ code }: { code: string }) {
   const cardsLeft = view.you?.cardsLeft ?? 0;
   const slots = matchSlots(view.you, view.rivals);
 
+  /*
+   * `--card-d` lo decide el `calc()` de CSS, no esto: acá solo se deriva,
+   * con el MISMO `boardDiameter`, cuánto pueden medir los overlays sin
+   * pisar el círculo. `jsPad` (8px) es a propósito un poco más generoso que
+   * el mínimo real de CSS (4px + safe-area) — si el viewport medido en JS
+   * llega ligeramente optimista, el overlay sale un pelo más chico de lo
+   * estrictamente posible, nunca más grande de lo seguro.
+   */
+  const jsPad = 8;
+  const geomD =
+    viewport.width > 0
+      ? boardDiameter(
+          Math.max(1, viewport.width - jsPad * 2),
+          Math.max(1, viewport.height - jsPad * 2),
+          CIRCLE_GAP
+        )
+      : 260;
+  const geomR = geomD / 2;
+  const cornerW = cornerMaxWidth(geomR, CORNER_H, CORNER_BLEED, CORNER_MIN_W, CORNER_MAX_W);
+  const waistOff = waistOffset(geomR, WAIST_H);
+  const waistMaxW = Math.max(WAIST_MIN_W, Math.min(WAIST_MAX_W, geomR - waistOff));
+
+  const overlayVars = {
+    "--corner-w": `${cornerW}px`,
+    "--corner-h": `${CORNER_H}px`,
+    "--board-bleed": `${CORNER_BLEED}px`,
+    "--waist-offset": `${waistOff}px`,
+    "--waist-max-w": `${waistMaxW}px`,
+  } as CSSProperties;
+
   return (
     <MatchShell phase="playing">
+      {/* `room-warn-overlay`: position absolute, no le resta alto a nada —
+          ni siquiera un aviso raro de conexión puede achicar el círculo. */}
       {failures >= OFFLINE_AFTER && (
-        <p className="room-warn" role="status">
+        <p className="room-warn room-warn-overlay" role="status">
           {t("match.you_offline")}
+        </p>
+      )}
+      {quitFailed && (
+        <p className="room-warn room-warn-overlay" role="status">
+          {t("match.quit.failed")}
         </p>
       )}
 
       {/*
-        Columnas de verdad a los lados, no superpuestas al círculo: el chip de
-        jugador necesita alias legible y "N cartas" enteros, y eso no cabe en
-        el triángulo muerto de una esquina. Cada columna tiene dos puestos —
-        junto a BASE, junto a TU CARTA— y el que no tiene jugador se queda
-        como hueco vacío en vez de dejar que el otro suba: así "junto a TU
-        CARTA" cae siempre en la misma esquina, tengas 2, 3 o 4 en la mesa.
-
-        Tiempo y Castigos ya no viven en la columna: se fueron al intersticio
-        entre las dos cartas, que es hueco muerto por construcción —ninguna de
-        las dos cartas llega ahí, midan lo que midan— así que no le cuesta ni
-        un píxel a la carta ni compite por ancho con el alias del jugador.
+        Todo lo que no es círculo vive en `position: absolute` DENTRO de
+        `.chain-area` — igual que ya vivían `.slot-tag`/`.deck-stack`/etc—,
+        así que se ancla a la caja EXACTA de las dos cartas (`width:
+        var(--card-d)`, `height: calc(var(--card-d)*2 + var(--card-gap))`)
+        sin ningún cálculo de centrado aparte. Ninguno de estos overlays
+        entra en la cuenta de `--card-d`: los jugadores se anclan a las
+        cuatro esquinas curvas de cada círculo; Tomadas/Castigos y la salida
+        usan el hueco lateral que deja la curvatura justo donde BASE y TU
+        CARTA casi se tocan (`--circle-gap: 4px`, el mínimo técnico, no una
+        fila para meter UI). Ver `lib/arena-board-geometry.ts`.
       */}
-      <div className="play-board match-board">
-        <div className="corner-col corner-col-left">
-          <div className="corner corner-base-left">
-            {slots.baseLeft ? (
-              <RailChip key={slots.baseLeft.profileId} player={slots.baseLeft} />
-            ) : (
-              <span className="corner-spacer" aria-hidden="true" />
-            )}
-          </div>
-          <div className="corner corner-mine-left">
-            {slots.mineLeft ? (
-              <RailChip key={slots.mineLeft.profileId} player={slots.mineLeft} />
-            ) : (
-              <span className="corner-spacer" aria-hidden="true" />
-            )}
-          </div>
-        </div>
-
-        <div className="chain-area">
-          <span className="slot-tag slot-tag-base">{t("game.slot.base")}</span>
-          <span className="slot-tag slot-tag-mine">{t("game.slot.mine")}</span>
+      <div className="match-stage">
+        <div className="chain-area" style={overlayVars}>
+          <span className="chain-label chain-label-base">{t("game.slot.base")}</span>
+          <span className="chain-label chain-label-mine">{t("game.slot.mine")}</span>
           {cardsLeft > 1 && <div className="deck-stack" />}
           {penaltyKey > 0 && (
             <span key={penaltyKey} className="penalty-float">
@@ -447,18 +478,6 @@ export default function ArenaMatch({ code }: { code: string }) {
               {t("match.late")}
             </span>
           )}
-          <div className="chain-gap-stats">
-            <div className="stat-pill">
-              <span className="sp-emoji">✋</span>
-              <span className="sp-value">{view.you?.correct ?? 0}</span>
-              <span className="sp-label">{t("match.stat.taken")}</span>
-            </div>
-            <div className="stat-pill">
-              <span className="sp-emoji">🧱</span>
-              <span className="sp-value">{view.you?.penalties ?? 0}</span>
-              <span className="sp-label">{t("match.stat.penalties")}</span>
-            </div>
-          </div>
           {visual.map((vc) => (
             <div
               key={vc.key}
@@ -476,43 +495,53 @@ export default function ArenaMatch({ code }: { code: string }) {
               />
             </div>
           ))}
-        </div>
 
-        <div className="corner-col corner-col-right">
+          {/* Posición fija por asiento: rival 1 arriba-izq, rival 2
+              arriba-der, rival 3 abajo-izq, tú siempre abajo-der. La
+              esquina sin jugador se queda vacía — nada se recentra. */}
+          <div className="corner corner-base-left">
+            {slots.baseLeft && <RailChip key={slots.baseLeft.profileId} player={slots.baseLeft} />}
+          </div>
           <div className="corner corner-base-right">
-            {slots.baseRight ? (
+            {slots.baseRight && (
               <RailChip key={slots.baseRight.profileId} player={slots.baseRight} />
-            ) : (
-              <span className="corner-spacer" aria-hidden="true" />
             )}
+          </div>
+          <div className="corner corner-mine-left">
+            {slots.mineLeft && <RailChip key={slots.mineLeft.profileId} player={slots.mineLeft} />}
           </div>
           <div className="corner corner-mine-right">
-            {slots.mineRight ? (
+            {slots.mineRight && (
               <RailChip key={slots.mineRight.profileId} player={slots.mineRight} />
-            ) : (
-              <span className="corner-spacer" aria-hidden="true" />
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Lo que no es partida vive fuera del tablero. */}
-      <div className="match-foot">
-        <button
-          type="button"
-          className="mute-btn"
-          onClick={toggleMuted}
-          aria-label={muted ? t("sound.unmute") : t("sound.mute")}
-        >
-          {muted ? "🔇" : "🔊"}
-        </button>
-        <button
-          type="button"
-          className={`match-quit${quitFailed ? " is-blocked" : ""}`}
-          onClick={() => setQuitConfirm(true)}
-        >
-          {quitFailed ? t("match.quit.failed") : t("match.quit")}
-        </button>
+          <div className="waist waist-left">
+            <div className="waist-pill">
+              <span className="sp-emoji">✋</span>
+              <span className="sp-value">{view.you?.correct ?? 0}</span>
+              <span className="sp-label">{t("match.stat.taken")}</span>
+            </div>
+          </div>
+          <div className="waist waist-right">
+            <div className="waist-pill">
+              <span className="sp-emoji">🧱</span>
+              <span className="sp-value">{view.you?.penalties ?? 0}</span>
+              <span className="sp-label">{t("match.stat.penalties")}</span>
+            </div>
+          </div>
+          {/* Mínimo a propósito: un toque abre la confirmación, nada de
+              texto ni de gesto sostenido ocupando el punto donde se tocan
+              las cartas. */}
+          <button
+            type="button"
+            className="waist-exit"
+            onClick={() => setQuitConfirm(true)}
+            aria-label={t("match.quit")}
+          >
+            🚪
+          </button>
+        </div>
       </div>
 
       {/* "No podrás volver" es cierto e irreversible, así que se confirma
