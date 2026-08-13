@@ -126,12 +126,18 @@ for (const [nombre, vw, vh] of PANTALLAS) {
   );
 }
 
-/* ── Un jugador por esquina, y los indicadores dentro de su columna ──────── */
+/* ── Un jugador por esquina, y los indicadores en el intersticio ─────────── */
 
 console.log("\n— Cuatro puestos de jugador y dos indicadores, ni uno más ─\n");
 
 {
-  const src = readFileSync(join(ROOT, "components/arena/ArenaMatch.tsx"), "utf8");
+  // Normalizado a LF: Windows (`core.autocrlf`) puede dejar el archivo en
+  // CRLF, y un delimitador escrito con `\n` no encontraría nada aunque el
+  // texto esté ahí.
+  const src = readFileSync(join(ROOT, "components/arena/ArenaMatch.tsx"), "utf8").replace(
+    /\r\n/g,
+    "\n"
+  );
 
   /** El trozo del código entre dos marcas literales, o `null` si no las encuentra. */
   function entre(desde: string, hasta: string): string | null {
@@ -156,9 +162,19 @@ console.log("\n— Cuatro puestos de jugador y dos indicadores, ni uno más ─\
     ok(`    hay exactamente una esquina "${esquina}"`, veces === 1, `${veces}`);
   }
 
-  const pastillas = [...(board ?? "").matchAll(/className="stat-pill"/g)].length;
+  // Cada esquina trae UN puesto, no más: el chip de jugador y nada de
+  // indicadores compitiendo por su ancho.
   ok(
-    "    hay exactamente dos indicadores (Tiempo y Castigos), dentro de las columnas",
+    "ninguna esquina trae un indicador — Tiempo/Castigos ya no compiten por su ancho",
+    !/className="corner [\s\S]{0,200}stat-pill/.test(board ?? ""),
+    "un stat-pill volvió a colarse en una columna"
+  );
+
+  const gapStats = entre('<div className="chain-gap-stats">', "</div>\n          {visual.map");
+  ok("hay una franja de indicadores en el intersticio entre las dos cartas", gapStats !== null, "no encuentro .chain-gap-stats");
+  const pastillas = [...(gapStats ?? "").matchAll(/className="stat-pill"/g)].length;
+  ok(
+    "    trae Tiempo y Castigos, ni uno más ni uno menos",
     pastillas === 2,
     `${pastillas} pastillas`
   );
@@ -166,7 +182,7 @@ console.log("\n— Cuatro puestos de jugador y dos indicadores, ni uno más ─\
   ok(
     "el botón de silencio no vive en el tablero",
     !/mute-btn/.test(board ?? ""),
-    "el silencio se metió otra vez en una columna en vez de en el pie"
+    "el silencio se metió otra vez en el tablero en vez de en el pie"
   );
 
   ok(
@@ -189,7 +205,10 @@ console.log("\n— La pantalla entera cabe en 100dvh, sin scroll —\n");
   const SHELL_PAD_V = 32; // .shell { padding: 16px } arriba + abajo
   const SHELL_GAP = 10; // .match-shell { gap: 10px }, un solo hueco: tablero → pie
   const FOOT_H = 42; // .match-foot .mute-btn 40px + margin-top 2px
-  const CARD_GAP = 32; // .shell.playing.match-shell .chain-area { --card-gap: 32px }
+  // .shell.playing.match-shell .chain-area { --card-gap: 44px } — el
+  // intersticio donde ahora viven Tiempo y Castigos, así que sí cuenta para
+  // el presupuesto vertical aunque no le cueste nada al DIÁMETRO de la carta.
+  const CARD_GAP = 44;
 
   for (const [nombre, vw, vh] of PANTALLAS) {
     const d = diametro(vw, vh);

@@ -403,11 +403,15 @@ export default function ArenaMatch({ code }: { code: string }) {
       {/*
         Columnas de verdad a los lados, no superpuestas al círculo: el chip de
         jugador necesita alias legible y "N cartas" enteros, y eso no cabe en
-        el triángulo muerto de una esquina. Cada columna tiene tres puestos
-        fijos —junto a BASE, junto a TU CARTA, el indicador— y el que no tiene
-        jugador se queda como hueco vacío en vez de dejar que los de abajo
-        suban: así el segundo puesto cae siempre a la altura de TU CARTA,
-        tengas 2, 3 o 4 jugadores en la mesa.
+        el triángulo muerto de una esquina. Cada columna tiene dos puestos —
+        junto a BASE, junto a TU CARTA— y el que no tiene jugador se queda
+        como hueco vacío en vez de dejar que el otro suba: así "junto a TU
+        CARTA" cae siempre en la misma esquina, tengas 2, 3 o 4 en la mesa.
+
+        Tiempo y Castigos ya no viven en la columna: se fueron al intersticio
+        entre las dos cartas, que es hueco muerto por construcción —ninguna de
+        las dos cartas llega ahí, midan lo que midan— así que no le cuesta ni
+        un píxel a la carta ni compite por ancho con el alias del jugador.
       */}
       <div className="play-board match-board">
         <div className="corner-col corner-col-left">
@@ -424,11 +428,6 @@ export default function ArenaMatch({ code }: { code: string }) {
             ) : (
               <span className="corner-spacer" aria-hidden="true" />
             )}
-          </div>
-          <div className="stat-pill">
-            <span className="sp-emoji">✋</span>
-            <span className="sp-value">{view.you?.correct ?? 0}</span>
-            <span className="sp-label">{t("match.stat.taken")}</span>
           </div>
         </div>
 
@@ -448,6 +447,18 @@ export default function ArenaMatch({ code }: { code: string }) {
               {t("match.late")}
             </span>
           )}
+          <div className="chain-gap-stats">
+            <div className="stat-pill">
+              <span className="sp-emoji">✋</span>
+              <span className="sp-value">{view.you?.correct ?? 0}</span>
+              <span className="sp-label">{t("match.stat.taken")}</span>
+            </div>
+            <div className="stat-pill">
+              <span className="sp-emoji">🧱</span>
+              <span className="sp-value">{view.you?.penalties ?? 0}</span>
+              <span className="sp-label">{t("match.stat.penalties")}</span>
+            </div>
+          </div>
           {visual.map((vc) => (
             <div
               key={vc.key}
@@ -481,11 +492,6 @@ export default function ArenaMatch({ code }: { code: string }) {
             ) : (
               <span className="corner-spacer" aria-hidden="true" />
             )}
-          </div>
-          <div className="stat-pill">
-            <span className="sp-emoji">🧱</span>
-            <span className="sp-value">{view.you?.penalties ?? 0}</span>
-            <span className="sp-label">{t("match.stat.penalties")}</span>
           </div>
         </div>
       </div>

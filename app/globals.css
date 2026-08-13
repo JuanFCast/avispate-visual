@@ -4688,12 +4688,50 @@ body {
 }
 
 /*
- * El hueco entre cartas sube de 24 a 32: da más aire a la costura donde
- * asoma el segundo puesto de cada columna.
+ * El hueco entre cartas sube de 24 a 44: ahí adentro viven ahora Tiempo y
+ * Castigos. Es hueco muerto por construcción —ninguna de las dos cartas
+ * llega ahí, midan lo que midan— así que meter algo ahí no le cuesta a la
+ * carta ni un píxel de diámetro. En la mayoría de los teléfonos ese costo ni
+ * se nota: sobraba alto de sobra (ver el porqué en `--card-d` más abajo).
  */
 .shell.playing.match-shell .chain-area {
-  --card-gap: 32px;
+  --card-gap: 44px;
   margin-bottom: 0;
+}
+
+/*
+ * Tiempo y Castigos, flotando en el intersticio entre BASE y TU CARTA.
+ *
+ * `top` los centra en la franja del hueco (`--card-gap`), no en la carta:
+ * las dos cartas ocupan `0..card-d` y `card-d+gap..2*card-d+gap`, así que
+ * cualquier punto entre esas dos franjas está garantizado fuera de las dos,
+ * sin necesidad de la trigonometría de esquina que hacía falta para un chip
+ * de jugador. Por eso esto SÍ puede vivir centrado, y el chip de jugador no.
+ */
+.chain-gap-stats {
+  position: absolute;
+  top: calc(var(--card-d) + var(--card-gap) / 2);
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.chain-gap-stats .stat-pill {
+  flex-direction: row;
+  width: auto;
+  height: 26px;
+  gap: 5px;
+  padding: 0 10px;
+  border-radius: 999px;
+}
+
+.chain-gap-stats .stat-pill .sp-label {
+  margin-left: -1px;
 }
 
 /*
@@ -4735,7 +4773,7 @@ body {
 
 /* Pantalla corta: la etiqueta de los indicadores es lo primero que sobra. */
 @media (max-height: 640px) {
-  .corner-col .stat-pill .sp-label,
+  .chain-gap-stats .sp-label,
   .rail-chip-name {
     display: none;
   }
@@ -4745,7 +4783,10 @@ body {
  * En horizontal las cartas van lado a lado, así que "junto a BASE" y "junto a
  * TU CARTA" dejan de significar algo dentro de una misma columna vertical —
  * las dos cartas ya no están una encima de la otra. Las columnas se quedan
- * como decoración de lado, centradas, sin el puesto de en medio fijo.
+ * como decoración de lado, centradas, sin el puesto de en medio fijo. Y el
+ * intersticio pasa de ser una franja horizontal a una vertical entre las dos
+ * cartas, así que Tiempo/Castigos se apilan ahí en vez de repartirse a los
+ * lados.
  */
 @media (min-width: 760px), (orientation: landscape) {
   .shell.playing.match-shell {
@@ -4764,10 +4805,15 @@ body {
     --card-gap: clamp(32px, 6vw, 72px);
     margin-bottom: 8px;
   }
-}
 
-.corner-col .stat-pill {
-  width: 100%;
+  .chain-gap-stats {
+    top: 0;
+    bottom: 0;
+    left: calc(var(--card-d) + var(--card-gap) / 2);
+    right: auto;
+    transform: translateX(-50%);
+    flex-direction: column;
+  }
 }
 
 /* El pie del tablero: silencio y abandonar. Ninguna de las dos es información
