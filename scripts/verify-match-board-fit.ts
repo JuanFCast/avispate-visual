@@ -1,27 +1,22 @@
-// Verifica que los indicadores del tablero NO toquen las cartas, en los
-// tamaños reales de pantalla del WebView de MiniPay.
+// Verifica que el tablero de la Arena quepa entero en 100dvh y que las
+// columnas de jugador dejen un diámetro de carta razonable, en los tamaños
+// reales de pantalla del WebView de MiniPay.
 //
-// ── El fallo ────────────────────────────────────────────────────────────────
+// ── La vuelta atrás que explica este archivo ─────────────────────────────
 //
-// Los rieles se superponen al tablero a propósito: la carta es un círculo, y
-// eso deja libres las cuatro esquinas de su caja, que es donde van los
-// indicadores. La carta puede así ocupar el ancho entero de la pantalla.
+// La versión anterior metía los chips en el triángulo muerto de la esquina
+// de la carta para exprimir cada píxel de diámetro. Se veía horrible: el
+// alias se recortaba a cuatro letras, la cuenta de cartas no cabía y el chip
+// entero quedaba del tamaño de una uña. La referencia real pedía lo
+// contrario — tarjetas legibles, con el alias completo y "N cartas" debajo —
+// así que los jugadores volvieron a vivir en columnas de verdad a los lados
+// del tablero, no superpuestas al círculo.
 //
-// Lo que no se hizo nunca fue la cuenta. El hueco de una esquina es un
-// triángulo cuyo lado mide unos `0,146 · d`: sobre una carta de 290 px son 42,
-// y las pastillas medían 52 y venían apiladas de dos en dos, así que la de
-// arriba llegaba hasta la mitad del círculo — que es justo donde más ancho es.
-// En la captura del 2026-08-08, CARTAS cruzaba el borde cian de TU CARTA.
-//
-// ── Qué comprueba esto ─────────────────────────────────────────────────────
-//
-// La geometría, con trigonometría y no de oído. Lee del CSS los números de
-// verdad —el ancho del riel, cuánto se sale, el alto de cada indicador, la
-// sangría del tablero y la fórmula del diámetro— y para cada pantalla calcula
-// a qué distancia queda la esquina del indicador del borde del círculo.
-//
-// Si alguien ensancha una pastilla, le sube el alto o cambia la cuenta del
-// diámetro, aquí sale el número exacto de píxeles que se está comiendo.
+// Eso cambia lo que hay que comprobar. Ya no hace falta trigonometría: si el
+// chip nunca entra en la caja de la carta, nunca la toca, punto. Lo que sí
+// hay que vigilar es que la carta no se quede diminuta por culpa de las
+// columnas, y que todo —tablero, columnas, pie— quepa en el alto real sin
+// scroll.
 //
 // Correr: node scripts/verify-match-board-fit.ts
 import { readFileSync } from "node:fs";
@@ -59,67 +54,37 @@ function px(nombre: string): number {
   return Number(m[1]);
 }
 
-/**
- * Una medida que encoge con la carta:
- * `clamp(<mín>px, calc(var(--card-d) * <k>), <máx>px)`.
- *
- * Se lee del CSS en vez de repetir los números aquí. Si mañana alguien sube el
- * factor o el tope, esta comprobación usa los suyos y no los de ayer.
- */
-function escalada(nombre: string): (d: number) => number {
+/** `clamp(<mín>px, <k>vw, <máx>px)`, tal como lo escribe el CSS. */
+function clampVw(nombre: string): (vw: number) => number {
   const m = new RegExp(
-    `--${nombre}:\\s*clamp\\(\\s*([\\d.]+)px\\s*,\\s*calc\\(var\\(--card-d\\)\\s*\\*\\s*([\\d.]+)\\)\\s*,\\s*([\\d.]+)px\\s*\\)`
+    `--${nombre}:\\s*clamp\\(\\s*([\\d.]+)px\\s*,\\s*([\\d.]+)vw\\s*,\\s*([\\d.]+)px\\s*\\)`
   ).exec(bloque);
-  if (!m) throw new Error(`--${nombre} debería escalar con la carta`);
+  if (!m) throw new Error(`--${nombre} debería ser un clamp(px, vw, px)`);
   const [, min, k, max] = m.map(Number);
-  return (d) => Math.min(Math.max(d * k, min), max);
+  return (vw) => Math.min(Math.max((vw * k) / 100, min), max);
 }
 
-const RAIL_OUT = px("rail-out");
-const BLEED = px("board-bleed");
-const railW = escalada("rail-w");
-const chipH = escalada("rail-chip-h");
+const chipW = clampVw("chip-w");
+const CHIP_GAP = px("chip-gap");
 
 /** Los tres términos del `min()` del diámetro, tal como están escritos. */
 const formula = /--card-d:\s*min\(([\s\S]*?)\);/.exec(bloque)?.[1] ?? "";
 const TOPE = Number(/(\d+)px\s*$/.exec(formula.trim())?.[1] ?? 0);
 const ALTO_RESTA = Number(/50dvh\s*-\s*(\d+)px/.exec(formula)?.[1] ?? 0);
 
-console.log(
-  `\nReserva por riel ${RAIL_OUT}px, sangría ${BLEED}px, tope de carta ${TOPE}px\n`
-);
+console.log(`\nColchón por columna: gap ${CHIP_GAP}px, tope de carta ${TOPE}px\n`);
 
 ok(
-  "la fórmula del diámetro sigue teniendo sus tres términos",
-  TOPE > 0 && ALTO_RESTA > 0 && /100vw/.test(formula),
+  "la fórmula del diámetro sigue restando las dos columnas y el alto",
+  TOPE > 0 && ALTO_RESTA > 0 && /100vw/.test(formula) && /chip-w/.test(formula),
   formula.replace(/\s+/g, " ").trim()
 );
 
-/* ── La geometría ────────────────────────────────────────────────────────── */
-
 /** Diámetro de carta que resultaría en esta pantalla. */
 function diametro(vw: number, vh: number): number {
-  const ancho = vw - 32 + 2 * BLEED - 2 * RAIL_OUT;
+  const ancho = vw - 32 - 2 * chipW(vw) - 2 * CHIP_GAP;
   const alto = vh / 2 - ALTO_RESTA;
   return Math.min(ancho, alto, TOPE);
-}
-
-/**
- * Cuánto aire queda entre la esquina interior del indicador y el borde del
- * círculo. Negativo = lo está pisando.
- *
- * El indicador es un rectángulo pegado a la esquina de la caja de la carta. Su
- * punto más comprometido es la esquina que mira al centro: si ESA queda fuera
- * del círculo, el rectángulo entero queda fuera.
- */
-function aire(d: number, altoIndicador: number): number {
-  const r = d / 2;
-  // Lo que el indicador entra en la caja de la carta. Si es más estrecho que la
-  // reserva, no entra nada: se queda fuera del todo y no hay nada que medir.
-  const muerde = Math.max(0, railW(d) - RAIL_OUT);
-  const dx = r - muerde;
-  const dy = r - altoIndicador;
-  return Math.hypot(dx, dy) - r;
 }
 
 /**
@@ -141,57 +106,29 @@ const PANTALLAS: [string, number, number][] = [
   ["Estrecho y muy alto", 320, 900],
 ];
 
-/** El aire mínimo que se considera "separado" y no "pegado". */
-const AIRE_MIN = 8;
+/** Por debajo de esto el círculo deja de sentirse "grande" en la pantalla. */
+const DIAMETRO_MIN = 150;
 
-console.log("— Separación entre las fichas de jugador y el círculo —\n");
-console.log("  pantalla                       carta   ficha");
-
-for (const [nombre, vw, vh] of PANTALLAS) {
-  const d = diametro(vw, vh);
-  const aFicha = aire(d, chipH(d));
-  console.log(
-    `  ${nombre.padEnd(30)} ${String(Math.round(d)).padStart(4)}px  ` +
-      `${aFicha.toFixed(1).padStart(5)}`
-  );
-  ok(
-    `    ${nombre}: la ficha de jugador no toca la carta`,
-    aFicha >= AIRE_MIN,
-    `solo ${aFicha.toFixed(1)}px de aire (mínimo ${AIRE_MIN})`
-  );
-}
-
-/* ── Y la carta sigue siendo lo más grande posible ───────────────────────── */
-
-console.log("\n— La carta no paga el arreglo —\n");
+console.log("— El diámetro de carta que deja cada pantalla —\n");
+console.log("  pantalla                       columna  carta");
 
 for (const [nombre, vw, vh] of PANTALLAS) {
   const d = diametro(vw, vh);
-  const porAlto = vh / 2 - ALTO_RESTA;
-  // Donde manda el alto, ensanchar los márgenes no le cuesta NADA a la carta:
-  // es la mitad de la pantalla por carta, y eso no lo cambia el ancho.
-  const mandaElAlto = porAlto <= vw - 32 + 2 * BLEED - 2 * RAIL_OUT;
   console.log(
-    `  ${nombre.padEnd(30)} ${String(Math.round(d)).padStart(4)}px  ` +
-      `${mandaElAlto ? "manda el alto (sin coste)" : "manda el ancho"}`
+    `  ${nombre.padEnd(30)} ${String(Math.round(chipW(vw))).padStart(5)}px  ${String(
+      Math.round(d)
+    ).padStart(4)}px`
   );
-}
-
-{
-  // Con el `bleed`, el ancho disponible es mayor que la columna de la app: sin
-  // él habría que quitarle diámetro a la carta para hacer sitio a los rieles.
-  const sinBleed = (vw: number) => vw - 32 - 2 * RAIL_OUT;
-  const conBleed = (vw: number) => vw - 32 + 2 * BLEED - 2 * RAIL_OUT;
   ok(
-    "salirse al margen le devuelve a la carta lo que se llevan los rieles",
-    conBleed(393) - sinBleed(393) === 2 * BLEED,
-    `${conBleed(393)} vs ${sinBleed(393)}`
+    `    ${nombre}: la carta no se queda diminuta`,
+    d >= DIAMETRO_MIN,
+    `${d.toFixed(1)}px de diámetro (mínimo ${DIAMETRO_MIN})`
   );
 }
 
-/* ── Un jugador por esquina, y los indicadores fuera del tablero ─────────── */
+/* ── Un jugador por esquina, y los indicadores dentro de su columna ──────── */
 
-console.log("\n— Y solo cabe uno por esquina —\n");
+console.log("\n— Cuatro puestos de jugador y dos indicadores, ni uno más ─\n");
 
 {
   const src = readFileSync(join(ROOT, "components/arena/ArenaMatch.tsx"), "utf8");
@@ -205,10 +142,7 @@ console.log("\n— Y solo cabe uno por esquina —\n");
     return src.slice(i + desde.length, j);
   }
 
-  const board = entre(
-    '<div className="play-board match-board">',
-    '{/* Indicadores secundarios'
-  );
+  const board = entre('<div className="play-board match-board">', "\n      {/* Lo que no es partida");
   ok("encuentro el cuerpo de .match-board", board !== null, "cambió el marcado del tablero");
 
   for (const esquina of [
@@ -222,25 +156,17 @@ console.log("\n— Y solo cabe uno por esquina —\n");
     ok(`    hay exactamente una esquina "${esquina}"`, veces === 1, `${veces}`);
   }
 
+  const pastillas = [...(board ?? "").matchAll(/className="stat-pill"/g)].length;
   ok(
-    "ningún indicador vive dentro del tablero",
-    !/stat-pill/.test(board ?? "no encontrado"),
-    "un stat-pill volvió a meterse en una esquina — eso es lo que rompía la geometría"
+    "    hay exactamente dos indicadores (Tiempo y Castigos), dentro de las columnas",
+    pastillas === 2,
+    `${pastillas} pastillas`
   );
 
   ok(
     "el botón de silencio no vive en el tablero",
     !/mute-btn/.test(board ?? ""),
-    "el silencio se metió otra vez en una esquina en vez de en el pie"
-  );
-
-  const filaStats = entre('<div className="match-stats-row">', '{/* Lo que no es partida');
-  ok("hay una fila de indicadores fuera del tablero", filaStats !== null, "no encuentro .match-stats-row");
-  const pastillas = [...(filaStats ?? "").matchAll(/className="stat-pill"/g)].length;
-  ok(
-    "    la fila trae Tiempo y Castigos, ni uno más ni uno menos",
-    pastillas === 2,
-    `${pastillas} pastillas`
+    "el silencio se metió otra vez en una columna en vez de en el pie"
   );
 
   ok(
@@ -256,24 +182,20 @@ console.log("\n— La pantalla entera cabe en 100dvh, sin scroll —\n");
 
 {
   /*
-   * Lo mismo que calcula `--card-d`, pero al revés: si esta cuenta no da el
-   * mismo número que el CSS, es que alguien cambió una fórmula sin la otra y
-   * algo se va a salir por abajo. Los tres números fijos (línea de stats,
-   * gap del shell, pie) tienen que existir también como CSS real y no solo
-   * aquí — por eso viven con su propio comentario en globals.css.
+   * Las columnas de jugador ya no cuestan alto de flujo —son tan altas como
+   * el tablero, `align-items: stretch` se encarga— así que lo único que hay
+   * que sumar aparte del tablero es el pie (silencio + abandonar).
    */
   const SHELL_PAD_V = 32; // .shell { padding: 16px } arriba + abajo
-  const SHELL_GAP = 10; // .match-shell { gap: 10px }
-  const STATS_ROW_H = 26; // .match-stats-row .stat-pill { height: 26px }
+  const SHELL_GAP = 10; // .match-shell { gap: 10px }, un solo hueco: tablero → pie
   const FOOT_H = 42; // .match-foot .mute-btn 40px + margin-top 2px
   const CARD_GAP = 32; // .shell.playing.match-shell .chain-area { --card-gap: 32px }
 
   for (const [nombre, vw, vh] of PANTALLAS) {
     const d = diametro(vw, vh);
-    // board + fila de stats + pie, con sus dos gaps del shell entre los tres.
-    const usado = SHELL_PAD_V + 2 * SHELL_GAP + STATS_ROW_H + FOOT_H + 2 * d + CARD_GAP;
+    const usado = SHELL_PAD_V + SHELL_GAP + FOOT_H + 2 * d + CARD_GAP;
     ok(
-      `    ${nombre}: tablero + stats + pie caben en el alto disponible`,
+      `    ${nombre}: tablero + pie caben en el alto disponible`,
       usado <= vh,
       `usa ${Math.round(usado)}px de ${vh}px — se pasa por ${Math.round(usado - vh)}px`
     );

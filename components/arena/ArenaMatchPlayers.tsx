@@ -61,15 +61,16 @@ export function stateOf(player: MatchPlayerView, t: Translate): string {
 }
 
 /**
- * Un jugador en la esquina: inicial, cartas que le quedan y su alias real.
+ * Un jugador en la esquina: avatar, alias real y cuántas cartas le quedan.
  *
- * El número es lo más grande del chip porque es la carrera: es la única cifra
- * que se mira de reojo sin soltar la partida. El alias va debajo, recortado
- * con `…` solo cuando de verdad no cabe —nunca se sustituye por la inicial, ni
- * el tuyo por "TÚ": esa insignia va aparte, sobre el avatar, para no borrar tu
- * propio nombre de la mesa. El estado no se escribe, se pinta (apagado,
- * bandera, puerta), y viaja completo en el `title` y en el `aria-label` para
- * quien no puede verlo.
+ * El alias manda —es una mesa con gente, no una tabla de números— y va en
+ * negrita justo bajo el avatar, recortado con `…` solo cuando de verdad no
+ * cabe. Nunca se sustituye por la inicial, ni el tuyo por "TÚ": esa insignia
+ * va aparte, sobre el avatar, para no borrar tu propio nombre de la mesa. La
+ * cuenta de cartas es la leyenda chica de abajo, no el número gigante: se mira
+ * de reojo, no se corre detrás de ella. El estado no se escribe, se pinta
+ * (apagado, bandera, puerta), y viaja completo en el `title` y en el
+ * `aria-label` para quien no puede verlo.
  */
 export function RailChip({ player }: { player: MatchPlayerView | null }) {
   const t = useT();
@@ -98,23 +99,20 @@ export function RailChip({ player }: { player: MatchPlayerView | null }) {
     >
       <span className="rail-chip-avatar" aria-hidden="true">
         {player.initial}
-        {player.isYou && <em className="rail-chip-you">{t("match.you")}</em>}
         {player.finished && <em className="rail-chip-flag">🏁</em>}
         {player.left && !player.finished && <em className="rail-chip-flag">🚪</em>}
       </span>
+      {player.isYou && <em className="rail-chip-you">{t("match.you")}</em>}
+      <strong className="rail-chip-name">{name}</strong>
       {/* Solo se anuncia el del rival: el tuyo ya lo canta la píldora del mazo,
           y dos regiones vivas diciendo números a la vez se pisan. */}
-      <strong
+      <small
         className="rail-chip-cards"
         aria-live={player.isYou ? "off" : "polite"}
         aria-label={`${name}: ${player.cardsLeft} ${t("match.cards")} · ${state}`}
       >
-        {player.cardsLeft}
-      </strong>
-      <span className="rail-chip-cards-label" aria-hidden="true">
-        {t("match.cards")}
-      </span>
-      <small className="rail-chip-name">{name}</small>
+        {player.cardsLeft} {t("match.cards")}
+      </small>
     </div>
   );
 }

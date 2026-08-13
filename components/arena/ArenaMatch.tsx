@@ -363,20 +363,34 @@ export default function ArenaMatch({ code }: { code: string }) {
       )}
 
       {/*
-        Cada jugador se ancla a una esquina real de `chain-area`, no a un
-        riel de altura completa. BASE ocupa la mitad de arriba de la caja y TU
-        CARTA la de abajo, así que "junto a BASE" es la esquina superior y
-        "junto a TU CARTA" la inferior — mismo triángulo libre de siempre, las
-        cuatro esquinas de un círculo inscrito miden lo mismo por simetría, así
-        que la carta no paga nada por usar las cuatro en vez de dos.
+        Columnas de verdad a los lados, no superpuestas al círculo: el chip de
+        jugador necesita alias legible y "N cartas" enteros, y eso no cabe en
+        el triángulo muerto de una esquina. Cada columna tiene tres puestos
+        fijos —junto a BASE, junto a TU CARTA, el indicador— y el que no tiene
+        jugador se queda como hueco vacío en vez de dejar que los de abajo
+        suban: así el segundo puesto cae siempre a la altura de TU CARTA,
+        tengas 2, 3 o 4 jugadores en la mesa.
       */}
       <div className="play-board match-board">
         <div className="corner-col corner-col-left">
           <div className="corner corner-base-left">
-            {slots.baseLeft && <RailChip key={slots.baseLeft.profileId} player={slots.baseLeft} />}
+            {slots.baseLeft ? (
+              <RailChip key={slots.baseLeft.profileId} player={slots.baseLeft} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
           </div>
           <div className="corner corner-mine-left">
-            {slots.mineLeft && <RailChip key={slots.mineLeft.profileId} player={slots.mineLeft} />}
+            {slots.mineLeft ? (
+              <RailChip key={slots.mineLeft.profileId} player={slots.mineLeft} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
+          </div>
+          <div className="stat-pill">
+            <span className="sp-emoji">⏱️</span>
+            <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
+            <span className="sp-label">{t("game.stat.time")}</span>
           </div>
         </div>
 
@@ -417,26 +431,24 @@ export default function ArenaMatch({ code }: { code: string }) {
 
         <div className="corner-col corner-col-right">
           <div className="corner corner-base-right">
-            {slots.baseRight && <RailChip key={slots.baseRight.profileId} player={slots.baseRight} />}
+            {slots.baseRight ? (
+              <RailChip key={slots.baseRight.profileId} player={slots.baseRight} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
           </div>
           <div className="corner corner-mine-right">
-            {slots.mineRight && <RailChip key={slots.mineRight.profileId} player={slots.mineRight} />}
+            {slots.mineRight ? (
+              <RailChip key={slots.mineRight.profileId} player={slots.mineRight} />
+            ) : (
+              <span className="corner-spacer" aria-hidden="true" />
+            )}
           </div>
-        </div>
-      </div>
-
-      {/* Indicadores secundarios, fuera del tablero: no le quitan sitio a la
-          carta ni compiten por sus esquinas. */}
-      <div className="match-stats-row">
-        <div className="stat-pill">
-          <span className="sp-emoji">⏱️</span>
-          <span className="sp-value">{(elapsedMs / 1000).toFixed(1)}s</span>
-          <span className="sp-label">{t("game.stat.time")}</span>
-        </div>
-        <div className="stat-pill">
-          <span className="sp-emoji">🧱</span>
-          <span className="sp-value">{view.you?.penalties ?? 0}</span>
-          <span className="sp-label">{t("match.stat.penalties")}</span>
+          <div className="stat-pill">
+            <span className="sp-emoji">🧱</span>
+            <span className="sp-value">{view.you?.penalties ?? 0}</span>
+            <span className="sp-label">{t("match.stat.penalties")}</span>
+          </div>
         </div>
       </div>
 
