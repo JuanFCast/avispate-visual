@@ -5,6 +5,7 @@ import { fmtUsdt } from "@/lib/arena";
 import { formatMs } from "@/lib/game";
 import type { MatchPlayerView, MatchStakes, MatchView } from "@/lib/arena-match";
 import { matchResultFor, standingsOf } from "@/lib/arena-match";
+import { seatColor } from "@/lib/arena-seat-color";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey, Translate } from "@/lib/i18n";
 
@@ -220,6 +221,13 @@ function Row({
     <tr className={isWinner ? "match-row-win" : undefined}>
       <th scope="row">
         <span className="match-row-name">
+          {/* El mismo punto de color que tenía su módulo en el tablero — la
+              silla no cambia entre jugar y ver el resultado. */}
+          <span
+            className="match-row-dot"
+            aria-hidden="true"
+            style={{ background: seatColor(player.seat) }}
+          />
           {player.name || t("room.players.anon")}
           {player.isYou && <em>{t("match.you")}</em>}
         </span>
