@@ -240,6 +240,103 @@ export function decideEmbeddedCreation(check: {
  * Dentro de MiniPay, la inyectada tiene que ganar siempre — no por canónica,
  * por estar en MiniPay.
  */
+/**
+ * Con qué nombre se anuncia la wallet embebida a wagmi.
+ *
+ * Vive aquí, y no en `embedded-wallet.tsx`, porque hay más de un sitio que
+ * necesita RECONOCERLA para no confundirla con otra: el más importante es
+ * `useMiniPayAutoConnect`, que busca la wallet inyectada de MiniPay. Una wallet
+ * descubierta por EIP-6963 también le sale a wagmi como `type: "injected"`, así
+ * que sin este nombre a mano MiniPay podría acabar conectando la embebida de
+ * Privy en vez de la del teléfono — la wallet equivocada, en el único sitio
+ * donde la inyectada tiene que ganar siempre. `wallet-identity.ts` no importa
+ * nada, así que puede leerlo cualquiera sin ciclos.
+ */
+export const EMBEDDED_WALLET_NAME = "Avíspate (Privy)";
+
+/**
+ * ── El anuncio EIP-6963 de la embebida ──────────────────────────────────────
+ *
+ * La wallet embebida NO es un conector declarado en `lib/wagmi.ts`: llega a
+ * wagmi únicamente porque la anunciamos por EIP-6963. Ese anuncio es, por
+ * tanto, la única forma que tiene la app de poder firmar con ella — si se
+ * pierde, wagmi se queda sin conector, `embedded-wallet.tsx` reintenta ocho
+ * veces contra algo que no existe y el botón de jugar pasa media hora
+ * deshabilitado diciendo "preparando tu billetera".
+ *
+ * La regla, entera: **un anuncio, un uuid y un oyente por dirección embebida.**
+ * Se pone cuando aparece la dirección, se reemplaza solo cuando la dirección
+ * CAMBIA, y se retira al desmontar. Nunca se rehace por un render.
+ *
+ * Las dos mitades importan y se rompieron por separado:
+ *
+ *   · Rehacerlo en cada render dejaba una closure viva por render, cada una
+ *     agarrada a un proveedor viejo, y todas contestaban al siguiente
+ *     `eip6963:requestProvider`. wagmi redescubría proveedores muertos y podía
+ *     reconectar uno anterior: la intermitencia de "a veces sale una dirección
+ *     y a veces otra".
+ *   · Y quitarlo sin volver a ponerlo —el arreglo de lo anterior— dejaba a la
+ *     app SIN anuncio para el resto de la sesión, que es el otro extremo del
+ *     mismo problema.
+ *
+ * Por eso la decisión vive aquí, pura: se puede recorrer una secuencia entera
+ * de renders en `scripts/verify-embedded-announce.ts` y comprobar que converge.
+ */
+export type EmbeddedAnnounce =
+  /** Ya está anunciada esa misma dirección (o no hay nada que anunciar). */
+  | { kind: "keep" }
+  /** Hay una embebida sin anunciar: se anuncia, retirando antes la anterior. */
+  | { kind: "announce"; address: string }
+  /** Ya no hay embebida y quedaba un anuncio vivo: se retira. */
+  | { kind: "retract" };
+
+export function decideEmbeddedAnnounce(check: {
+  /** La embebida que Privy expone AHORA, o `null` si no hay. */
+  embeddedAddress: string | null;
+  /** La dirección cuyo anuncio está VIVO ahora mismo, o `null`. */
+  announced: string | null;
+}): EmbeddedAnnounce {
+  const embedded = norm(check.embeddedAddress);
+  const announced = norm(check.announced);
+
+  if (!embedded) return announced ? { kind: "retract" } : { kind: "keep" };
+  // La comparación es por DIRECCIÓN, nunca por la identidad del objeto que
+  // devuelve Privy: ese objeto cambia entre renders sin que cambie la wallet,
+  // y confundir las dos cosas es exactamente lo que rehacía el anuncio.
+  if (embedded === announced) return { kind: "keep" };
+  return { kind: "announce", address: embedded };
+}
+
+/**
+ * El uuid con el que se anuncia una embebida. DERIVADO de la dirección, no
+ * aleatorio.
+ *
+ * wagmi indexa los proveedores descubiertos por `info.uuid`. Con uno aleatorio,
+ * anunciar dos veces la misma wallet le crea DOS conectores con el mismo
+ * nombre, y `connectors.find(c => c.name === …)` se queda con el primero — que
+ * puede ser el del proveedor muerto. Derivándolo de la dirección, anunciar de
+ * más es idempotente: la misma wallet es siempre el mismo conector.
+ *
+ * Sale con forma de UUIDv4 (8-4-4-4-12, versión y variante en su sitio) porque
+ * es lo que pide EIP-6963; no pretende ser aleatorio ni secreto, y no lo es:
+ * la dirección de la que sale ya es pública.
+ */
+export function embeddedAnnounceUuid(address: string): string {
+  const hex = norm(address).replace(/^0x/, "").padEnd(32, "0").slice(0, 32);
+  // Nibble de versión (4) y de variante (8..b), como exige el formato.
+  const conVersion = `${hex.slice(0, 12)}4${hex.slice(13, 16)}`;
+  const variante = "89ab"[parseInt(hex[16] ?? "0", 16) % 4];
+  const resto = `${variante}${hex.slice(17, 20)}${hex.slice(20)}`;
+  const todo = `${conVersion}${resto}`;
+  return [
+    todo.slice(0, 8),
+    todo.slice(8, 12),
+    todo.slice(12, 16),
+    todo.slice(16, 20),
+    todo.slice(20, 32),
+  ].join("-");
+}
+
 export type EmbeddedAutoConnect =
   | { kind: "connect" }
   /** El perfil no ha terminado de resolverse (cargando, falló, o va a

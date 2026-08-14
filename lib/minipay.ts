@@ -2,6 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAccount, useConnect } from "wagmi";
+// Con extensión: `scripts/verify-*.ts` importa este módulo con `node`, que la
+// exige. Misma razón que en `game.ts` → `symbols.ts`.
+import { EMBEDDED_WALLET_NAME } from "./wallet-identity.ts";
 
 interface MiniPayEthereum {
   isMiniPay?: boolean;
@@ -45,8 +48,20 @@ export function useMiniPayAutoConnect(): void {
   useEffect(() => {
     if (tried.current || isConnected) return;
     if (!isMiniPay()) return;
+    /**
+     * La inyectada del TELÉFONO, y nunca la embebida.
+     *
+     * `type: "injected"` no distingue: una wallet descubierta por EIP-6963
+     * —como la embebida de Privy, que anunciamos nosotros— le sale a wagmi con
+     * ese mismo tipo. Si el orden de los conectores la pusiera primero, aquí se
+     * conectaría la embebida dentro de MiniPay: justo la wallet equivocada, en
+     * el único sitio donde la inyectada tiene que ganar siempre. Se descarta
+     * por nombre, que es lo único que la identifica sin ambigüedad.
+     */
     const injected = connectors.find(
-      (c) => c.id === "injected" || c.type === "injected"
+      (c) =>
+        c.name !== EMBEDDED_WALLET_NAME &&
+        (c.id === "injected" || c.type === "injected")
     );
     if (!injected) return;
     tried.current = true;

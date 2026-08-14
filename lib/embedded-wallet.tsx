@@ -15,8 +15,11 @@ import { useProfile } from "./profile-context";
 import { useIsMiniPay } from "./minipay";
 import {
   canonicalFromProfile,
+  decideEmbeddedAnnounce,
   decideEmbeddedAutoConnect,
   decideEmbeddedCreation,
+  embeddedAnnounceUuid,
+  EMBEDDED_WALLET_NAME,
 } from "./wallet-identity";
 
 /**
@@ -38,7 +41,7 @@ import {
 
 /** Identidad EIP-6963 con la que anunciamos la embebida a wagmi/RainbowKit. */
 export const EMBEDDED_INFO = {
-  name: "Avíspate (Privy)",
+  name: EMBEDDED_WALLET_NAME,
   rdns: "fun.avispate.embedded",
   icon:
     "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23FFC20E'/%3E%3C/svg%3E",
@@ -159,7 +162,12 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
    */
   const [manual, setManual] = useState(0);
   const [stuck, setStuck] = useState(false);
-  const announcedRef = useRef<string | null>(null);
+  /** El anuncio EIP-6963 VIVO: una dirección, un oyente. Nunca dos. */
+  const anuncioRef = useRef<{ address: string; listener: () => void } | null>(
+    null
+  );
+  /** Turno del anuncio, contra dos proveedores resolviendo a la vez. */
+  const anuncioSeqRef = useRef(0);
   const createTriedRef = useRef(false);
   const attemptsRef = useRef(0);
   /** Qué dirección embebida ya se soltó, para no repetirlo en cada render. */
@@ -173,52 +181,65 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
   const waiting =
     privyReady && authenticated && !isConnected && autoConnect.kind !== "skip";
 
-  // 1. Anunciar la embebida por EIP-6963 para que wagmi la descubra como una
-  //    wallet más, sin reemplazar los conectores externos.
+  /**
+   * 1. Anunciar la embebida por EIP-6963 para que wagmi la descubra como una
+   *    wallet más, sin reemplazar los conectores externos.
+   *
+   * El anuncio vivo se guarda en un ref y NO se desmonta con el efecto: quién
+   * está anunciado depende de qué wallet hay, no de cuántas veces haya vuelto a
+   * correr este código. La regla completa y su porqué, en
+   * `decideEmbeddedAnnounce` (`wallet-identity.ts`), que es pura y está probada
+   * en `scripts/verify-embedded-announce.ts`.
+   */
+  const retirarAnuncio = useCallback(() => {
+    const vivo = anuncioRef.current;
+    if (!vivo) return;
+    window.removeEventListener("eip6963:requestProvider", vivo.listener);
+    anuncioRef.current = null;
+  }, []);
+
   useEffect(() => {
-    if (!embedded || !embeddedAddress) return;
-    if (announcedRef.current === embeddedAddress) return;
-    let cancelled = false;
+    const accion = decideEmbeddedAnnounce({
+      embeddedAddress,
+      announced: anuncioRef.current?.address ?? null,
+    });
+    if (accion.kind === "keep") return;
+    if (accion.kind === "retract") {
+      retirarAnuncio();
+      return;
+    }
+    if (!embedded) return;
 
     /**
-     * El oyente se guarda para poder QUITARLO.
-     *
-     * Antes la limpieza solo marcaba `cancelled` y el `addEventListener` se
-     * quedaba puesto para siempre. Cada vez que este efecto volvía a correr
-     * dejaba otra closure viva, y cada una seguía agarrada a su `detail` — o
-     * sea a un proveedor viejo. En el siguiente `eip6963:requestProvider` se
-     * anunciaban TODOS, incluidos los muertos, y wagmi podía redescubrir y
-     * reconectar uno anterior. Con dos wallets en juego eso es exactamente la
-     * intermitencia que se veía: a veces salía una dirección y a veces otra.
+     * Dos direcciones resolviendo su proveedor a la vez: solo la última pedida
+     * puede quedarse. Sin esto, una respuesta lenta de la wallet anterior
+     * pisaría el anuncio de la actual — y el anuncio ES con qué se firma.
      */
-    let listener: (() => void) | null = null;
+    const turno = ++anuncioSeqRef.current;
 
     (async () => {
       const provider = await embedded.getEthereumProvider();
-      if (cancelled || !provider) return;
-      announcedRef.current = embeddedAddress;
+      if (!provider || turno !== anuncioSeqRef.current) return;
 
+      // Fuera el anterior ANTES de poner el nuevo: nunca dos oyentes vivos.
+      retirarAnuncio();
       const detail = Object.freeze({
-        info: { ...EMBEDDED_INFO, uuid: crypto.randomUUID() },
+        info: { ...EMBEDDED_INFO, uuid: embeddedAnnounceUuid(accion.address) },
         provider,
       });
       const announce = () =>
         window.dispatchEvent(
           new CustomEvent("eip6963:announceProvider", { detail })
         );
-      listener = announce;
       // Responder tanto a peticiones futuras como anunciar de inmediato.
       window.addEventListener("eip6963:requestProvider", announce);
+      anuncioRef.current = { address: accion.address, listener: announce };
       announce();
     })();
+  }, [embedded, embeddedAddress, retirarAnuncio]);
 
-    return () => {
-      cancelled = true;
-      if (listener) {
-        window.removeEventListener("eip6963:requestProvider", listener);
-      }
-    };
-  }, [embedded, embeddedAddress]);
+  // Y se retira al DESMONTAR, que es el único momento en que sobra de verdad.
+  useEffect(() => retirarAnuncio, [retirarAnuncio]);
 
   /**
    * 2. Crear la wallet — y ahora ESTE es el único sitio que la crea.
