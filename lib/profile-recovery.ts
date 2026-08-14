@@ -18,6 +18,58 @@
     servidor, no solo esperar a que un SDK local termine de hidratar. */
 export const PROFILE_REQUEST_TIMEOUT_MS = 12_000;
 
+/**
+ * Lo que se espera por el TOKEN, que es una espera distinta de la del perfil.
+ *
+ * `getAccessToken()` de Privy es una llamada a un SDK que habla con su iframe;
+ * puede tardar, fallar o no volver nunca. Es más corto que el del perfil
+ * porque no es una ida y vuelta a nuestro servidor: si en ocho segundos el
+ * SDK no ha contestado, no va a contestar.
+ */
+export const TOKEN_REQUEST_TIMEOUT_MS = 8_000;
+
+export type BoundedCall<T> =
+  | { kind: "ok"; value: T }
+  | { kind: "timeout" }
+  | { kind: "error"; error: unknown };
+
+/**
+ * Corre una promesa con tope de tiempo. SIEMPRE resuelve.
+ *
+ * Existe por el agujero que quedó abierto: `fetchProfileWithTimeout` acotaba
+ * la petición del perfil, pero el `await getToken()` de justo antes no tenía
+ * tope ninguno. Un SDK colgado ahí dejaba el perfil en "cargando" para
+ * siempre, y `canonicalFromProfile` reporta "cargando" como "no lo sé", que
+ * no autoriza nada — así que el jugador se quedaba con "Comprobando tu
+ * perfil…" y un botón muerto, sin forma de salir salvo recargar.
+ *
+ * No cancela el trabajo de fondo (una promesa no se puede abortar desde
+ * fuera): lo que hace es dejar de ESPERARLO, que es lo que hacía falta para
+ * poder contarle algo al jugador.
+ */
+export async function callWithTimeout<T>(
+  run: () => Promise<T>,
+  timeoutMs: number
+): Promise<BoundedCall<T>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expiry = new Promise<BoundedCall<T>>((resolve) => {
+    timer = setTimeout(() => resolve({ kind: "timeout" }), timeoutMs);
+  });
+  try {
+    return await Promise.race([
+      run().then((value): BoundedCall<T> => ({ kind: "ok", value })),
+      expiry,
+    ]);
+  } catch (error) {
+    // Que el SDK lance NO es lo mismo que quedarse mudo, y se distinguen
+    // aquí aunque quien llama trate a los dos igual: el día que uno de los
+    // dos merezca otra respuesta, el dato ya está.
+    return { kind: "error", error };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export type ProfileFetchOutcome =
   | { kind: "ok"; response: Response }
   | { kind: "timeout" }

@@ -17,10 +17,12 @@ import {
 } from "./wallet-session-client";
 import { SETTLE_LIMIT_MS } from "./wallet-identity";
 import {
+  callWithTimeout,
   createSequenceGate,
   decideProfileRefreshAction,
   fetchProfileWithTimeout,
   PROFILE_REQUEST_TIMEOUT_MS,
+  TOKEN_REQUEST_TIMEOUT_MS,
 } from "./profile-recovery";
 
 interface ProfileState {
@@ -162,8 +164,23 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       publish(EMPTY);
       return;
     }
-    setState((s) => ({ ...s, loading: true }));
-    const token = await getToken();
+    setState((s) => (s.loading ? s : { ...s, loading: true }));
+    /**
+     * Con tope de tiempo, y este era el agujero.
+     *
+     * `fetchProfileWithTimeout` (más abajo) acotaba la petición del perfil,
+     * pero esta espera —el SDK de Privy hablando con su iframe— no tenía
+     * ninguno. Colgada aquí, `refresh()` no llegaba nunca a `publish()`, así
+     * que `loading` se quedaba en true PARA SIEMPRE: el lobby en "Comprobando
+     * tu entrada…", el modal en "Comprobando tu perfil…" y el botón de jugar
+     * muerto, sin más salida que recargar.
+     *
+     * Vencido el plazo se trata como fallo, que es lo honesto —no sabemos
+     * quién es— y encima es RECUPERABLE: el lobby ofrece "reintentar" con
+     * `profile.failed`, mientras que "cargando" no ofrece nada.
+     */
+    const attempt = await callWithTimeout(getToken, TOKEN_REQUEST_TIMEOUT_MS);
+    const token = attempt.kind === "ok" ? attempt.value : null;
     // Hay sesión pero no se pudo sacar el token: tampoco se sabe nada del
     // perfil. Es un fallo, no un perfil vacío.
     if (!token) {
@@ -232,14 +249,39 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const embeddedWallet =
     wallets.find((w) => w.walletClientType === "privy")?.address ?? null;
 
+  /**
+   * El `refresh` más reciente, alcanzable sin que su IDENTIDAD dispare nada.
+   *
+   * Este efecto colgaba de `refresh`, que cuelga de `getToken`, que cuelga de
+   * `getAccessToken` de Privy. Si el SDK devuelve una función nueva en cada
+   * render —y no promete lo contrario—, el efecto corría en CADA render:
+   * `sequenceGate.begin()` subía el número cada vez, así que la respuesta que
+   * estaba llegando se descartaba siempre por "ya no eres la actual" y
+   * `publish()` no se ejecutaba nunca. El perfil se quedaba cargando para
+   * siempre sin que fallara ni una sola petición, que es justo lo que hace
+   * este fallo tan difícil de ver: en la pestaña de red todo sale 200.
+   *
+   * Con el ref, el efecto depende solo de lo que de verdad cambia el
+   * resultado —hay sesión, cuál, y qué wallet embebida hay— y siempre llama a
+   * la versión buena. Es el mismo patrón que ya usa `arena-match-client.ts`.
+   */
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
+
   useEffect(() => {
     if (!ready) return;
-    refresh();
-  }, [ready, authenticated, embeddedWallet, refresh]);
+    refreshRef.current();
+  }, [ready, authenticated, embeddedWallet]);
 
   const setAlias = useCallback(
     async (alias: string) => {
-      const token = await getToken();
+      // Mismo tope y por lo mismo: sin él, un SDK mudo deja el formulario de
+      // nombre girando sin decir nada. Aquí el fallo sí es contable —
+      // "no_session" ya tiene su mensaje— así que además se puede reintentar.
+      const attempt = await callWithTimeout(getToken, TOKEN_REQUEST_TIMEOUT_MS);
+      const token = attempt.kind === "ok" ? attempt.value : null;
       if (!token) return { ok: false, error: "no_session" };
       const res = await fetch("/api/profile", {
         method: "POST",

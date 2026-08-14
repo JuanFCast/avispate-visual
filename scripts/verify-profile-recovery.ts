@@ -21,9 +21,11 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
+  callWithTimeout,
   createSequenceGate,
   decideProfileRefreshAction,
   fetchProfileWithTimeout,
+  TOKEN_REQUEST_TIMEOUT_MS,
   type ProfileFetchOutcome,
 } from "../lib/profile-recovery.ts";
 import { decidePlayStart } from "../lib/pay-guard.ts";
@@ -440,6 +442,113 @@ console.log("\n— isMiniPay(): fiable en MiniPay, silenciosa en Chrome/Safari �
       (globalThis as { window?: unknown }).window = originalWindow;
     }
   }
+}
+
+/* ==========================================================================
+ * El MISMO cuelgue, por las otras dos puertas que quedaron abiertas
+ * --------------------------------------------------------------------------
+ * Foto real del 2026-08-14, Chrome de escritorio: el lobby en "Comprobando tu
+ * entrada… / Preparando…" y el modal en "Comprobando tu perfil…", los tres a
+ * la vez y para siempre. Los tres salen de la MISMA condición
+ * (`profile.authenticated && profile.loading`), así que el perfil se quedó
+ * cargando sin publicar nunca un resultado — ni bueno ni malo.
+ *
+ * El timeout del `fetch` de arriba no lo cubría, porque ninguna de las dos
+ * causas llega a hacer el fetch.
+ * ========================================================================== */
+console.log("\n— A. El token también tiene tope: un SDK colgado no cuelga el perfil —");
+{
+  // `await getToken()` iba SIN tope: llama a `getAccessToken()` de Privy, que
+  // habla con su iframe y puede no volver nunca. Colgada ahí, `refresh()` no
+  // llegaba a `publish()` y `loading` se quedaba en true para siempre.
+  const colgada = await callWithTimeout(
+    () => new Promise<string>(() => {}),
+    30
+  );
+  ok(
+    "una llamada que no vuelve NUNCA termina por timeout",
+    colgada.kind === "timeout",
+    `recibido ${JSON.stringify(colgada)}`
+  );
+
+  const buena = await callWithTimeout(async () => "token-bueno", 1_000);
+  ok(
+    "y una que sí contesta devuelve su valor",
+    buena.kind === "ok" && buena.value === "token-bueno"
+  );
+
+  const rota = await callWithTimeout(async () => {
+    throw new Error("privy_down");
+  }, 1_000);
+  ok(
+    "un SDK que LANZA se distingue de uno mudo",
+    rota.kind === "error",
+    `recibido ${JSON.stringify(rota.kind)}`
+  );
+
+  // Lo que importa para el jugador: las tres formas de no tener token acaban
+  // en `failed`, que el lobby SÍ sabe ofrecer con un botón de reintentar
+  // (`cta.profile_failed`), mientras que "cargando" no ofrece nada.
+  ok(
+    "ninguna de las tres se queda esperando",
+    [colgada.kind, buena.kind, rota.kind].every((k) =>
+      ["ok", "timeout", "error"].includes(k)
+    )
+  );
+
+  ok(
+    "el tope del token es más corto que el del perfil (no es una ida y vuelta a nuestro servidor)",
+    TOKEN_REQUEST_TIMEOUT_MS > 0 && TOKEN_REQUEST_TIMEOUT_MS <= 12_000
+  );
+
+  const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  ok(
+    "y `refresh()` lo usa de verdad, en vez del await pelado",
+    /callWithTimeout\(getToken, TOKEN_REQUEST_TIMEOUT_MS\)/.test(ctx),
+    "el `await getToken()` sin tope es exactamente el cuelgue"
+  );
+  ok(
+    "ya no queda ningún `await getToken()` sin acotar en refresh",
+    /const token = await getToken\(\);/.test(ctx) === false
+  );
+}
+
+console.log("\n— B. El refresco no puede dispararse en bucle y descartarse a sí mismo —");
+{
+  /*
+   * El efecto colgaba de `refresh`, que cuelga de `getToken`, que cuelga de
+   * `getAccessToken` de Privy. Si el SDK devuelve una función nueva por
+   * render, el efecto corre en CADA render y `sequenceGate.begin()` sube el
+   * número cada vez — así que la respuesta en vuelo se descarta siempre por
+   * "ya no eres la actual" y `publish()` no se ejecuta jamás. Ni una sola
+   * petición falla: en la pestaña de red todo sale 200 y la pantalla no
+   * avanza.
+   */
+  const gate = createSequenceGate();
+  const enVuelo = gate.begin();
+  // Cada render vuelve a arrancar otro refresco…
+  for (let render = 0; render < 5; render++) gate.begin();
+  ok(
+    "reproducción del bucle: la respuesta en vuelo queda descartada",
+    gate.isCurrent(enVuelo) === false,
+    "si esto fuera true, el bucle no explicaría el cuelgue"
+  );
+
+  const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  ok(
+    "el efecto ya NO depende de la identidad de `refresh`",
+    /\}, \[ready, authenticated, embeddedWallet\]\);/.test(ctx),
+    "con `refresh` en las dependencias, un SDK sin memoizar vuelve a colgarlo"
+  );
+  ok(
+    "y llama siempre a la versión más reciente por ref",
+    /refreshRef\.current\(\);/.test(ctx) && /refreshRef = useRef\(refresh\)/.test(ctx)
+  );
+  ok(
+    "poner `loading: true` no crea estado nuevo si ya estaba cargando",
+    /s\.loading \? s : \{ \.\.\.s, loading: true \}/.test(ctx),
+    "un objeto nuevo por render es lo que alimenta el bucle"
+  );
 }
 
 console.log(
