@@ -926,7 +926,16 @@ console.log("\n— Y esta enchufada donde importa —");
   );
   check(
     "sin tocar jamás una wallet que NO sea la embebida",
-    /!== embeddedAddress\.toLowerCase\(\)\) return;/.test(embebida),
+    /puesta !== embeddedAddress\.toLowerCase\(\)\) return;/.test(embebida),
+    true
+  );
+  check(
+    // `disconnect` sale de `useDisconnect()` y wagmi no promete que su
+    // identidad sea estable: sin candado, el efecto lo llamaría en CADA
+    // render y wagmi no se asentaría nunca.
+    "y suelta UNA vez por dirección, no en cada render",
+    /soltadaRef\.current === puesta\) return;/.test(embebida) &&
+      /soltadaRef\.current = puesta;/.test(embebida),
     true
   );
   check(

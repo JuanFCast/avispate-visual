@@ -162,6 +162,8 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
   const announcedRef = useRef<string | null>(null);
   const createTriedRef = useRef(false);
   const attemptsRef = useRef(0);
+  /** Qué dirección embebida ya se soltó, para no repetirlo en cada render. */
+  const soltadaRef = useRef<string | null>(null);
 
   /**
    * Hay sesión y todavía no se puede firmar con nada, y encima es algo que nos
@@ -298,8 +300,23 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     if (!isConnected || !embeddedAddress) return;
-    if ((address ?? "").toLowerCase() !== embeddedAddress.toLowerCase()) return;
+    const puesta = (address ?? "").toLowerCase();
+    if (puesta !== embeddedAddress.toLowerCase()) return;
     if (autoConnect.kind !== "skip") return;
+    /**
+     * UNA vez por dirección, y el candado NO es una precaución de más.
+     *
+     * `disconnect` sale de `useDisconnect()`, y wagmi no promete que su
+     * identidad sea estable entre renders. Si cambia, este efecto vuelve a
+     * correr en CADA render y —mientras se cumplan las condiciones de
+     * arriba— llama a `disconnect()` cada vez: una tormenta que mantiene a
+     * wagmi cambiando de estado sin parar y la pantalla girando sin
+     * asentarse nunca. El ref lo deja en un intento por dirección; si la
+     * wallet vuelve a aparecer sola, es otra dirección o el mismo caso ya
+     * resuelto, y `soltada` no lo bloquea.
+     */
+    if (soltadaRef.current === puesta) return;
+    soltadaRef.current = puesta;
     disconnect();
   }, [isConnected, address, embeddedAddress, autoConnect.kind, disconnect]);
 
