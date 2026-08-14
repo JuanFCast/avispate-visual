@@ -555,6 +555,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "PIPERABBY: canónica externa distinta a la embebida → no se conecta sola",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "known", address: RABBY },
       embeddedAddress: EMBED,
       hasExternal: false,
@@ -566,6 +567,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "la embebida ES la canónica (usuario solo-correo) → sí se conecta",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "known", address: EMBED },
       embeddedAddress: EMBED,
       hasExternal: false,
@@ -577,6 +579,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "jugador nuevo de verdad, sin nada enlazado → sí se conecta",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "none" },
       embeddedAddress: null,
       hasExternal: false,
@@ -588,6 +591,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "jugador nuevo con su embebida YA creada, perfil sin canónica todavía → se conecta",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "none" },
       embeddedAddress: EMBED,
       hasExternal: false,
@@ -599,6 +603,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "entró firmando con la suya, nunca hubo embebida → salta, no espera",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "none" },
       embeddedAddress: null,
       hasExternal: true,
@@ -612,6 +617,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "perfil todavía cargando → espera, no se adelanta",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "loading" },
       embeddedAddress: EMBED,
       hasExternal: false,
@@ -626,6 +632,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "perfil que FALLÓ (timeout o error de red) → sigue esperando, no 'none'",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: canonicalFromProfile({
         ready: true,
         loading: false,
@@ -643,6 +650,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "perfil recuperándose (loading:true a mitad de un refresh) → sigue esperando",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: canonicalFromProfile({
         ready: true,
         loading: true,
@@ -660,6 +668,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "Privy sin terminar de arrancar (`ready:false`) → sigue esperando",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: canonicalFromProfile({
         ready: false,
         loading: false,
@@ -684,6 +693,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "externa Y embebida enlazadas, sin canónica → ambiguo, NO se conecta sola",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "none" },
       embeddedAddress: EMBED,
       hasExternal: true,
@@ -698,6 +708,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "externa Y embebida enlazadas, pero el perfil dice que la canónica ES la embebida → se conecta",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "known", address: EMBED },
       embeddedAddress: EMBED,
       hasExternal: true,
@@ -711,6 +722,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "externa Y embebida enlazadas, canónica es una tercera dirección → no se conecta",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "known", address: OTRA },
       embeddedAddress: EMBED,
       hasExternal: true,
@@ -719,11 +731,84 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
     { kind: "skip", reason: "ambiguous_identity" }
   );
 
+  console.log("\n  — Protección 3: dentro de MiniPay, la inyectada manda SIEMPRE —");
+
+  // El bug que volvió, ahora dentro de MiniPay: la MISMA cuenta de correo
+  // enlazada en un navegador normal (con su embebida) y abierta también en
+  // MiniPay (con la inyectada) hace que `hasEmbedded` sea `true` ahí también.
+  // Sin este chequeo, si la canónica coincidía con esa embebida, el efecto de
+  // aquí y `MiniPayBridge` competían por conectar cada uno la suya.
+  check(
+    "MiniPay + embebida enlazada + canónica ES la embebida → NUNCA se conecta la embebida",
+    decideEmbeddedAutoConnect({
+      inMiniPay: true,
+      canonical: { status: "known", address: EMBED },
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "skip", reason: "minipay" }
+  );
+
+  check(
+    "MiniPay + sin canónica todavía (jugador nuevo en MiniPay) → tampoco",
+    decideEmbeddedAutoConnect({
+      inMiniPay: true,
+      canonical: { status: "none" },
+      embeddedAddress: null,
+      hasExternal: false,
+      hasEmbedded: false,
+    }),
+    { kind: "skip", reason: "minipay" }
+  );
+
+  check(
+    "MiniPay + perfil todavía cargando → tampoco espera, salta directo",
+    decideEmbeddedAutoConnect({
+      inMiniPay: true,
+      canonical: { status: "loading" },
+      embeddedAddress: EMBED,
+      hasExternal: true,
+      hasEmbedded: true,
+    }),
+    { kind: "skip", reason: "minipay" }
+  );
+
+  // Barrido: dentro de MiniPay, NINGUNA combinación de canónica/externa/
+  // embebida devuelve "connect". La inyectada de MiniPay es la única wallet
+  // real ahí dentro, sin excepción — igual que ya exige `decideEmbeddedCreation`.
+  {
+    const combos: string[] = [];
+    for (const canon of [
+      { status: "none" as const },
+      { status: "loading" as const },
+      { status: "known" as const, address: EMBED },
+      { status: "known" as const, address: RABBY },
+    ])
+      for (const ext of [true, false])
+        for (const emb of [true, false])
+          combos.push(
+            decideEmbeddedAutoConnect({
+              inMiniPay: true,
+              canonical: canon,
+              embeddedAddress: EMBED,
+              hasExternal: ext,
+              hasEmbedded: emb,
+            }).kind
+          );
+    check(
+      "dentro de MiniPay: nunca 'connect', en ninguna de las 16 combinaciones",
+      new Set(combos),
+      new Set(["skip"])
+    );
+  }
+
   console.log("\n  — Detalles —");
 
   check(
     "no se confunde por mayúsculas en la dirección",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "known", address: EMBED.toUpperCase() },
       embeddedAddress: EMBED,
       hasExternal: false,
@@ -735,6 +820,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
   check(
     "canónica conocida pero la embebida de esta sesión aún no llegó (null) → no se conecta",
     decideEmbeddedAutoConnect({
+      inMiniPay: false,
       canonical: { status: "known", address: EMBED },
       embeddedAddress: null,
       hasExternal: false,
@@ -751,6 +837,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
       for (const emb of [true, false])
         combos.push(
           decideEmbeddedAutoConnect({
+            inMiniPay: false,
             canonical: { status: "known", address: RABBY },
             embeddedAddress: EMBED,
             hasExternal: ext,
@@ -773,6 +860,7 @@ console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
       for (const emb of [true, false])
         combos.push(
           decideEmbeddedAutoConnect({
+            inMiniPay: false,
             canonical: { status: "loading" },
             embeddedAddress: EMBED,
             hasExternal: ext,
@@ -839,6 +927,11 @@ console.log("\n— Y esta enchufada donde importa —");
   check(
     "sin tocar jamás una wallet que NO sea la embebida",
     /!== embeddedAddress\.toLowerCase\(\)\) return;/.test(embebida),
+    true
+  );
+  check(
+    "y la llamada real le pasa inMiniPay, no solo los scripts de prueba",
+    /decideEmbeddedAutoConnect\(\{\s*inMiniPay,/.test(embebida),
     true
   );
 

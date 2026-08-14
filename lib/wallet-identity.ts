@@ -226,6 +226,19 @@ export function decideEmbeddedCreation(check: {
  * Si el perfil TODAVÍA no respondió, se espera — conectar antes de saber es
  * la misma carrera que esto existe para cerrar. Y si no hay canónica ni
  * externa, es un jugador nuevo de verdad: la embebida es correcta.
+ *
+ * ── Y DENTRO de MiniPay, ni siquiera esa última excepción ──────────────────
+ *
+ * `decideEmbeddedCreation` ya trata MiniPay como caso absoluto, comprobado
+ * ANTES que cualquier otra cosa: ahí la wallet inyectada ES la identidad, sin
+ * excepción. Esto tenía que copiar el mismo criterio y no lo hacía —así
+ * volvió a pasar, ahora dentro de MiniPay: alguien con la MISMA cuenta de
+ * correo enlazada en un navegador normal (con su embebida) y en MiniPay
+ * (con la inyectada) hace que `hasEmbedded` sea `true` también ahí dentro, y
+ * si la canónica coincidía con esa embebida, `MiniPayBridge` (la inyectada) y
+ * este efecto (la embebida) intentaban conectar CADA UNO su wallet a la vez.
+ * Dentro de MiniPay, la inyectada tiene que ganar siempre — no por canónica,
+ * por estar en MiniPay.
  */
 export type EmbeddedAutoConnect =
   | { kind: "connect" }
@@ -235,6 +248,8 @@ export type EmbeddedAutoConnect =
   | {
       kind: "skip";
       reason:
+        /** Estamos dentro de MiniPay: la inyectada manda, sin excepción. */
+        | "minipay"
         /** Externa enlazada, sin ninguna embebida de por medio. */
         | "has_external"
         /** Externa Y embebida enlazadas, sin canónica todavía: ambiguo, y la
@@ -245,6 +260,8 @@ export type EmbeddedAutoConnect =
     };
 
 export function decideEmbeddedAutoConnect(check: {
+  /** Estamos dentro de MiniPay: su wallet inyectada manda, siempre. */
+  inMiniPay: boolean;
   /** La canónica del perfil, en sus tres estados (`canonicalFromProfile`). */
   canonical: CanonicalWallet;
   /** La dirección de la embebida EN ESTA SESIÓN, o `null` si Privy aún no la
@@ -255,6 +272,10 @@ export function decideEmbeddedAutoConnect(check: {
   /** Privy tiene una wallet embebida enlazada a esta identidad. */
   hasEmbedded: boolean;
 }): EmbeddedAutoConnect {
+  // Va lo primero, igual que en `decideEmbeddedCreation`: dentro de MiniPay
+  // no hay canónica, `hasExternal` ni `hasEmbedded` que puedan cambiar esto.
+  if (check.inMiniPay) return { kind: "skip", reason: "minipay" };
+
   if (check.hasExternal) {
     const embeddedIsCanonical =
       check.canonical.status === "known" &&

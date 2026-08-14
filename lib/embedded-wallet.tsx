@@ -143,6 +143,7 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
    * de un fallo) se espera en vez de adelantarse. Ver `wallet-identity.ts`.
    */
   const autoConnect = decideEmbeddedAutoConnect({
+    inMiniPay,
     canonical: canonicalFromProfile(profile),
     embeddedAddress,
     hasExternal,
