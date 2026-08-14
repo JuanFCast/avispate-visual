@@ -550,12 +550,28 @@ export default function GameShell() {
    * haciendo parecer que la cuenta seguía atascada. Al terminar la carga (con
    * éxito o con el botón de reintento) se retira solo; nunca autoriza un pago,
    * porque el siguiente toque vuelve a pasar por `decidePlayStart` completo.
+   *
+   * ── Y se retira por la MISMA razón por la que se puso ─────────────────────
+   *
+   * Esto miraba `profile.loading`, que no es la condición que frenó la jugada:
+   * el guardián para cuando `canonical.status === "loading"`, y eso también
+   * incluye "el perfil no está listo" y "el perfil falló"
+   * (`canonicalFromProfile`). Las dos condiciones no coincidían, así que había
+   * estados en los que el cobro seguía bloqueado y el aviso desaparecía en el
+   * mismo instante: la persona pulsaba Jugar y no pasaba absolutamente nada,
+   * sin mensaje y sin jugada. Mirando la causa real, el aviso dura exactamente
+   * lo que dura el motivo.
+   *
+   * Lo que este efecto sigue SIN hacer, y no por descuido: reanudar la jugada.
+   * Que ya se sepa de quién es la cuenta no es permiso para cobrar — el permiso
+   * lo da el dedo de la persona, y el siguiente toque vuelve a pasar por
+   * `decidePlayStart` entero. Aquí solo se decide si el aviso se sigue viendo.
    */
   useEffect(() => {
     if (payBlock?.kind !== "checking") return;
-    if (profile.authenticated && profile.loading) return;
+    if (canonical.status === "loading") return;
     setPayBlock(null);
-  }, [payBlock?.kind, profile.authenticated, profile.loading]);
+  }, [payBlock?.kind, canonical.status]);
 
   /**
    * Reconciliación del pagador, y la hace la PERSONA, no la app.

@@ -278,7 +278,7 @@ console.log("\n— 6. El aviso se limpia solo; el permiso de cobrar es otra cosa
   const start = gameShell.indexOf(marker);
   ok("el efecto que limpia \"checking\" existe", start !== -1);
 
-  const depsMarker = "}, [payBlock?.kind, profile.authenticated, profile.loading]);";
+  const depsMarker = "}, [payBlock?.kind, canonical.status]);";
   const end = gameShell.indexOf(depsMarker, start);
   ok("y tiene el cierre esperado (mismas dependencias)", end !== -1);
 
@@ -292,12 +292,27 @@ console.log("\n— 6. El aviso se limpia solo; el permiso de cobrar es otra cosa
     body || "no se pudo aislar el cuerpo del efecto"
   );
 
-  // La foto vieja se puede limpiar por dos motivos: ya se sabe (perfil listo)
-  // o ya no hay sesión (perfil sin autenticar). Ninguno de los dos AUTORIZA
-  // nada por sí mismo — solo decide si el aviso se sigue mostrando.
+  /**
+   * El aviso dura EXACTAMENTE lo que dura su motivo.
+   *
+   * Esto miraba `profile.loading`, y ese era el fallo: el guardián frena cuando
+   * `canonical.status === "loading"`, que según `canonicalFromProfile` también
+   * cubre "el perfil no está listo" y "el perfil falló". Al no coincidir las dos
+   * condiciones, había estados en los que el cobro seguía bloqueado y el aviso
+   * se borraba en el mismo instante — la persona pulsaba Jugar y no pasaba nada,
+   * sin mensaje y sin jugada.
+   *
+   * Limpiar sigue sin autorizar nada (lo comprueba el caso de arriba): solo
+   * decide si el aviso se sigue mostrando, y ahora lo hace por la causa real.
+   */
   ok(
-    "la condición para limpiar es \"ya no está cargando\", no \"ya se puede cobrar\"",
-    /if \(profile\.authenticated && profile\.loading\) return;/.test(gameShell)
+    "la condición para limpiar es la MISMA que frenó la jugada (canonical)",
+    /if \(canonical\.status === "loading"\) return;/.test(body)
+  );
+  ok(
+    "y ya no se decide con profile.loading, que no es lo que frena el cobro",
+    !/profile\.loading/.test(body),
+    body
   );
 }
 
