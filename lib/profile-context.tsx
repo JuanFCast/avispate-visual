@@ -56,6 +56,33 @@ interface ProfileState {
   walletAddress: string | null;
 }
 
+/**
+ * Lo que ve el panel de `?debugProfile=1`. TEMPORAL — se quita entero cuando
+ * se cierre el diagnóstico del congelamiento.
+ *
+ * Nada de esto es un secreto: son estados y contadores. Jamás lleva el token,
+ * la cookie ni la dirección completa — quien pinta el panel abrevia, y aquí
+ * solo viajan códigos de estado y números.
+ */
+export interface ProfileDebugSnapshot {
+  /** Veces que `refresh()` ha arrancado desde que se montó el proveedor. */
+  refreshCount: number;
+  /** Número vivo del `sequenceGate`. Si sube solo, hay bucle. */
+  sequence: number;
+  /** En qué quedó pedir el token: pending / ok / timeout / error / none. */
+  lastToken: string;
+  /** En qué quedó `/api/profile`: pending / 200 / 401 / 500 / timeout / … */
+  lastFetch: string;
+  /** Qué se publicó por última vez, y si el gate lo descartó. */
+  lastPublish: string;
+  /** Cuántas respuestas descartó el gate por "ya no eres la actual". */
+  discarded: number;
+  /** `state.loading` CRUDO, para distinguirlo del derivado. */
+  rawLoading: boolean;
+  /** ¿Hay sesión de wallet guardada? Solo sí/no — nunca el token. */
+  walletSession: boolean;
+}
+
 interface ProfileContextValue extends ProfileState {
   /** Ya sabemos si hay sesión o no, venga de donde venga. */
   ready: boolean;
@@ -64,6 +91,12 @@ interface ProfileContextValue extends ProfileState {
   setAlias: (alias: string) => Promise<{ ok: boolean; error?: string }>;
   /** Token de acceso de Privy para llamar a las rutas protegidas. */
   getToken: () => Promise<string | null>;
+  /**
+   * TEMPORAL: la foto para `?debugProfile=1`. Se lee bajo demanda (el panel
+   * consulta cada poco) en vez de vivir en el estado, para que instrumentar
+   * esto no le cueste un render a nadie que no esté depurando.
+   */
+  readDebug: () => ProfileDebugSnapshot;
 }
 
 const ProfileContext = createContext<ProfileContextValue | null>(null);
@@ -94,6 +127,20 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // sesión o reintentar, una respuesta vieja no debe volver a poner el perfil
   // anterior encima del actual. Ver `lib/profile-recovery.ts`.
   const sequenceGate = useRef(createSequenceGate());
+  /**
+   * TEMPORAL (`?debugProfile=1`): contadores de solo observación.
+   *
+   * En un `ref` a propósito: escribir aquí no dispara renders, así que la
+   * instrumentación no puede alterar lo que intenta medir ni costarle nada a
+   * quien no está depurando.
+   */
+  const dbg = useRef({
+    refreshCount: 0,
+    lastToken: "idle",
+    lastFetch: "idle",
+    lastPublish: "idle",
+    discarded: 0,
+  });
   // Sesión de wallet (MiniPay, sin firma). Se lee en un efecto y no durante el
   // render: `localStorage` no existe en el servidor y tocarlo antes de montar
   // rompe la hidratación.
@@ -157,12 +204,24 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     const sequence = sequenceGate.current.begin();
-    const publish = (next: ProfileState) => {
-      if (sequenceGate.current.isCurrent(sequence)) setState(next);
+    dbg.current.refreshCount += 1;
+    /**
+     * `etiqueta` es TEMPORAL (`?debugProfile=1`) y no cambia la decisión: el
+     * `if` es el mismo de siempre, solo se anota qué salió por él. Es el dato
+     * que faltaba — si el gate está descartando publicaciones, aquí se ve.
+     */
+    const publish = (next: ProfileState, etiqueta: string) => {
+      if (sequenceGate.current.isCurrent(sequence)) {
+        dbg.current.lastPublish = etiqueta;
+        setState(next);
+      } else {
+        dbg.current.discarded += 1;
+        dbg.current.lastPublish = `${etiqueta} DESCARTADO`;
+      }
     };
 
     if (!authenticated) {
-      publish(EMPTY);
+      publish(EMPTY, "EMPTY (sin sesion)");
       return;
     }
     setState((s) => (s.loading ? s : { ...s, loading: true }));
@@ -180,12 +239,15 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
      * quién es— y encima es RECUPERABLE: el lobby ofrece "reintentar" con
      * `profile.failed`, mientras que "cargando" no ofrece nada.
      */
+    dbg.current.lastToken = "pending";
     const attempt = await callWithTimeout(getToken, TOKEN_REQUEST_TIMEOUT_MS);
     const token = attempt.kind === "ok" ? attempt.value : null;
+    dbg.current.lastToken =
+      attempt.kind === "ok" ? (token ? "ok" : "none") : attempt.kind;
     // Hay sesión pero no se pudo sacar el token: tampoco se sabe nada del
     // perfil. Es un fallo, no un perfil vacío.
     if (!token) {
-      publish(FAILED);
+      publish(FAILED, "FAILED (sin token)");
       return;
     }
 
@@ -200,6 +262,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     // qué hacer con el resultado —éxito, sesión inválida, o fallo recuperable—
     // es pura y vive en `lib/profile-recovery.ts`, donde se puede probar sin
     // un navegador.
+    dbg.current.lastFetch = "pending";
     const outcome = await fetchProfileWithTimeout(
       (signal) =>
         fetch("/api/profile", {
@@ -208,6 +271,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         }),
       PROFILE_REQUEST_TIMEOUT_MS
     );
+    dbg.current.lastFetch =
+      outcome.kind === "ok" ? String(outcome.response.status) : outcome.kind;
     const action = decideProfileRefreshAction(outcome, { usingWalletSession });
 
     if (action.kind === "clear_invalid_session") {
@@ -236,26 +301,32 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
        * RECUPERABLE: el lobby pinta "reintentar" para `profile.failed`, y ese
        * toque vuelve a pedir el token, ya sin la ficha vencida de por medio.
        */
-      publish(privyAuth ? FAILED : EMPTY);
+      publish(
+        privyAuth ? FAILED : EMPTY,
+        privyAuth ? "FAILED (sesion wallet invalida)" : "EMPTY (sesion wallet invalida)"
+      );
       return;
     }
     if (action.kind === "failed") {
-      publish(FAILED);
+      publish(FAILED, `FAILED (${dbg.current.lastFetch})`);
       return;
     }
     try {
       const data = await (outcome as { kind: "ok"; response: Response }).response.json();
-      publish({
-        loading: false,
-        failed: false,
-        fetched: true,
-        alias: data.alias ?? null,
-        walletAddress: data.walletAddress ?? null,
-      });
+      publish(
+        {
+          loading: false,
+          failed: false,
+          fetched: true,
+          alias: data.alias ?? null,
+          walletAddress: data.walletAddress ?? null,
+        },
+        "OK"
+      );
     } catch {
-      publish(FAILED);
+      publish(FAILED, "FAILED (json ilegible)");
     }
-  }, [authenticated, getToken]);
+  }, [authenticated, getToken, privyAuth]);
 
   /**
    * La wallet embebida de Privy no existe en el instante del login: se crea
@@ -351,6 +422,20 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
    */
   const loading = state.loading || (authenticated && !state.fetched);
 
+  /**
+   * TEMPORAL (`?debugProfile=1`). Se lee bajo demanda, nunca vive en el
+   * estado: así el panel no participa del ciclo de renders que está midiendo.
+   */
+  const readDebug = useCallback(
+    (): ProfileDebugSnapshot => ({
+      ...dbg.current,
+      sequence: sequenceGate.current.current(),
+      rawLoading: state.loading,
+      walletSession: Boolean(readWalletSession()),
+    }),
+    [state.loading]
+  );
+
   return (
     <ProfileContext.Provider
       value={{
@@ -361,6 +446,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         refresh,
         setAlias,
         getToken,
+        readDebug,
       }}
     >
       {children}

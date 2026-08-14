@@ -164,6 +164,8 @@ export interface SequenceGate {
   begin(): number;
   /** ¿Esta consulta sigue siendo la última que arrancó? */
   isCurrent(seq: number): boolean;
+  /** El número actual. Solo lectura, para el panel de diagnóstico. */
+  current(): number;
 }
 
 export function createSequenceGate(): SequenceGate {
@@ -171,5 +173,6 @@ export function createSequenceGate(): SequenceGate {
   return {
     begin: () => ++current,
     isCurrent: (seq: number) => seq === current,
+    current: () => current,
   };
 }
