@@ -822,6 +822,25 @@ console.log("\n— Y esta enchufada donde importa —");
     /const externalOnly = hasExternal && !hasEmbedded;/.test(embebida),
     false
   );
+  check(
+    // El reenganche NATIVO de wagmi (`reconnectOnMount`) es independiente de
+    // nuestro `connect()` y puede restaurar la embebida sin pasar por la
+    // regla. Sin esto, un navegador que quedó conectado a ella en cualquier
+    // sesión ANTES de este arreglo la reengancha sola en cada carga.
+    "existe el efecto que suelta la embebida si wagmi la reenganchó solo",
+    /useDisconnect\(\)/.test(embebida),
+    true
+  );
+  check(
+    "y solo la suelta cuando la regla dice 'skip'",
+    /if \(autoConnect\.kind !== "skip"\) return;/.test(embebida),
+    true
+  );
+  check(
+    "sin tocar jamás una wallet que NO sea la embebida",
+    /!== embeddedAddress\.toLowerCase\(\)\) return;/.test(embebida),
+    true
+  );
 
   // El invariante, no la forma: la EXTERNA se elige primero. Comprobar que ya
   // no existe el patron viejo no serviria — es subcadena del nuevo, porque la

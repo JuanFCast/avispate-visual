@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
-import { useAccount, useConnect } from "wagmi";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
 import { useProfile } from "./profile-context";
 import { useIsMiniPay } from "./minipay";
 import {
@@ -113,8 +113,9 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
   // Y dentro de MiniPay la respuesta ya está: su wallet inyectada.
   const inMiniPay = useIsMiniPay();
   const { createWallet } = useCreateWallet();
-  const { isConnected } = useAccount();
+  const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
+  const { disconnect } = useDisconnect();
 
   const embedded = wallets.find((w) => w.walletClientType === "privy");
   const embeddedAddress = embedded?.address ?? null;
@@ -274,6 +275,32 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
     const retry = setTimeout(() => setRound((r) => r + 1), CONNECT_RETRY_MS);
     return () => clearTimeout(retry);
   }, [isConnected, authenticated, autoConnect.kind, connectors, connect, round, manual]);
+
+  /**
+   * 3b. Si la embebida YA está conectada y no debería estarlo, se suelta.
+   *
+   * El efecto de arriba impide que ESTE código vuelva a conectarla — pero
+   * wagmi tiene su PROPIO reenganche, independiente y previo a cualquier
+   * efecto nuestro: `WagmiProvider` reintenta solo, al montar, el último
+   * conector que esta pestaña recuerda tener conectado (`reconnectOnMount`,
+   * con su estado persistido en `localStorage`). Un navegador que quedó
+   * conectado a la embebida en CUALQUIER sesión anterior a este arreglo — el
+   * caso real de PipeRabby — la reengancha sola en cada carga, sin pasar por
+   * `connect()` y por lo tanto sin pasar por `decideEmbeddedAutoConnect`.
+   *
+   * No hay forma de adelantarse a ese reenganche desde aquí: solo queda
+   * reaccionar en cuanto aparece. Es la misma regla, aplicada después en vez
+   * de antes — si `autoConnect` dice `"skip"`, la embebida no tiene nada que
+   * hacer conectada, así que se desconecta. Nunca toca una wallet EXTERNA
+   * (el chequeo de abajo es justo por eso) y nunca desenlaza nada de Privy:
+   * `disconnect()` es solo un estado de wagmi, no toca `linkedAccounts`.
+   */
+  useEffect(() => {
+    if (!isConnected || !embeddedAddress) return;
+    if ((address ?? "").toLowerCase() !== embeddedAddress.toLowerCase()) return;
+    if (autoConnect.kind !== "skip") return;
+    disconnect();
+  }, [isConnected, address, embeddedAddress, autoConnect.kind, disconnect]);
 
   // 4. El reloj de la paciencia. Se reinicia con cada reintento manual.
   useEffect(() => {
