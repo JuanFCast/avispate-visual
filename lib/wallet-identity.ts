@@ -241,6 +241,109 @@ export function decideEmbeddedCreation(check: {
  * por estar en MiniPay.
  */
 /**
+ * ── Reenganchar la wallet CANÓNICA externa, sin pedirle nada a nadie ────────
+ *
+ * El caso PipeRabby: identidad de correo, canónica en Rabby, y una embebida
+ * enlazada de arrastre. Al cargar, `decideEmbeddedAutoConnect` suelta la
+ * embebida (bien: no es quien cobra) y no queda NADA conectado, así que el
+ * lobby pide "conecta tu billetera" en cada visita aunque Rabby lleve meses
+ * autorizada para el sitio.
+ *
+ * Se puede arreglar sin regalar nada, porque preguntar y pedir son cosas
+ * distintas: `eth_accounts` devuelve las cuentas YA autorizadas sin abrir
+ * ninguna ventana —lista vacía si la extensión está bloqueada o sin permiso—,
+ * mientras que `eth_requestAccounts` es el que interrumpe. `reconnect()` de
+ * wagmi usa solo la primera (`connect({ isReconnecting: true })`), así que
+ * reenganchar es demostrar, no suponer.
+ *
+ * La condición para hacerlo es estricta a propósito: la cuenta que el conector
+ * enseña PRIMERO tiene que ser la canónica. No basta con que esté entre las
+ * autorizadas — wagmi deja activa `accounts[0]`, así que conectar con la
+ * canónica en segundo lugar dejaría activa OTRA dirección. Si no se puede
+ * demostrar, se pide conexión manual y ya está.
+ */
+export type CanonicalReconnect =
+  /** Hay canónica externa y nada puesto: se puede preguntar en silencio. */
+  | { kind: "probe"; canonical: string }
+  /** Todavía no se sabe (perfil cargando, o wagmi aún reenganchando). */
+  | { kind: "wait" }
+  | {
+      kind: "skip";
+      reason:
+        /** MiniPay: manda su inyectada, aquí no se reengancha nada. */
+        | "minipay"
+        /** Ya hay una wallet puesta. NUNCA se cambia sola por otra. */
+        | "already_connected"
+        /** Sin sesión no hay perfil, y sin perfil no hay canónica. */
+        | "no_session"
+        /** El perfil no tiene wallet anotada: la primera que traiga será suya. */
+        | "no_canonical"
+        /** La canónica ES la embebida: de esa se encarga el otro decisor. */
+        | "canonical_is_embedded";
+    };
+
+export function decideCanonicalReconnect(check: {
+  inMiniPay: boolean;
+  /** Hay sesión (Privy o de wallet). Sin ella no hay perfil que consultar. */
+  authenticated: boolean;
+  /** wagmi ya tiene una wallet activa. */
+  isConnected: boolean;
+  /** wagmi sigue reenganchando por su cuenta: no adelantarse. */
+  reconnecting: boolean;
+  canonical: CanonicalWallet;
+  embeddedAddress: string | null;
+}): CanonicalReconnect {
+  // MiniPay primero y sin excepción, igual que en los otros dos decisores.
+  if (check.inMiniPay) return { kind: "skip", reason: "minipay" };
+  // Una wallet ya puesta es una decisión de la persona (o de wagmi). Cambiarla
+  // sola sería exactamente lo que no se puede hacer.
+  if (check.isConnected) return { kind: "skip", reason: "already_connected" };
+  if (!check.authenticated) return { kind: "skip", reason: "no_session" };
+  // wagmi reengancha solo al montar. Correr en paralelo es pedir una pelea.
+  if (check.reconnecting) return { kind: "wait" };
+  if (check.canonical.status === "loading") return { kind: "wait" };
+  if (check.canonical.status === "none")
+    return { kind: "skip", reason: "no_canonical" };
+  if (
+    check.embeddedAddress &&
+    norm(check.canonical.address) === norm(check.embeddedAddress)
+  )
+    return { kind: "skip", reason: "canonical_is_embedded" };
+  return { kind: "probe", canonical: norm(check.canonical.address) };
+}
+
+/** Lo que contestó un conector cuando se le preguntó en silencio. */
+export interface ProbedConnector {
+  id: string;
+  name: string;
+  /** Lo que devolvió `eth_accounts`. Vacío = bloqueada o sin permiso. */
+  accounts: readonly string[];
+}
+
+/**
+ * Cuál de los conectores DEMUESTRA ser la wallet canónica, si alguno.
+ *
+ * "Demuestra" es literal: su primera cuenta autorizada es la canónica. Con eso,
+ * reenganchar deja activa esa misma dirección y no otra — que es la única forma
+ * de cumplir "nunca cambies solo a una wallet distinta de la canónica" sin
+ * tener que deshacer nada después.
+ */
+export function pickCanonicalConnector(
+  canonical: string,
+  probed: readonly ProbedConnector[]
+): string | null {
+  const suya = norm(canonical);
+  if (!suya) return null;
+  for (const c of probed) {
+    // La embebida no compite aquí: su conexión la gobierna
+    // `decideEmbeddedAutoConnect`, y meterla sería tener dos autoridades.
+    if (c.name === EMBEDDED_WALLET_NAME) continue;
+    if (norm(c.accounts[0]) === suya) return c.id;
+  }
+  return null;
+}
+
+/**
  * Con qué nombre se anuncia la wallet embebida a wagmi.
  *
  * Vive aquí, y no en `embedded-wallet.tsx`, porque hay más de un sitio que

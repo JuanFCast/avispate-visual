@@ -9,6 +9,7 @@ import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { wagmiConfig } from "./wagmi";
 import { useMiniPayAutoConnect } from "./minipay";
+import { useCanonicalReconnect } from "./canonical-reconnect";
 import { EmbeddedWalletProvider } from "./embedded-wallet";
 import { ProfileProvider } from "./profile-context";
 import WelcomeGasBridge from "@/components/WelcomeGasBridge";
@@ -42,6 +43,16 @@ const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID ?? "";
 /** Dentro de MiniPay, auto-conecta su wallet inyectada. */
 function MiniPayBridge() {
   useMiniPayAutoConnect();
+  return null;
+}
+
+/**
+ * Fuera de MiniPay, reengancha la wallet canónica externa si YA está
+ * autorizada. Va dentro de `ProfileProvider` porque necesita saber cuál es la
+ * canónica, y no toca nada si no puede demostrarlo (`canonical-reconnect.ts`).
+ */
+function CanonicalWalletBridge() {
+  useCanonicalReconnect();
   return null;
 }
 
@@ -131,6 +142,7 @@ export default function WalletProviders({ children }: { children: ReactNode }) {
           <ProfileProvider>
             <EmbeddedWalletProvider>
               <MiniPayBridge />
+              <CanonicalWalletBridge />
               <WelcomeGasBridge />
               <OutboxBridge />
               {/* TEMPORAL: diagnóstico del congelamiento. Quitar al cerrarlo. */}
