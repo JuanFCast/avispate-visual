@@ -168,6 +168,63 @@ export interface SequenceGate {
   current(): number;
 }
 
+/**
+ * Una consulta a la vez, y las que lleguen mientras tanto se COALESCEN.
+ *
+ * ── El caso real que lo hizo falta (2026-08-14, panel `?debugProfile=1`) ───
+ *
+ * `refresh()` se dispara desde cuatro sitios (el efecto de montaje por sus
+ * tres entradas, y el `await refresh()` de `wallet-auth.ts` al terminar de
+ * firmar). Cuando se solapan, cada uno pide número nuevo al `sequenceGate` y
+ * la respuesta BUENA que venía en camino se descarta por "ya no eres la
+ * actual". El panel lo cazó con todas las letras: `/api/profile` 200, y aun
+ * así `ultimo publish = OK DESCARTADO` con el perfil en
+ * `{fetched:false, failed:false}` — o sea cargando para siempre.
+ *
+ * La respuesta NO es quitar el gate: el gate está bien y protege del caso
+ * legítimo (una consulta vieja no debe pisar a una nueva). Lo que está mal es
+ * lanzar consultas redundantes que compiten entre sí. Con esto, mientras haya
+ * una viva no se arranca otra; solo se anota que hay que repetir al terminar,
+ * y se repite UNA vez pase lo que pase. Así el gate deja de tener a quién
+ * descartar.
+ */
+export interface SingleFlight {
+  /** Corre `job`, o se engancha al que ya está vivo y pide repetición. */
+  run(job: () => Promise<void>): Promise<void>;
+  /** ¿Hay una consulta viva ahora mismo? */
+  busy(): boolean;
+}
+
+export function createSingleFlight(): SingleFlight {
+  let live: Promise<void> | null = null;
+  let again = false;
+
+  const run = async (job: () => Promise<void>): Promise<void> => {
+    if (live) {
+      // Ya hay una en vuelo. Arrancar otra invalidaría su respuesta, así que
+      // se espera a esa y se pide UNA repetición al final — que es lo que de
+      // verdad quería quien llamó: datos frescos, no una carrera.
+      again = true;
+      await live;
+      return;
+    }
+    live = (async () => {
+      try {
+        await job();
+      } finally {
+        live = null;
+      }
+    })();
+    await live;
+    if (again) {
+      again = false;
+      await run(job);
+    }
+  };
+
+  return { run, busy: () => live !== null };
+}
+
 export function createSequenceGate(): SequenceGate {
   let current = 0;
   return {

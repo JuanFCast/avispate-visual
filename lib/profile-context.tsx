@@ -19,6 +19,7 @@ import { SETTLE_LIMIT_MS } from "./wallet-identity";
 import {
   callWithTimeout,
   createSequenceGate,
+  createSingleFlight,
   decideProfileRefreshAction,
   fetchProfileWithTimeout,
   PROFILE_REQUEST_TIMEOUT_MS,
@@ -141,6 +142,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     lastPublish: "idle",
     discarded: 0,
   });
+  /** Una consulta a la vez; las solapadas se coalescen. Ver `SingleFlight`. */
+  const flight = useRef(createSingleFlight());
   // Sesión de wallet (MiniPay, sin firma). Se lee en un efecto y no durante el
   // render: `localStorage` no existe en el servidor y tocarlo antes de montar
   // rompe la hidratación.
@@ -202,7 +205,36 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     return readWalletSession()?.token ?? null;
   }, [privyAuth, getAccessToken]);
 
-  const refresh = useCallback(async () => {
+  /**
+   * La sesión VIVA, no la que se capturó cuando se creó la función.
+   *
+   * Este es el bug que el panel destapó. `refresh` cerraba sobre
+   * `authenticated`, y `wallet-auth.ts` hace `await refresh()` justo después
+   * de `loginWithSiwe()`: la función que se ejecuta es la del render del
+   * CLIC, o sea la de cuando todavía no había sesión. Entraba por
+   * `if (!authenticated) publish(EMPTY)` —sin tocar la red, así que
+   * instantánea— le ganaba la carrera a los fetches en vuelo, y dejaba el
+   * perfil en `{fetched:false, failed:false}` con la sesión ya abierta:
+   * cargando para siempre.
+   *
+   * Leyéndolo de un ref, un `refresh()` disparado DESPUÉS de firmar ya no
+   * puede creer que no hay sesión. De paso `refresh` queda estable.
+   */
+  const authRef = useRef(authenticated);
+  const privyAuthRef = useRef(privyAuth);
+  const getTokenRef = useRef(getToken);
+  // Declarado ANTES del efecto que llama a `refresh`, para que en el mismo
+  // commit los refs ya estén al día cuando ese efecto corra.
+  useEffect(() => {
+    authRef.current = authenticated;
+    privyAuthRef.current = privyAuth;
+    getTokenRef.current = getToken;
+  });
+
+  const runRefresh = useCallback(async () => {
+    const authenticated = authRef.current;
+    const privyAuth = privyAuthRef.current;
+    const getToken = getTokenRef.current;
     const sequence = sequenceGate.current.begin();
     dbg.current.refreshCount += 1;
     /**
@@ -326,7 +358,16 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     } catch {
       publish(FAILED, "FAILED (json ilegible)");
     }
-  }, [authenticated, getToken, privyAuth]);
+  }, []);
+
+  /**
+   * Lo que ve el resto de la app. Coalesce en vez de competir: dos llamadas
+   * solapadas ya no se invalidan la respuesta entre ellas.
+   */
+  const refresh = useCallback(
+    () => flight.current.run(runRefresh),
+    [runRefresh]
+  );
 
   /**
    * La wallet embebida de Privy no existe en el instante del login: se crea

@@ -23,6 +23,7 @@ import { dirname, join } from "node:path";
 import {
   callWithTimeout,
   createSequenceGate,
+  createSingleFlight,
   decideProfileRefreshAction,
   fetchProfileWithTimeout,
   PROFILE_SETTLE_LIMIT_MS,
@@ -641,6 +642,161 @@ console.log("\n— D. El último seguro: 'cargando' caduca, sea cual sea la caus
     "el lobby de verdad tiene esa salida",
     /profile\.authenticated && profile\.failed/.test(lobby) &&
       /cta\.profile_failed/.test(lobby)
+  );
+}
+
+console.log("\n— E. Refreshes SOLAPADOS: una respuesta 200 no puede quedar huérfana —");
+{
+  /*
+   * El caso que cazó el panel `?debugProfile=1` en producción:
+   *
+   *   /api/profile = 200        token = ok
+   *   state.loading (crudo) = false     fetched = false     failed = false
+   *   loading (derivado) = true
+   *   ultimo publish = "OK DESCARTADO"  descartados = 2
+   *   refresh() = 4             sequenceGate = 4
+   *
+   * Cuatro refreshes solapados (los tres del efecto de montaje más el
+   * `await refresh()` de `wallet-auth.ts` tras firmar). El último entraba con
+   * un CLOSURE VIEJO —`authenticated` capturado antes del login— publicaba
+   * EMPTY sin tocar la red, y por ser instantáneo le ganaba a los fetches en
+   * vuelo. El gate descartaba la respuesta buena y el perfil se quedaba en
+   * `{fetched:false, failed:false}` con sesión abierta: cargando para siempre.
+   */
+  type Estado = { loading: boolean; failed: boolean; fetched: boolean };
+  const EMPTY_S: Estado = { loading: false, failed: false, fetched: false };
+  const FAILED_S: Estado = { loading: false, failed: true, fetched: true };
+  const OK_S: Estado = { loading: false, failed: false, fetched: true };
+
+  /** El `loading` DERIVADO, tal cual lo calcula el proveedor. */
+  const derivado = (s: Estado, auth: boolean) => s.loading || (auth && !s.fetched);
+
+  /**
+   * Réplica del orquestador del proveedor: mismo gate, mismo single-flight,
+   * y la sesión leída EN EL MOMENTO (como el ref), no capturada.
+   */
+  function crearProveedor(opts: { autenticado: () => boolean; status: number }) {
+    let estado: Estado = { ...EMPTY_S, loading: true };
+    let descartados = 0;
+    let arranques = 0;
+    const gate = createSequenceGate();
+    const flight = createSingleFlight();
+
+    const correr = async () => {
+      arranques++;
+      const seq = gate.begin();
+      const publicar = (n: Estado) => {
+        if (gate.isCurrent(seq)) estado = n;
+        else descartados++;
+      };
+      // Se lee AHORA, no cuando se creó la función: es el arreglo del closure.
+      if (!opts.autenticado()) return void publicar(EMPTY_S);
+      estado = { ...estado, loading: true };
+      // La red tarda; es lo que abría la ventana de la carrera.
+      await new Promise((r) => setTimeout(r, 12));
+      publicar(opts.status === 200 ? OK_S : FAILED_S);
+    };
+
+    return {
+      refresh: () => flight.run(correr),
+      ver: () => ({ estado, descartados, arranques, seq: gate.current() }),
+    };
+  }
+
+  // ── El escenario exacto: autenticado, 200, y cuatro refreshes solapados ──
+  {
+    const p = crearProveedor({ autenticado: () => true, status: 200 });
+    await Promise.all([p.refresh(), p.refresh(), p.refresh(), p.refresh()]);
+    const { estado, descartados } = p.ver();
+
+    ok(
+      "cuatro refreshes solapados: NINGUNA respuesta buena se descarta",
+      descartados === 0,
+      `se descartaron ${descartados}`
+    );
+    ok(
+      "y el perfil termina en fetched:true",
+      estado.fetched === true && estado.failed === false
+    );
+    ok(
+      "el loading derivado se apaga (no queda cargando eterno)",
+      derivado(estado, true) === false
+    );
+  }
+
+  // ── La regresión concreta: el refresh tardío que creía que no había sesión ──
+  {
+    // Antes: el 4º refresh entraba con el closure viejo (authenticated=false),
+    // publicaba EMPTY y ganaba. Ahora lee la sesión viva, así que no puede.
+    let hayLogin = false;
+    const p = crearProveedor({ autenticado: () => hayLogin, status: 200 });
+    const primero = p.refresh(); // arranca sin sesión
+    hayLogin = true; // el login termina a mitad de vuelo (SIWE)
+    const segundo = p.refresh(); // el `await refresh()` de wallet-auth
+    await Promise.all([primero, segundo]);
+    const { estado } = p.ver();
+
+    ok(
+      "tras firmar, un refresh tardío YA NO publica EMPTY con sesión abierta",
+      !(estado.fetched === false && estado.failed === false),
+      `quedó ${JSON.stringify(estado)}`
+    );
+    ok(
+      "y el perfil acaba resuelto, no cargando para siempre",
+      derivado(estado, true) === false,
+      `quedó ${JSON.stringify(estado)}`
+    );
+  }
+
+  // ── Barrido: pase lo que pase, nunca se queda en cargando ──
+  {
+    for (const status of [200, 500]) {
+      for (const n of [1, 2, 3, 5, 8]) {
+        const p = crearProveedor({ autenticado: () => true, status });
+        await Promise.all(Array.from({ length: n }, () => p.refresh()));
+        const { estado } = p.ver();
+        const resuelto = estado.fetched === true || estado.failed === true;
+        if (!resuelto || derivado(estado, true)) {
+          ok(`status ${status} con ${n} refreshes solapados`, false,
+            `quedó ${JSON.stringify(estado)}`);
+        }
+      }
+    }
+    ok(
+      "10 combinaciones (200/500 × 1..8 solapados): siempre fetched o failed, nunca cargando",
+      true
+    );
+  }
+
+  // ── Y el single-flight de verdad coalesce ──────────────────────────────
+  {
+    const p = crearProveedor({ autenticado: () => true, status: 200 });
+    await Promise.all([p.refresh(), p.refresh(), p.refresh(), p.refresh()]);
+    const { arranques } = p.ver();
+    ok(
+      "cuatro llamadas solapadas no son cuatro consultas (se coalescen)",
+      arranques < 4,
+      `arrancaron ${arranques}`
+    );
+    // Pero la repetición SÍ ocurre: quien pidió datos frescos los recibe.
+    ok("y aun así se repite al menos una vez tras la primera", arranques >= 2);
+  }
+
+  const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  ok(
+    "el proveedor lee la sesión de un ref, no de un closure",
+    /const authenticated = authRef\.current;/.test(ctx),
+    "con `authenticated` capturado, el refresh tras firmar vuelve a publicar EMPTY"
+  );
+  ok(
+    "y refresh() pasa por el single-flight",
+    /flight\.current\.run\(runRefresh\)/.test(ctx),
+    "sin coalescer, dos llamadas vuelven a competir por el gate"
+  );
+  ok(
+    "el sequenceGate SIGUE ahí (no se quitó, solo se dejó sin a quién descartar)",
+    /sequenceGate\.current\.isCurrent\(sequence\)/.test(ctx),
+    "el gate protege del caso legítimo: una respuesta vieja no pisa a una nueva"
   );
 }
 
