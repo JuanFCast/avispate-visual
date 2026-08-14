@@ -935,6 +935,43 @@ console.log("\n— Y esta enchufada donde importa —");
     true
   );
 
+  /*
+   * Y el guardián tiene que tener SALIDA en los dos sitios que cobran.
+   *
+   * El reto diario siempre la tuvo (`lobby-block` con "Cambiar o conectar
+   * billetera"); la Arena pintaba el mismo aviso como texto suelto y sin un
+   * solo botón que permitiera conectar la billetera que el propio mensaje
+   * pedía. Misma cuenta, mismo bloqueo: recuperable desde la portada e
+   * imposible desde la Arena. Un aviso sin salida no es una protección, es un
+   * callejón — y es lo que impedía pagar la entrada de 0.10.
+   */
+  const arenaPago = readFileSync(
+    join(ROOT, "components/arena/ArenaSeatPayment.tsx"),
+    "utf8"
+  );
+  check(
+    "la pantalla de pago de la Arena puede abrir el selector de wallets",
+    /ConnectModalBridge/.test(arenaPago),
+    true
+  );
+  check(
+    "pero NUNCA dentro de MiniPay",
+    /!inMiniPay && <ConnectModalBridge/.test(arenaPago),
+    true
+  );
+  check(
+    "reconoce los tres avisos que se arreglan con la billetera",
+    ["pay.block.wrong_wallet", "pay.block.reconnect", "pay.block.account_changed"]
+      .every((k) => arenaPago.includes(k)),
+    true
+  );
+  check(
+    "y ofrece el botón cuando el bloqueo es de billetera",
+    /walletBlocked && !busy/.test(arenaPago) &&
+      /pay\.action\.connect/.test(arenaPago),
+    true
+  );
+
   // El invariante, no la forma: la EXTERNA se elige primero. Comprobar que ya
   // no existe el patron viejo no serviria — es subcadena del nuevo, porque la
   // embebida sigue siendo el segundo recurso para quien solo entro por correo.

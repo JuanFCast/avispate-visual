@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
+import dynamic from "next/dynamic";
 import { useArenaJoin, type JoinStage } from "@/lib/arena-join";
 import { seatPaymentFor, seatTokenFor } from "@/lib/seat-token-client";
 import { ARENA_COMMISSION_BPS, fmtEntry } from "@/lib/arena";
@@ -9,8 +10,34 @@ import { MINIPAY_ADD_CASH } from "@/lib/tokens";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
 
+/**
+ * El puente a RainbowKit, igual que en el reto individual: es el único sitio
+ * que llama a `useConnectModal`, se pide bajo demanda y NUNCA dentro de
+ * MiniPay (su reglamento prohíbe ofrecer otra wallet, y además ya hay una).
+ */
+const ConnectModalBridge = dynamic(
+  () => import("../wallet/ConnectModalBridge"),
+  { ssr: false }
+);
+
 /** Igual que en el reto individual: el único error que se arregla recargando. */
 const FUNDS_ERROR: MessageKey = "pay.error.insufficient";
+
+/**
+ * Los avisos que se resuelven CONECTANDO la billetera correcta, no
+ * reintentando el pago.
+ *
+ * Es el agujero que esta pantalla tenía: los pintaba como texto suelto —
+ * "Conecta la tuya para jugar"— sin un solo botón que permitiera conectarla.
+ * El reto diario sí ofrecía esa salida (`lobby-block` en
+ * `DailyChallengeCard`), así que la misma cuenta bloqueada podía arreglarse
+ * desde la portada y era un callejón sin salida desde la Arena.
+ */
+const WALLET_ERRORS: readonly MessageKey[] = [
+  "pay.block.wrong_wallet",
+  "pay.block.reconnect",
+  "pay.block.account_changed",
+];
 
 const STAGE_KEY: Record<JoinStage, MessageKey> = {
   checking: "arena.pay.stage.checking",
@@ -50,7 +77,18 @@ export default function ArenaSeatPayment({
 }: Props) {
   const t = useT();
   const inMiniPay = useIsMiniPay();
-  const { stage, error, payAndSit, finishPending } = useArenaJoin();
+  const { stage, error, clearError, payAndSit, finishPending } = useArenaJoin();
+  /**
+   * La entrega `ConnectModalBridge` cuando RainbowKit está listo — igual que
+   * en `GameShell`. Empieza en `null`, así que el botón nunca promete abrir
+   * algo que todavía no existe.
+   */
+  const [openConnectModal, setOpenConnectModal] = useState<(() => void) | null>(
+    null
+  );
+  const onConnectModalReady = useCallback((open: () => void) => {
+    setOpenConnectModal(() => open);
+  }, []);
   /**
    * ¿Hay un pago hecho en este dispositivo que el servidor no aceptó todavía?
    *
@@ -80,6 +118,20 @@ export default function ArenaSeatPayment({
     if (ok) onSeated();
   }
 
+  /**
+   * La salida cuando la billetera es el problema. Reutiliza el conector de
+   * siempre: abrir el modal es lo que le da a la extensión la ocasión de
+   * pedir la contraseña, y al volver nada se da por bueno — el siguiente
+   * toque en Pagar revalida TODO desde el primer paso del guardián.
+   *
+   * Dentro de MiniPay no se ofrece conectar: ahí "reintentar" es limpiar el
+   * aviso y volver a preguntarle a la wallet que ya está puesta.
+   */
+  function reconnectWallet() {
+    clearError();
+    if (!inMiniPay) openConnectModal?.();
+  }
+
   /** Termina un pago ya hecho. No firma ni cobra nada. */
   async function finish() {
     const ok = await finishPending({
@@ -91,8 +143,14 @@ export default function ArenaSeatPayment({
     if (ok) onSeated();
   }
 
+  const walletBlocked = error !== null && WALLET_ERRORS.includes(error);
+
   return (
     <div className="panel arena-pay">
+      {/* Fuera de MiniPay únicamente: sin esto, el aviso de "conecta la tuya"
+          no tenía forma de cumplirse desde esta pantalla. */}
+      {!inMiniPay && <ConnectModalBridge onReady={onConnectModalReady} />}
+
       <h3 className="arena-pay-title">{t("arena.pay.title")}</h3>
       <p className="hint">
         {t("arena.pay.support", { entry, commission: String(commission) })}
@@ -140,6 +198,19 @@ export default function ArenaSeatPayment({
             </>
           )}
         </p>
+      )}
+
+      {/* El problema es la billetera, así que la acción es la billetera — no
+          volver a tocar Pagar, que daría exactamente el mismo aviso. Mismo
+          texto y mismo par de casos que el reto diario. */}
+      {walletBlocked && !busy && (
+        <button
+          type="button"
+          className="access-btn access-btn-primary"
+          onClick={reconnectWallet}
+        >
+          {t(inMiniPay ? "pay.action.retry" : "pay.action.connect")}
+        </button>
       )}
     </div>
   );

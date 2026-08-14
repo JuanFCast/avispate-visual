@@ -95,6 +95,12 @@ export interface ArenaJoinApi {
   stage: JoinStage | null;
   error: MessageKey | null;
   /**
+   * Retira el aviso para que la pantalla pueda ofrecer la salida sin dejar
+   * pintado el problema que ya se está resolviendo. No autoriza nada: el
+   * siguiente intento vuelve a pasar por `decidePlayStart` entero.
+   */
+  clearError: () => void;
+  /**
    * Consigue la ficha de una silla que YA está registrada pero cuya ficha se
    * perdió. No firma, no cobra y no toca la cadena para escribir.
    */
@@ -498,5 +504,7 @@ export function useArenaJoin(): ArenaJoinApi {
     []
   );
 
-  return { stage, error, payAndSit, finishPending, claimSeatToken };
+  const clearError = useCallback(() => setError(null), []);
+
+  return { stage, error, clearError, payAndSit, finishPending, claimSeatToken };
 }
