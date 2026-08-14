@@ -7,6 +7,7 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useDisconnect } from "wagmi";
 import { shortAddress, useActiveWallet, useWalletIdentity } from "@/lib/wallet";
 import { logoutEverything } from "@/lib/logout";
+import { useIsMiniPay } from "@/lib/minipay";
 import { USDT_DECIMALS } from "@/lib/contracts";
 import ProfileHeader from "@/components/profile/ProfileHeader";
 import ProfileStats from "@/components/profile/ProfileStats";
@@ -38,6 +39,7 @@ export default function PerfilPage() {
   const { address, isConnected } = useActiveWallet();
   const { verdict, shown: shownWallet } = useWalletIdentity();
   const { disconnect } = useDisconnect();
+  const inMiniPay = useIsMiniPay();
 
   const loggedIn = authenticated || isConnected;
 
@@ -179,14 +181,27 @@ export default function PerfilPage() {
           {t("profile.link.support")}
         </a>
         <LanguageToggle />
-        <button
-          type="button"
-          className="profile-link-row profile-logout-link"
-          onClick={handleLogout}
-        >
-          {t("profile.link.logout")}
-        </button>
-        <p className="profile-links-hint">{t("profile.links.hint")}</p>
+        {/*
+          Dentro de MiniPay no hay "cambiar de cuenta": la wallet la pone la
+          propia app y no se puede desconectar desde aquí, así que ofrecer
+          "Cerrar sesión" solo le daba al jugador una salida hacia la pantalla
+          en blanco que el bug de "estamos comprobando tu cuenta" resolvía —
+          la recuperación de una sesión inválida ahora es automática
+          (`lib/profile-recovery.ts`), así que ya no hace falta ese escape.
+          Fuera de MiniPay (Chrome, Safari) se conserva igual que siempre.
+        */}
+        {!inMiniPay && (
+          <>
+            <button
+              type="button"
+              className="profile-link-row profile-logout-link"
+              onClick={handleLogout}
+            >
+              {t("profile.link.logout")}
+            </button>
+            <p className="profile-links-hint">{t("profile.links.hint")}</p>
+          </>
+        )}
         <div className="profile-legal">
           <Link href="/terminos">{t("profile.legal.terms")}</Link>
           <span aria-hidden="true">·</span>

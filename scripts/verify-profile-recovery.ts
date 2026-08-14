@@ -1,0 +1,448 @@
+// El bug: "estamos comprobando tu cuenta" para siempre, en MiniPay y en
+// Chrome. La causa real era que `fetch("/api/profile")` no tenía tope de
+// tiempo, así que una petición colgada dejaba `loading` pegado en `true` — y
+// `canonicalFromProfile` (`lib/wallet-identity.ts`) reporta `loading` Y
+// `failed` como el mismo "cargando", así que ni siquiera fallar destrababa
+// nada. Solo cerrar sesión y volver a entrar forzaba un `refresh()` nuevo.
+//
+// Esto prueba, sin navegador, los seis puntos que Juan pidió cubrir:
+//   1. una petición colgada termina por timeout, no se queda cargando para siempre
+//   2. después del timeout hay una ruta de reintento real, sin logout/login
+//   3. una respuesta vieja no puede pisar a un refresh más nuevo
+//   4. un 401 de sesión limpia SOLO la sesión inválida y se puede recuperar
+//   5. timeout / error de red / 5xx NUNCA se leen como sesión inválida
+//   6. el aviso "checking" se limpia solo, pero nunca habilita un cobro
+// Y además: que "Cerrar sesión" esté oculto dentro de MiniPay (no como parche
+// del bug, sino porque la recuperación automática ya no lo necesita), y que
+// `isMiniPay()` distinga de forma confiable MiniPay de un navegador normal.
+//
+// Correr: node scripts/verify-profile-recovery.ts
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import {
+  createSequenceGate,
+  decideProfileRefreshAction,
+  fetchProfileWithTimeout,
+  type ProfileFetchOutcome,
+} from "../lib/profile-recovery.ts";
+import { decidePlayStart } from "../lib/pay-guard.ts";
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+let failed = 0;
+
+function ok(name: string, condition: boolean, detail = "") {
+  if (!condition) failed++;
+  console.log(
+    `${condition ? "  ok  " : " FALLA"} ${name}${condition ? "" : `\n         ${detail}`}`
+  );
+}
+
+function fakeResponse(status: number): Response {
+  return new Response(null, { status });
+}
+
+/* ── 1. Una petición colgada termina por timeout, no se queda cargando ──── */
+
+console.log("\n— 1. Colgada de verdad: no se queda cargando para siempre —\n");
+
+{
+  // `run` nunca resuelve por sí sola — solo reacciona al abort. Es la
+  // situación exacta que producía el bug: un fetch que ni responde ni falla.
+  const colgada = (signal: AbortSignal): Promise<Response> =>
+    new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(new Error("aborted")));
+    });
+
+  const start = Date.now();
+  const outcome = await fetchProfileWithTimeout(colgada, 80);
+  const elapsedMs = Date.now() - start;
+
+  ok(
+    "una petición que nunca resuelve por sí sola SÍ resuelve, por timeout",
+    outcome.kind === "timeout",
+    JSON.stringify(outcome)
+  );
+  ok(
+    "resuelve cerca del propio tope, no se queda esperando de más",
+    elapsedMs < 80 + 500,
+    `tardó ${elapsedMs}ms con un tope de 80ms`
+  );
+}
+
+{
+  // Con un `run` que SÍ responde a tiempo, el timeout no interfiere.
+  const rapida = async (): Promise<Response> => fakeResponse(200);
+  const outcome = await fetchProfileWithTimeout(rapida, 5000);
+  ok(
+    "una petición normal no se confunde con un timeout",
+    outcome.kind === "ok" && outcome.response.status === 200,
+    JSON.stringify(outcome)
+  );
+}
+
+/* ── 2. Después del timeout, ruta de reintento real sin logout/login ────── */
+
+console.log("\n— 2. Reintentar de verdad recupera la cuenta, sin cerrar sesión —\n");
+
+{
+  // El mismo mecanismo que usaría un segundo `refresh()`: primero cuelga,
+  // como cualquier petición real puede colgar una vez; el reintento (misma
+  // función, sin remontar nada, sin logout) esta vez responde bien.
+  const colgada = (signal: AbortSignal): Promise<Response> =>
+    new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(new Error("aborted")));
+    });
+  const primero = await fetchProfileWithTimeout(colgada, 50);
+  const primeraAccion = decideProfileRefreshAction(primero, {
+    usingWalletSession: false,
+  });
+  ok(
+    "el primer intento (colgado) queda como recuperable, no como final",
+    primeraAccion.kind === "failed",
+    JSON.stringify(primeraAccion)
+  );
+
+  const reintento = await fetchProfileWithTimeout(
+    async () => fakeResponse(200),
+    5000
+  );
+  const segundaAccion = decideProfileRefreshAction(reintento, {
+    usingWalletSession: false,
+  });
+  ok(
+    "reintentar la MISMA función después de un fallo sí puede tener éxito",
+    segundaAccion.kind === "success",
+    JSON.stringify(segundaAccion)
+  );
+}
+
+{
+  // La ruta real en la UI: `HomeLobby.tsx` ofrece "reintentar/recargar"
+  // cuando `profile.failed`, y ese botón llama a `profile.refresh()` — nunca
+  // a `logoutEverything`.
+  const lobby = readFileSync(
+    join(ROOT, "components/lobby/HomeLobby.tsx"),
+    "utf8"
+  ).replace(/\r\n/g, "\n");
+
+  ok(
+    "hay un CTA dedicado para perfil fallido (profile.authenticated && profile.failed)",
+    /profile\.authenticated\s*&&\s*profile\.failed/.test(lobby)
+  );
+  ok(
+    "ese CTA es accionable (action: \"reload\")",
+    /action:\s*"reload"/.test(lobby)
+  );
+
+  const onPress = lobby.slice(lobby.indexOf("onPress={() => {"));
+  ok(
+    "\"reload\" llama a profile.refresh(), no a un logout",
+    /cta\.action === "reload"[\s\S]{0,40}profile\.refresh\(\)/.test(onPress),
+    "el botón de reintentar tiene que reintentar, no cerrar sesión"
+  );
+  ok(
+    "el camino de reintento no pasa por logoutEverything",
+    !/logoutEverything/.test(lobby)
+  );
+}
+
+/* ── 3. Una respuesta vieja no pisa a un refresh más nuevo ───────────────── */
+
+console.log("\n— 3. Orden de llegada no manda: manda quién arrancó último —\n");
+
+{
+  const gate = createSequenceGate();
+  const viejo = gate.begin();
+  const nuevo = gate.begin();
+
+  ok("el más nuevo sigue siendo el vigente", gate.isCurrent(nuevo));
+  ok(
+    "el viejo ya no puede publicar, aunque responda después",
+    !gate.isCurrent(viejo)
+  );
+
+  // Un tercer `refresh()` (p. ej. el reintento manual del punto 2) vuelve a
+  // desplazar al que hoy es "nuevo".
+  const masNuevo = gate.begin();
+  ok(
+    "y un tercero desplaza al segundo exactamente igual",
+    gate.isCurrent(masNuevo) && !gate.isCurrent(nuevo)
+  );
+}
+
+/* ── 4 y 5. Qué SÍ y qué NO cuenta como "sesión de wallet inválida" ──────── */
+
+console.log("\n— 4. Un 401 con sesión de wallet limpia SOLO esa sesión —\n");
+
+{
+  const outcome: ProfileFetchOutcome = { kind: "ok", response: fakeResponse(401) };
+  const action = decideProfileRefreshAction(outcome, { usingWalletSession: true });
+  ok(
+    "401 + sesión de wallet → limpiar la sesión (no un fallo genérico)",
+    action.kind === "clear_invalid_session",
+    JSON.stringify(action)
+  );
+}
+
+{
+  // Después de limpiar, un intento posterior con la sesión NUEVA (ya no
+  // "usingWalletSession" contra la vieja, porque esa ya no existe) puede
+  // tener éxito: no queda ninguna marca que impida recuperarse.
+  const reintento = await fetchProfileWithTimeout(
+    async () => fakeResponse(200),
+    5000
+  );
+  const action = decideProfileRefreshAction(reintento, { usingWalletSession: false });
+  ok(
+    "y después de limpiar, la cuenta se puede recuperar sin logout",
+    action.kind === "success",
+    JSON.stringify(action)
+  );
+}
+
+console.log(
+  "\n— 5. Timeout / error de red / 5xx NUNCA se leen como sesión inválida —\n"
+);
+
+{
+  const timeout: ProfileFetchOutcome = { kind: "timeout" };
+  const redError: ProfileFetchOutcome = { kind: "network_error", error: new Error("offline") };
+  const quinientos: ProfileFetchOutcome = { kind: "ok", response: fakeResponse(500) };
+
+  for (const [nombre, outcome] of [
+    ["timeout", timeout],
+    ["error de red", redError],
+    ["500 del servidor", quinientos],
+  ] as const) {
+    const action = decideProfileRefreshAction(outcome, { usingWalletSession: true });
+    ok(
+      `${nombre} con sesión de wallet → NUNCA "clear_invalid_session"`,
+      action.kind !== "clear_invalid_session",
+      JSON.stringify(action)
+    );
+    ok(`${nombre} con sesión de wallet → "failed" (recuperable)`, action.kind === "failed");
+  }
+
+  // Un 401 real, pero con un token de PRIVY (no de wallet): tampoco es motivo
+  // para tocar `clearWalletSession()` — esa sesión ni siquiera es la que se
+  // usó para pedir el perfil.
+  const cuatroCeroUno: ProfileFetchOutcome = { kind: "ok", response: fakeResponse(401) };
+  const accionPrivy = decideProfileRefreshAction(cuatroCeroUno, {
+    usingWalletSession: false,
+  });
+  ok(
+    "401 con token de Privy (no de wallet) tampoco limpia la sesión de wallet",
+    accionPrivy.kind === "failed",
+    JSON.stringify(accionPrivy)
+  );
+}
+
+/* ── 6. "checking" se limpia solo, pero nunca habilita un cobro ─────────── */
+
+console.log("\n— 6. El aviso se limpia solo; el permiso de cobrar es otra cosa —\n");
+
+{
+  // `decidePlayStart` no recibe `payBlock` en absoluto — estructuralmente no
+  // puede leer "ya se limpió el aviso" como permiso. Mientras el perfil siga
+  // "loading", la respuesta es SIEMPRE "checking", nunca "proceed".
+  const decision = decidePlayStart({
+    expected: "0xabc",
+    probe: { status: "answered", accounts: ["0xabc"] },
+    pending: null,
+    canonical: { status: "loading" },
+  });
+  ok(
+    'con canonical "loading" la decisión es SIEMPRE "checking"',
+    decision.kind === "checking",
+    JSON.stringify(decision)
+  );
+  ok(
+    'y nunca "proceed" mientras no se sepa de quién es la cuenta',
+    decision.kind !== "proceed"
+  );
+}
+
+{
+  const gameShell = readFileSync(
+    join(ROOT, "components/GameShell.tsx"),
+    "utf8"
+  ).replace(/\r\n/g, "\n");
+
+  const marker = 'if (payBlock?.kind !== "checking") return;';
+  const start = gameShell.indexOf(marker);
+  ok("el efecto que limpia \"checking\" existe", start !== -1);
+
+  const depsMarker = "}, [payBlock?.kind, profile.authenticated, profile.loading]);";
+  const end = gameShell.indexOf(depsMarker, start);
+  ok("y tiene el cierre esperado (mismas dependencias)", end !== -1);
+
+  const body = start !== -1 && end !== -1 ? gameShell.slice(start, end) : "";
+
+  ok(
+    "el efecto SOLO limpia el aviso — nada de iniciar cobro ni partida",
+    body.length > 0 &&
+      /setPayBlock\(null\)/.test(body) &&
+      !/playForDeck|startGame\(|setPayStage\(|handleStart\(|enqueue\(/.test(body),
+    body || "no se pudo aislar el cuerpo del efecto"
+  );
+
+  // La foto vieja se puede limpiar por dos motivos: ya se sabe (perfil listo)
+  // o ya no hay sesión (perfil sin autenticar). Ninguno de los dos AUTORIZA
+  // nada por sí mismo — solo decide si el aviso se sigue mostrando.
+  ok(
+    "la condición para limpiar es \"ya no está cargando\", no \"ya se puede cobrar\"",
+    /if \(profile\.authenticated && profile\.loading\) return;/.test(gameShell)
+  );
+}
+
+/* ── "Cerrar sesión" oculto en MiniPay, visible en navegador normal ─────── */
+
+console.log("\n— Cerrar sesión: oculto en MiniPay, presente fuera —\n");
+
+{
+  const perfil = readFileSync(join(ROOT, "app/perfil/page.tsx"), "utf8").replace(
+    /\r\n/g,
+    "\n"
+  );
+
+  ok(
+    "la página importa useIsMiniPay de lib/minipay",
+    /import\s*\{\s*useIsMiniPay\s*\}\s*from\s*"@\/lib\/minipay"/.test(perfil)
+  );
+  ok(
+    "lee inMiniPay con el hook, no con una variable inventada",
+    /const inMiniPay = useIsMiniPay\(\);/.test(perfil)
+  );
+
+  const botonIdx = perfil.indexOf('profile-logout-link"');
+  const boton = perfil.slice(botonIdx);
+  const justoAntes = perfil.slice(Math.max(0, botonIdx - 200), botonIdx);
+  ok(
+    "el botón de cerrar sesión sigue existiendo (no se borró, se oculta)",
+    /onClick=\{handleLogout\}/.test(boton)
+  );
+  ok(
+    "el botón está envuelto por \"{!inMiniPay &&\" a menos de 200 caracteres",
+    /\{!inMiniPay\s*&&/.test(justoAntes),
+    justoAntes
+  );
+  ok(
+    "el aviso de \"cierra sesión para cambiar de cuenta\" se oculta con el botón",
+    /profile\.links\.hint/.test(
+      perfil.slice(
+        perfil.indexOf('profile-logout-link"'),
+        perfil.indexOf('profile-legal"')
+      )
+    )
+  );
+}
+
+/* ── Fiabilidad de isMiniPay(): ni falsos positivos ni falsos negativos ── */
+
+console.log("\n— isMiniPay(): fiable en MiniPay, silenciosa en Chrome/Safari —\n");
+
+{
+  const originalWindow = (globalThis as { window?: unknown }).window;
+  const originalEnv = process.env.NODE_ENV;
+  // Next.js declara `NODE_ENV` como solo-lectura en `NodeJS.ProcessEnv`; el
+  // valor SÍ es mutable en runtime, solo el tipo lo prohíbe.
+  const env = process.env as Record<string, string | undefined>;
+
+  function withWindow<T>(win: unknown, run: () => T): T {
+    (globalThis as { window?: unknown }).window = win;
+    try {
+      return run();
+    } finally {
+      if (originalWindow === undefined) {
+        delete (globalThis as { window?: unknown }).window;
+      } else {
+        (globalThis as { window?: unknown }).window = originalWindow;
+      }
+    }
+  }
+
+  try {
+    // Import dinámico: `lib/minipay.ts` es "use client" e importa hooks de
+    // React/wagmi, pero `isMiniPay()` en sí no usa ninguno — solo lee
+    // `window`. Se importa DESPUÉS de decidir el mock para que la primera
+    // lectura de `window` ya encuentre lo que la prueba espera.
+    delete (globalThis as { window?: unknown }).window;
+    const { isMiniPay } = await import("../lib/minipay.ts");
+
+    ok(
+      "sin window (servidor/SSR) nunca revienta ni da falso positivo",
+      withWindow(undefined, () => isMiniPay()) === false
+    );
+
+    ok(
+      "Chrome/Safari sin ninguna wallet inyectada → false",
+      withWindow({ location: { search: "" } }, () => isMiniPay()) === false
+    );
+
+    ok(
+      "Chrome con MetaMask inyectado (isMiniPay ausente) → false",
+      withWindow(
+        {
+          ethereum: { isMetaMask: true },
+          location: { search: "" },
+        },
+        () => isMiniPay()
+      ) === false
+    );
+
+    ok(
+      "una wallet que dice isMiniPay: false explícito → false",
+      withWindow(
+        { ethereum: { isMiniPay: false }, location: { search: "" } },
+        () => isMiniPay()
+      ) === false
+    );
+
+    ok(
+      "MiniPay real (window.ethereum.isMiniPay === true) → true",
+      withWindow(
+        { ethereum: { isMiniPay: true }, location: { search: "" } },
+        () => isMiniPay()
+      ) === true
+    );
+
+    env.NODE_ENV = "production";
+    ok(
+      "en producción, ?minipay=1 NO puede fingir estar en MiniPay",
+      withWindow(
+        {
+          ethereum: undefined,
+          location: { search: "?minipay=1" },
+        },
+        () => isMiniPay()
+      ) === false,
+      "el override de desarrollo tiene que estar bloqueado en producción"
+    );
+
+    env.NODE_ENV = "development";
+    ok(
+      "fuera de producción, ?minipay=1 sí sirve para probar la UI",
+      withWindow(
+        {
+          ethereum: undefined,
+          location: { search: "?minipay=1" },
+        },
+        () => isMiniPay()
+      ) === true
+    );
+  } finally {
+    env.NODE_ENV = originalEnv;
+    if (originalWindow === undefined) {
+      delete (globalThis as { window?: unknown }).window;
+    } else {
+      (globalThis as { window?: unknown }).window = originalWindow;
+    }
+  }
+}
+
+console.log(
+  failed === 0 ? "\nTodo bien.\n" : `\n${failed} comprobación(es) fallaron.\n`
+);
+process.exit(failed === 0 ? 0 : 1);

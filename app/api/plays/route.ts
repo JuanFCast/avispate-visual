@@ -23,7 +23,12 @@ const ADDR_RE = /^0x[0-9a-f]{40}$/i;
  * gastó su jugada gratis del día: se puede compensar a quien corresponda en
  * vez de perderle la plata en silencio.
  *
- * Idempotente por `tx_hash`: reintentar el registro no crea filas repetidas.
+ * También genera la SEMILLA del mazo que el jugador está a punto de jugar y la
+ * devuelve en la respuesta: `/api/scores` la usa para rejugar la partida y
+ * comprobar que el resultado es real (`lib/score-verify.ts`). Idempotente por
+ * `tx_hash`: reintentar el registro no crea filas repetidas NI cambia la
+ * semilla — se relee la que quedó guardada la primera vez, nunca la que se
+ * acaba de generar en este intento.
  */
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
@@ -64,11 +69,14 @@ export async function POST(req: Request) {
      * identidad sobre el perfil de quien pagó sería justo el error que este
      * bloque existe para impedir.
      */
+    // La semilla se genera SIEMPRE en este intento, pero solo sobrevive si esta
+    // fila todavía no existía — `ignoreDuplicates` no la pisa en un reintento.
     const receipt = {
       profile_id: profile.id,
       tx_hash: txHash.toLowerCase(),
       deck_size: deckSize,
       is_paid: !check.wasFree,
+      seed: crypto.randomUUID(),
     };
 
     if (check.payerMismatch) {
@@ -95,7 +103,16 @@ export async function POST(req: Request) {
     // 23505 = ya estaba registrada; para nosotros es éxito.
     if (error && error.code !== "23505") throw error;
 
-    return NextResponse.json({ ok: true });
+    // Releer la fila real: en un reintento, la semilla que importa es la que
+    // quedó guardada la primera vez, no la que se acaba de generar arriba.
+    const { data: row, error: readError } = await db
+      .from("plays")
+      .select("seed")
+      .eq("tx_hash", txHash.toLowerCase())
+      .single();
+    if (readError || !row?.seed) throw readError ?? new Error("missing_seed");
+
+    return NextResponse.json({ ok: true, seed: row.seed });
   } catch {
     return NextResponse.json({ error: "server_error" }, { status: 500 });
   }

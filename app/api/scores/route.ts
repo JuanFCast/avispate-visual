@@ -6,6 +6,7 @@ import {
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { verifyPlayTx } from "@/lib/onchain";
 import { validateAlias } from "@/lib/alias";
+import { verifyScoreMoves } from "@/lib/score-verify";
 
 export const dynamic = "force-dynamic";
 
@@ -14,37 +15,27 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 const TX_RE = /^0x[0-9a-f]{64}$/i;
 const ADDR_RE = /^0x[0-9a-f]{40}$/i;
 
-function isInt(n: unknown): n is number {
-  return typeof n === "number" && Number.isInteger(n);
-}
-
 interface ScoreCore {
   clientGameId: string;
   deckSize: number;
-  totalMs: number;
-  averageMs: number;
-  errors: number;
-  accuracy: number;
+  moves: unknown;
 }
 
-/** Valida los campos comunes de una partida. Devuelve error string o null. */
+/**
+ * Valida los campos comunes de una partida. Devuelve error string o null.
+ *
+ * Ya NO valida `totalMs`/`averageMs`/`errors`/`accuracy`: esos los calcula el
+ * servidor rejugando `moves` contra la semilla real (`verifyScoreMoves`), más
+ * abajo. Antes se aceptaban tal cual llegaran del cliente — ver la auditoría
+ * del 2026-08-13, era el hueco más grave del proyecto.
+ */
 function validateCore(body: Record<string, unknown>): ScoreCore | string {
-  const { clientGameId, deckSize, totalMs, averageMs, errors, accuracy } = body;
+  const { clientGameId, deckSize, moves } = body;
   if (typeof clientGameId !== "string" || !UUID_RE.test(clientGameId))
     return "invalid_client_game_id";
   if (!DECK_SIZES.includes(deckSize as number)) return "invalid_deck_size";
-  if (!isInt(totalMs) || totalMs < 0 || !isInt(averageMs) || averageMs < 0)
-    return "invalid_time";
-  if (!isInt(errors) || errors < 0) return "invalid_errors";
-  if (!isInt(accuracy) || accuracy < 0 || accuracy > 100) return "invalid_accuracy";
-  return {
-    clientGameId,
-    deckSize: deckSize as number,
-    totalMs,
-    averageMs,
-    errors,
-    accuracy,
-  };
+  if (!Array.isArray(moves) || moves.length === 0) return "invalid_moves";
+  return { clientGameId, deckSize: deckSize as number, moves };
 }
 
 /**
@@ -88,6 +79,41 @@ export async function POST(req: Request) {
         { status: 409 }
       );
 
+    const db = getSupabaseAdmin();
+
+    /**
+     * La semilla real la generó `/api/plays` antes de que el jugador viera la
+     * primera carta — este txHash es la misma llave que usa esa tabla, así que
+     * si no hay fila ahí, no hay semilla con la que rejugar, y el envío se
+     * rechaza. `deck_size` se cruza también: aunque `verifyPlayTx` ya exige que
+     * coincida con el evento on-chain, comprobarlo otra vez contra el recibo no
+     * cuesta nada y cierra una vía más.
+     */
+    const { data: playRow } = await db
+      .from("plays")
+      .select("seed, deck_size")
+      .eq("tx_hash", txHash.toLowerCase())
+      .maybeSingle();
+    if (!playRow?.seed || playRow.deck_size !== core.deckSize)
+      return NextResponse.json({ error: "invalid_score" }, { status: 400 });
+
+    /**
+     * El servidor rejuega el mazo entero contra esa semilla y decide el
+     * tiempo/errores/precisión POR SU CUENTA a partir de los toques reales — el
+     * cliente ya no manda esos números, y si los mandara no se leerían. Ver
+     * `lib/score-verify.ts`.
+     */
+    const verified = verifyScoreMoves(playRow.seed, core.deckSize, core.moves);
+    if (!verified.ok) {
+      // El motivo detallado ("too_fast", "non_monotonic"...) se queda en el
+      // log del servidor, no en la respuesta: devolverlo tal cual le daría a
+      // quien intenta fabricar un puntaje un oráculo para afinar el intento
+      // siguiente.
+      console.error("score_rejected", { txHash, reason: verified.reason });
+      return NextResponse.json({ error: "invalid_score" }, { status: 400 });
+    }
+    const { totalMs, averageMs, errors, accuracy } = verified.score;
+
     // Los perfiles de correo también se encuentran aquí: su wallet embebida
     // quedó guardada en el perfil al iniciar sesión.
     const profile = await ensureProfileByWallet(check.player);
@@ -107,7 +133,6 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "alias_taken" }, { status: 409 });
     }
 
-    const db = getSupabaseAdmin();
     // Idempotencia: mismo clientGameId se ignora; tx_hash repetido dispara
     // scores_tx_hash_key (23505) → la jugada ya se registró (ok idempotente).
     const { error } = await db.from("scores").upsert(
@@ -115,10 +140,10 @@ export async function POST(req: Request) {
         profile_id: profile.id,
         client_game_id: core.clientGameId,
         deck_size: core.deckSize,
-        total_ms: core.totalMs,
-        average_ms: core.averageMs,
-        errors: core.errors,
-        accuracy: core.accuracy,
+        total_ms: totalMs,
+        average_ms: averageMs,
+        errors,
+        accuracy,
         is_paid: !check.wasFree,
         tx_hash: txHash.toLowerCase(),
       },

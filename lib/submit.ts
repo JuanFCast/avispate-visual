@@ -55,6 +55,12 @@ export interface SendOutcome {
    * conectando esa wallet, nunca la app por su cuenta.
    */
   payer?: string;
+  /**
+   * Cuerpo de la respuesta cuando el servidor aceptó el envío. Hoy solo lo usa
+   * `/api/plays` (la semilla del mazo que hay que jugar); el resto de
+   * llamantes lo ignora sin problema.
+   */
+  data?: Record<string, unknown>;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -69,7 +75,13 @@ async function postOnce(url: string, body: unknown): Promise<SendOutcome> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    if (res.ok) return { result: "ok" };
+    if (res.ok) {
+      const data = (await res.json().catch(() => null)) as Record<
+        string,
+        unknown
+      > | null;
+      return { result: "ok", data: data ?? undefined };
+    }
 
     // 5xx y 429: el servidor está mal o saturado, no la petición.
     if (res.status >= 500 || res.status === 429) return { result: "retry" };

@@ -92,10 +92,18 @@ export function placeSymbols(
   return placed;
 }
 
-/** Primera carta base de la cadena: 8 símbolos únicos al azar. */
-export function generateFirstCard(): ChainCard {
-  const pool = shuffle(SYMBOLS.map((s) => s.id)).slice(0, SYMBOLS_PER_CARD);
-  return { id: 1, symbols: placeSymbols(pool) };
+/**
+ * Primera carta base de la cadena: 8 símbolos únicos al azar.
+ *
+ * `rnd` es opcional y por defecto sigue siendo `Math.random` —el reto diario
+ * de siempre—, pero cuando el servidor necesita rejugar la partida para
+ * comprobar un puntaje (`lib/score-verify.ts`) le pasa un generador con
+ * semilla, y el MISMO código produce el MISMO mazo. Ver `lib/arena-deck.ts`,
+ * que ya usaba este patrón para la Arena.
+ */
+export function generateFirstCard(rnd: Rnd = Math.random): ChainCard {
+  const pool = shuffle(SYMBOLS.map((s) => s.id), rnd).slice(0, SYMBOLS_PER_CARD);
+  return { id: 1, symbols: placeSymbols(pool, rnd) };
 }
 
 /** Cuántos distractores buscan parecerse al objetivo. */
@@ -112,28 +120,32 @@ const MAX_SIMILAR = 6; // mismo color + misma categoría, combinados
  */
 export function generateNextCard(
   base: ChainCard,
-  id: number
+  id: number,
+  rnd: Rnd = Math.random
 ): { card: ChainCard; targetSymbolId: string } {
   const baseIds = new Set(base.symbols.map((p) => p.symbolId));
   const targetId =
-    base.symbols[Math.floor(Math.random() * base.symbols.length)].symbolId;
+    base.symbols[Math.floor(rnd() * base.symbols.length)].symbolId;
   const target = SYMBOL_BY_ID[targetId];
 
   const available = SYMBOLS.filter(
     (s) => !baseIds.has(s.id) && s.id !== targetId
   );
   const sameColor = shuffle(
-    available.filter((s) => s.color === target.color)
+    available.filter((s) => s.color === target.color),
+    rnd
   );
   const sameCategory = shuffle(
     available.filter(
       (s) => s.color !== target.color && s.category === target.category
-    )
+    ),
+    rnd
   );
   const rest = shuffle(
     available.filter(
       (s) => s.color !== target.color && s.category !== target.category
-    )
+    ),
+    rnd
   );
 
   const distractors: Symbol[] = [];
@@ -152,7 +164,7 @@ export function generateNextCard(
   // Si los grupos parecidos eran pequeños, completa con lo que quede.
   if (distractors.length < SYMBOLS_PER_CARD - 1) {
     const chosen = new Set(distractors.map((s) => s.id));
-    for (const s of shuffle(available)) {
+    for (const s of shuffle(available, rnd)) {
       if (distractors.length >= SYMBOLS_PER_CARD - 1) break;
       if (!chosen.has(s.id)) distractors.push(s);
     }
@@ -161,7 +173,7 @@ export function generateNextCard(
   return {
     card: {
       id,
-      symbols: placeSymbols([targetId, ...distractors.map((s) => s.id)]),
+      symbols: placeSymbols([targetId, ...distractors.map((s) => s.id)], rnd),
     },
     targetSymbolId: targetId,
   };

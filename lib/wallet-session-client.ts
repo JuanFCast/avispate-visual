@@ -58,6 +58,10 @@ export function readWalletSession(): StoredSession | null {
 export function clearWalletSession(): void {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(KEY);
+  // No basta con borrar el almacenamiento: `ProfileProvider` conserva en
+  // memoria si había sesión. Sin avisarle, un token inválido deja la app
+  // creyendo que el jugador sigue autenticado hasta la próxima recarga.
+  window.dispatchEvent(new Event(WALLET_SESSION_EVENT));
 }
 
 /**

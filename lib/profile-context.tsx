@@ -5,15 +5,23 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import {
+  clearWalletSession,
   readWalletSession,
   WALLET_SESSION_EVENT,
 } from "./wallet-session-client";
 import { SETTLE_LIMIT_MS } from "./wallet-identity";
+import {
+  createSequenceGate,
+  decideProfileRefreshAction,
+  fetchProfileWithTimeout,
+  PROFILE_REQUEST_TIMEOUT_MS,
+} from "./profile-recovery";
 
 interface ProfileState {
   /** Aún cargando el perfil del servidor. */
@@ -79,6 +87,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const { ready: privyReady, authenticated: privyAuth, getAccessToken } = usePrivy();
   const { wallets } = useWallets();
   const [state, setState] = useState<ProfileState>({ ...EMPTY, loading: true });
+  // Solo la consulta más reciente puede publicar su respuesta. Al cambiar de
+  // sesión o reintentar, una respuesta vieja no debe volver a poner el perfil
+  // anterior encima del actual. Ver `lib/profile-recovery.ts`.
+  const sequenceGate = useRef(createSequenceGate());
   // Sesión de wallet (MiniPay, sin firma). Se lee en un efecto y no durante el
   // render: `localStorage` no existe en el servidor y tocarlo antes de montar
   // rompe la hidratación.
@@ -141,8 +153,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   }, [privyAuth, getAccessToken]);
 
   const refresh = useCallback(async () => {
+    const sequence = sequenceGate.current.begin();
+    const publish = (next: ProfileState) => {
+      if (sequenceGate.current.isCurrent(sequence)) setState(next);
+    };
+
     if (!authenticated) {
-      setState(EMPTY);
+      publish(EMPTY);
       return;
     }
     setState((s) => ({ ...s, loading: true }));
@@ -150,16 +167,46 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     // Hay sesión pero no se pudo sacar el token: tampoco se sabe nada del
     // perfil. Es un fallo, no un perfil vacío.
     if (!token) {
-      setState(FAILED);
+      publish(FAILED);
+      return;
+    }
+
+    // Recordamos de qué puerta salió el token. Si el servidor invalida una
+    // sesión de wallet (por ejemplo, después de rotar el secreto), conservarla
+    // 30 días en localStorage crea un bucle imposible de arreglar desde la UI.
+    const walletSession = readWalletSession();
+    const usingWalletSession = walletSession?.token === token;
+
+    // `fetchProfileWithTimeout` SIEMPRE resuelve, colgada o no: es lo que
+    // garantiza que `loading` nunca se quede pegado en `true`. La decisión de
+    // qué hacer con el resultado —éxito, sesión inválida, o fallo recuperable—
+    // es pura y vive en `lib/profile-recovery.ts`, donde se puede probar sin
+    // un navegador.
+    const outcome = await fetchProfileWithTimeout(
+      (signal) =>
+        fetch("/api/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+          signal,
+        }),
+      PROFILE_REQUEST_TIMEOUT_MS
+    );
+    const action = decideProfileRefreshAction(outcome, { usingWalletSession });
+
+    if (action.kind === "clear_invalid_session") {
+      // Volvemos de inmediato al camino wallet-only. La siguiente jugada
+      // confirmada emitirá una sesión nueva; no hace falta borrar alias,
+      // historial ni ninguna transacción.
+      clearWalletSession();
+      publish(EMPTY);
+      return;
+    }
+    if (action.kind === "failed") {
+      publish(FAILED);
       return;
     }
     try {
-      const res = await fetch("/api/profile", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("profile_fetch_failed");
-      const data = await res.json();
-      setState({
+      const data = await (outcome as { kind: "ok"; response: Response }).response.json();
+      publish({
         loading: false,
         failed: false,
         fetched: true,
@@ -167,7 +214,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         walletAddress: data.walletAddress ?? null,
       });
     } catch {
-      setState(FAILED);
+      publish(FAILED);
     }
   }, [authenticated, getToken]);
 

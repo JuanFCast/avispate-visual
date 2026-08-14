@@ -11,6 +11,7 @@ import {
   type ChainCard,
   type GameResult,
 } from "@/lib/game";
+import { dailyCardRnd, type RawMove } from "@/lib/score-verify";
 import { loadLeaderboard, saveResult } from "@/lib/leaderboard";
 import { isMuted, setMuted, sound, unlockAudio } from "@/lib/sound";
 import { useProfile } from "@/lib/profile-context";
@@ -292,6 +293,15 @@ export default function GameShell() {
   const errorsRef = useRef(0);
   const startAtRef = useRef(0);
   const finishedRef = useRef(false);
+  /**
+   * Semilla que mandó `/api/plays` al confirmar la jugada, y el registro de
+   * cada toque (símbolo + milisegundo). El servidor rejuega la partida con
+   * esta misma semilla y este mismo log para comprobar que el resultado es
+   * real — ver `lib/score-verify.ts`. Sin semilla no hay mazo determinista que
+   * rejugar, así que sin ella no se puede empezar a jugar.
+   */
+  const seedRef = useRef("");
+  const movesRef = useRef<RawMove[]>([]);
 
   useEffect(() => {
     setMutedState(isMuted());
@@ -352,6 +362,11 @@ export default function GameShell() {
   async function handleStart(deck: number) {
     if (payStage) return;
     setPayError(null);
+    // Cada intento vuelve a validar TODO desde cero. Un bloqueo transitorio de
+    // un intento anterior no debe seguir pintado cuando la cuenta ya cargó;
+    // si la causa persiste, el guardián lo vuelve a establecer unas líneas
+    // más abajo. La jugada pendiente sigue protegida por `pendingPlay()`.
+    setPayBlock(null);
     const alias = currentAlias || playerName;
 
     if (!canPlay) {
@@ -449,10 +464,25 @@ export default function GameShell() {
       // así el botón de los resultados sabe decir cuánto cuesta la revancha.
       refetchFreePlays();
 
+      /**
+       * La semilla del mazo viene en la respuesta de `/api/plays` — sin ella
+       * no hay partida que jugar, porque el servidor no podría comprobar
+       * ningún resultado. No debería faltar nunca (el servidor la genera
+       * siempre que acepta el envío), así que si falta es un fallo de
+       * servidor, no algo que la persona pueda arreglar reintentando aquí:
+       * el pago ya quedó registrado y a salvo.
+       */
+      const seed = typeof sent.data?.seed === "string" ? sent.data.seed : "";
+      if (!seed) {
+        setPayStage(null);
+        setPayError("pay.error.generic");
+        return;
+      }
+
       setPayStage("starting");
       setTimeout(() => {
         setPayStage(null);
-        startGame(alias, deck);
+        startGame(alias, deck, seed);
       }, HANDOFF_MS);
     } catch (err) {
       setPayStage(null);
@@ -512,6 +542,22 @@ export default function GameShell() {
   }
 
   /**
+   * `checking` es una foto de un instante, no una decisión permanente.
+   *
+   * Era posible tocar "Jugar otra vez" justo cuando MiniPay acababa de crear
+   * la sesión y el perfil empezaba a cargarse. El guardián frenaba bien el
+   * cobro, pero el aviso quedaba guardado incluso después de recibir el perfil,
+   * haciendo parecer que la cuenta seguía atascada. Al terminar la carga (con
+   * éxito o con el botón de reintento) se retira solo; nunca autoriza un pago,
+   * porque el siguiente toque vuelve a pasar por `decidePlayStart` completo.
+   */
+  useEffect(() => {
+    if (payBlock?.kind !== "checking") return;
+    if (profile.authenticated && profile.loading) return;
+    setPayBlock(null);
+  }, [payBlock?.kind, profile.authenticated, profile.loading]);
+
+  /**
    * Reconciliación del pagador, y la hace la PERSONA, no la app.
    *
    * Cuando la cadena dice que pagó una dirección distinta, el envío se queda
@@ -561,10 +607,12 @@ export default function GameShell() {
     refetchFreePlays();
   }
 
-  function startGame(name: string, deck: number) {
+  function startGame(name: string, deck: number, seed: string) {
     unlockAudio();
-    const base = generateFirstCard();
-    const gen = generateNextCard(base, 2);
+    seedRef.current = seed;
+    movesRef.current = [];
+    const base = generateFirstCard(dailyCardRnd(seed, 1));
+    const gen = generateNextCard(base, 2, dailyCardRnd(seed, 2));
     baseRef.current = base;
     incomingRef.current = gen.card;
     targetRef.current = gen.targetSymbolId;
@@ -600,16 +648,20 @@ export default function GameShell() {
    * se genera UNA vez y viaja con el envío guardado, así que reintentar (hoy o
    * mañana) siempre es la misma partida para el servidor y nunca se duplica.
    */
-  function queueScore(r: GameResult): (() => Promise<void>) | null {
+  function queueScore(): (() => Promise<void>) | null {
     if (!txHashRef.current || !playerRef.current) return null;
     const clientGameId = crypto.randomUUID();
+    /**
+     * El servidor ya no lee `totalMs`/`averageMs`/`errors`/`accuracy`: los
+     * recalcula rejugando `moves` contra la semilla real (`lib/score-verify.ts`).
+     * Se manda una COPIA del log — `movesRef.current` es el mismo array que
+     * `handleTap` sigue mutando (o vuelve a vaciar si la persona ya arrancó
+     * otra partida) mientras este envío espera turno en la bandeja.
+     */
     const item = enqueue(`score:${clientGameId}`, "/api/scores", {
       clientGameId,
       deckSize,
-      totalMs: r.totalMs,
-      averageMs: r.averageMs,
-      errors: r.errors,
-      accuracy: r.accuracy,
+      moves: [...movesRef.current],
       txHash: txHashRef.current,
       player: playerRef.current,
       alias: currentAlias || undefined,
@@ -646,7 +698,7 @@ export default function GameShell() {
     saveResult(gameResult);
     // La marca queda escrita en la bandeja ANTES de pintar nada; el envío se
     // dispara después y ya puede tardar lo que quiera.
-    const sendScore = queueScore(gameResult);
+    const sendScore = queueScore();
     setResult(gameResult);
     setBestAverageMs(Math.min(previousBest, averageMs));
     setIsNewRecord(averageMs < previousBest);
@@ -688,6 +740,12 @@ export default function GameShell() {
     // Solo se juega con tu carta: la base es de referencia y no responde.
     if (cardId !== incomingRef.current?.id) return;
 
+    // Mismo reloj que ya usaba `totalMs`. Cada toque —acierto o error— queda
+    // en el log que el servidor va a rejugar; sin esto no hay con qué probar
+    // que el resultado corresponde a una partida real.
+    const tMs = Math.round(performance.now() - startAtRef.current);
+    movesRef.current.push({ symbolId, tMs });
+
     if (symbolId === targetRef.current) {
       spentRef.current += 1;
       const remaining = deckSize - spentRef.current;
@@ -707,7 +765,12 @@ export default function GameShell() {
         promoteCards(null);
         setTimeout(() => finishGame(totalMs), FINAL_CARD_DELAY_MS);
       } else {
-        const gen = generateNextCard(incomingRef.current, nextIdRef.current++);
+        const id = nextIdRef.current++;
+        const gen = generateNextCard(
+          incomingRef.current,
+          id,
+          dailyCardRnd(seedRef.current, id)
+        );
         targetRef.current = gen.targetSymbolId;
         promoteCards(gen.card);
       }
