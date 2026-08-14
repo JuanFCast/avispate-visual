@@ -31,6 +31,8 @@
  * sé", y "no lo sé" no autoriza nada.
  */
 
+import type { CanonicalWallet } from "./pay-guard";
+
 export type WalletIdentityVerdict =
   /** La conectada ES la canónica. Todo permitido. */
   | { kind: "ok"; address: string }
@@ -188,6 +190,95 @@ export function decideEmbeddedCreation(check: {
   if (norm(check.canonical)) return { kind: "never", reason: "has_canonical" };
 
   return { kind: "create" };
+}
+
+/**
+ * ¿Se debe auto-conectar la wallet embebida en wagmi, sin que el jugador toque
+ * nada?
+ *
+ * ── El bug que la hizo falta (misma identidad, 2026-08-13) ─────────────────
+ *
+ * `decideEmbeddedCreation` ya impedía CREAR una segunda embebida cuando el
+ * perfil tiene canónica. Pero la de PipeRabby (2026-08-07) no hay que
+ * crearla: ya EXISTE, enlazada en Privy desde el incidente. Nadie decidía si
+ * CONECTARLA sola era buena idea, y el efecto de `embedded-wallet.tsx` lo
+ * hacía sin preguntar en cuanto veía sesión activa y nada más conectado. El
+ * resultado: la misma partida gratis y el mismo pago de Arena bloqueados por
+ * `wrong_wallet`, en el mismo navegador, un año después de "arreglado".
+ *
+ * ── La regla ──────────────────────────────────────────────────────────────
+ *
+ * La EXTERNA manda por defecto. Si esta identidad tiene una wallet externa
+ * enlazada (`hasExternal`), la embebida NUNCA se conecta sola — ni siquiera
+ * si también hay una embebida (`hasEmbedded`) y todavía no hay canónica en el
+ * perfil. Dos wallets enlazadas y ninguna canónica anotada es exactamente la
+ * ambigüedad que no se puede resolver por defecto; el mismo criterio que ya
+ * usa el servidor (`privy-server.ts`: "la externa se elige primero").
+ *
+ * La única excepción es cuando el PERFIL, la fuente que manda, dice
+ * explícitamente que la embebida es su canónica — alguien enlazó una externa
+ * por curiosidad pero su cuenta real, la que cobra, sigue siendo la
+ * embebida. Ahí sí se conecta.
+ *
+ * Sin externa enlazada, manda el perfil: si su canónica es otra dirección,
+ * tampoco se conecta (`canonical_elsewhere` — el caso PipeRabby en sí, donde
+ * la Rabby nunca llegó a *enlazarse* en Privy, solo se *conectó* por wagmi).
+ * Si el perfil TODAVÍA no respondió, se espera — conectar antes de saber es
+ * la misma carrera que esto existe para cerrar. Y si no hay canónica ni
+ * externa, es un jugador nuevo de verdad: la embebida es correcta.
+ */
+export type EmbeddedAutoConnect =
+  | { kind: "connect" }
+  /** El perfil no ha terminado de resolverse (cargando, falló, o va a
+      reintentar). Fallar cerrado: no se sabe, no se conecta nada solo. */
+  | { kind: "wait" }
+  | {
+      kind: "skip";
+      reason:
+        /** Externa enlazada, sin ninguna embebida de por medio. */
+        | "has_external"
+        /** Externa Y embebida enlazadas, sin canónica todavía: ambiguo, y la
+            externa gana el desempate por defecto. */
+        | "ambiguous_identity"
+        /** Hay canónica y es una dirección distinta a esta embebida. */
+        | "canonical_elsewhere";
+    };
+
+export function decideEmbeddedAutoConnect(check: {
+  /** La canónica del perfil, en sus tres estados (`canonicalFromProfile`). */
+  canonical: CanonicalWallet;
+  /** La dirección de la embebida EN ESTA SESIÓN, o `null` si Privy aún no la
+      expone en `useWallets()`. */
+  embeddedAddress: string | null;
+  /** Privy tiene una wallet externa enlazada a esta identidad. */
+  hasExternal: boolean;
+  /** Privy tiene una wallet embebida enlazada a esta identidad. */
+  hasEmbedded: boolean;
+}): EmbeddedAutoConnect {
+  if (check.hasExternal) {
+    const embeddedIsCanonical =
+      check.canonical.status === "known" &&
+      check.embeddedAddress !== null &&
+      norm(check.canonical.address) === norm(check.embeddedAddress);
+    if (!embeddedIsCanonical) {
+      return {
+        kind: "skip",
+        reason: check.hasEmbedded ? "ambiguous_identity" : "has_external",
+      };
+    }
+  }
+
+  // Sin externa que la gane de entrada: falla cerrado mientras no se sepa.
+  if (check.canonical.status === "loading") return { kind: "wait" };
+
+  if (
+    check.canonical.status === "known" &&
+    norm(check.canonical.address) !== norm(check.embeddedAddress)
+  ) {
+    return { kind: "skip", reason: "canonical_elsewhere" };
+  }
+
+  return { kind: "connect" };
 }
 
 /**

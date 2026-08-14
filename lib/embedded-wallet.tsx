@@ -13,7 +13,11 @@ import { useCreateWallet, usePrivy, useWallets } from "@privy-io/react-auth";
 import { useAccount, useConnect } from "wagmi";
 import { useProfile } from "./profile-context";
 import { useIsMiniPay } from "./minipay";
-import { decideEmbeddedCreation } from "./wallet-identity";
+import {
+  canonicalFromProfile,
+  decideEmbeddedAutoConnect,
+  decideEmbeddedCreation,
+} from "./wallet-identity";
 
 /**
  * La wallet embebida de Privy, desde que el jugador entra con su correo hasta
@@ -130,8 +134,19 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
   const hasExternal = linkedWallets.some(
     (a) => a.walletClientType !== undefined && a.walletClientType !== "privy"
   );
-  /** Entró firmando con la suya: no hay wallet embebida que crear ni esperar. */
-  const externalOnly = hasExternal && !hasEmbedded;
+
+  /**
+   * ¿Se conecta esta embebida SOLA? La externa manda por defecto —incluida
+   * la ambigüedad de tener las dos enlazadas y ninguna canónica todavía— y
+   * mientras el perfil no termine de resolverse (cargando, o recuperándose
+   * de un fallo) se espera en vez de adelantarse. Ver `wallet-identity.ts`.
+   */
+  const autoConnect = decideEmbeddedAutoConnect({
+    canonical: canonicalFromProfile(profile),
+    embeddedAddress,
+    hasExternal,
+    hasEmbedded,
+  });
   /** Ronda de reintento AUTOMÁTICO. Al cambiar, se vuelve a intentar conectar. */
   const [round, setRound] = useState(0);
   /**
@@ -151,7 +166,8 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
    * toca resolver a nosotros. Con wallet propia no se cuenta el tiempo: ahí no
    * estamos esperando a nadie, estamos esperando al jugador.
    */
-  const waiting = privyReady && authenticated && !isConnected && !externalOnly;
+  const waiting =
+    privyReady && authenticated && !isConnected && autoConnect.kind !== "skip";
 
   // 1. Anunciar la embebida por EIP-6963 para que wagmi la descubra como una
   //    wallet más, sin reemplazar los conectores externos.
@@ -241,8 +257,10 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
       return;
     }
     // La wallet propia la conecta su dueño, no nosotros: reintentar contra ella
-    // solo abriría modales que nadie pidió.
-    if (externalOnly) return;
+    // solo abriría modales que nadie pidió. Y si el perfil no ha terminado de
+    // resolverse (`"wait"`), tampoco se conecta: es la carrera que este
+    // arreglo existe para cerrar — ver `decideEmbeddedAutoConnect`.
+    if (autoConnect.kind !== "connect") return;
     // El tope existe para no quedarse reintentando en bucle contra un jugador
     // que desconectó su wallet a propósito. Pasado el tope manda el botón.
     if (attemptsRef.current >= MAX_CONNECT_ATTEMPTS) return;
@@ -255,7 +273,7 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
     // conecte, este efecto sale por arriba y no quedan temporizadores vivos.
     const retry = setTimeout(() => setRound((r) => r + 1), CONNECT_RETRY_MS);
     return () => clearTimeout(retry);
-  }, [isConnected, authenticated, externalOnly, connectors, connect, round, manual]);
+  }, [isConnected, authenticated, autoConnect.kind, connectors, connect, round, manual]);
 
   // 4. El reloj de la paciencia. Se reinicia con cada reintento manual.
   useEffect(() => {
@@ -278,7 +296,7 @@ export function EmbeddedWalletProvider({ children }: { children: ReactNode }) {
     ? "idle"
     : isConnected
       ? "ready"
-      : externalOnly
+      : autoConnect.kind === "skip"
         ? "external"
         : stuck
           ? "stuck"

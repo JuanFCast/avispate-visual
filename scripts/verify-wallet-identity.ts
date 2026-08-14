@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   canonicalFromProfile,
+  decideEmbeddedAutoConnect,
   decideEmbeddedCreation,
   decideWalletIdentity,
   mayTransact,
@@ -547,6 +548,245 @@ console.log("\n— Un perfil que NO cargo no es un perfil vacio —");
   );
 }
 
+console.log("\n— Auto-conectar la embebida: cuándo SÍ y cuándo NO —");
+{
+  // El caso real, con nombre: perfil con Rabby canónica, la embebida vieja de
+  // 2026-08-07 sigue enlazada en Privy. No debe ganar la carrera de wagmi.
+  check(
+    "PIPERABBY: canónica externa distinta a la embebida → no se conecta sola",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "known", address: RABBY },
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "skip", reason: "canonical_elsewhere" }
+  );
+
+  check(
+    "la embebida ES la canónica (usuario solo-correo) → sí se conecta",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "known", address: EMBED },
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "connect" }
+  );
+
+  check(
+    "jugador nuevo de verdad, sin nada enlazado → sí se conecta",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "none" },
+      embeddedAddress: null,
+      hasExternal: false,
+      hasEmbedded: false,
+    }),
+    { kind: "connect" }
+  );
+
+  check(
+    "jugador nuevo con su embebida YA creada, perfil sin canónica todavía → se conecta",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "none" },
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "connect" }
+  );
+
+  check(
+    "entró firmando con la suya, nunca hubo embebida → salta, no espera",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "none" },
+      embeddedAddress: null,
+      hasExternal: true,
+      hasEmbedded: false,
+    }),
+    { kind: "skip", reason: "has_external" }
+  );
+
+  console.log("\n  — Protección 1: perfil sin resolver (falló, timeout, reintentando) —");
+
+  check(
+    "perfil todavía cargando → espera, no se adelanta",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "loading" },
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "wait" }
+  );
+
+  // Compuesto con `canonicalFromProfile`, igual que lo vería el componente
+  // real: un perfil que FALLÓ (timeout de `fetchProfileWithTimeout`, red caída,
+  // 500) no puede colarse como "sin canónica" y dejar pasar la conexión.
+  check(
+    "perfil que FALLÓ (timeout o error de red) → sigue esperando, no 'none'",
+    decideEmbeddedAutoConnect({
+      canonical: canonicalFromProfile({
+        ready: true,
+        loading: false,
+        failed: true,
+        authenticated: true,
+        walletAddress: null,
+      }),
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "wait" }
+  );
+
+  check(
+    "perfil recuperándose (loading:true a mitad de un refresh) → sigue esperando",
+    decideEmbeddedAutoConnect({
+      canonical: canonicalFromProfile({
+        ready: true,
+        loading: true,
+        failed: false,
+        authenticated: true,
+        walletAddress: RABBY, // el valor viejo en caché no cuenta mientras carga
+      }),
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "wait" }
+  );
+
+  check(
+    "Privy sin terminar de arrancar (`ready:false`) → sigue esperando",
+    decideEmbeddedAutoConnect({
+      canonical: canonicalFromProfile({
+        ready: false,
+        loading: false,
+        failed: false,
+        authenticated: true,
+        walletAddress: null,
+      }),
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "wait" }
+  );
+
+  console.log("\n  — Protección 2: externa Y embebida enlazadas, sin canónica todavía —");
+
+  // El caso que se pidió revisar explícitamente: dos wallets enlazadas a la
+  // misma identidad y el perfil todavía no dice cuál es la canónica. La
+  // embebida NO puede ganar por defecto solo porque llegó primero a
+  // `useWallets()` — es la misma ambigüedad que resolvió `privy-server.ts`
+  // ("la externa se elige primero"), aplicada también aquí.
+  check(
+    "externa Y embebida enlazadas, sin canónica → ambiguo, NO se conecta sola",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "none" },
+      embeddedAddress: EMBED,
+      hasExternal: true,
+      hasEmbedded: true,
+    }),
+    { kind: "skip", reason: "ambiguous_identity" }
+  );
+
+  // Pero si el PERFIL ya zanjó la ambigüedad —la canónica es justo esta
+  // embebida, aunque también haya una externa enlazada por curiosidad—, la
+  // fuente que manda gana y sí se conecta.
+  check(
+    "externa Y embebida enlazadas, pero el perfil dice que la canónica ES la embebida → se conecta",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "known", address: EMBED },
+      embeddedAddress: EMBED,
+      hasExternal: true,
+      hasEmbedded: true,
+    }),
+    { kind: "connect" }
+  );
+
+  // Y si el perfil dice que la canónica es la OTRA externa (ni la embebida ni
+  // la enlazada de Privy), tampoco se conecta.
+  check(
+    "externa Y embebida enlazadas, canónica es una tercera dirección → no se conecta",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "known", address: OTRA },
+      embeddedAddress: EMBED,
+      hasExternal: true,
+      hasEmbedded: true,
+    }),
+    { kind: "skip", reason: "ambiguous_identity" }
+  );
+
+  console.log("\n  — Detalles —");
+
+  check(
+    "no se confunde por mayúsculas en la dirección",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "known", address: EMBED.toUpperCase() },
+      embeddedAddress: EMBED,
+      hasExternal: false,
+      hasEmbedded: true,
+    }).kind,
+    "connect"
+  );
+
+  check(
+    "canónica conocida pero la embebida de esta sesión aún no llegó (null) → no se conecta",
+    decideEmbeddedAutoConnect({
+      canonical: { status: "known", address: EMBED },
+      embeddedAddress: null,
+      hasExternal: false,
+      hasEmbedded: true,
+    }),
+    { kind: "skip", reason: "canonical_elsewhere" }
+  );
+
+  // Barrido: con canónica CONOCIDA y distinta de la embebida, jamás sale
+  // "connect", pase lo que pase con hasExternal/hasEmbedded.
+  {
+    const combos: string[] = [];
+    for (const ext of [true, false])
+      for (const emb of [true, false])
+        combos.push(
+          decideEmbeddedAutoConnect({
+            canonical: { status: "known", address: RABBY },
+            embeddedAddress: EMBED,
+            hasExternal: ext,
+            hasEmbedded: emb,
+          }).kind
+        );
+    check(
+      "canónica ajena: nunca 'connect', pase lo que pase con hasExternal/hasEmbedded",
+      combos.every((k) => k !== "connect"),
+      true
+    );
+  }
+
+  // Barrido: mientras el perfil no resuelva ('loading'), jamás sale "connect"
+  // salvo que la externa ya la haya descartado con un 'skip' más fuerte —y en
+  // ese caso da igual, el resultado sigue sin ser "connect".
+  {
+    const combos: string[] = [];
+    for (const ext of [true, false])
+      for (const emb of [true, false])
+        combos.push(
+          decideEmbeddedAutoConnect({
+            canonical: { status: "loading" },
+            embeddedAddress: EMBED,
+            hasExternal: ext,
+            hasEmbedded: emb,
+          }).kind
+        );
+    check(
+      "perfil sin resolver: nunca 'connect', pase lo que pase",
+      combos.every((k) => k !== "connect"),
+      true
+    );
+  }
+}
+
 console.log("\n— Y esta enchufada donde importa —");
 {
   const perfil = readFileSync(join(ROOT, "app/perfil/page.tsx"), "utf8");
@@ -566,6 +806,21 @@ console.log("\n— Y esta enchufada donde importa —");
     "el listener de proveedores se quita al limpiar",
     /removeEventListener\("eip6963:requestProvider"/.test(embebida),
     true
+  );
+  check(
+    "el auto-conectar pasa por la regla nueva",
+    /decideEmbeddedAutoConnect\(\{/.test(embebida),
+    true
+  );
+  check(
+    "y de verdad frena el connect() cuando la regla no dice 'connect'",
+    /if \(autoConnect\.kind !== "connect"\) return;/.test(embebida),
+    true
+  );
+  check(
+    "ya no queda el criterio viejo (solo Privy, sin mirar el perfil)",
+    /const externalOnly = hasExternal && !hasEmbedded;/.test(embebida),
+    false
   );
 
   // El invariante, no la forma: la EXTERNA se elige primero. Comprobar que ya
