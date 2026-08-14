@@ -70,6 +70,26 @@ export async function callWithTimeout<T>(
   }
 }
 
+/**
+ * Cuánto puede durar un "comprobando tu perfil" antes de rendirse, pase lo
+ * que pase.
+ *
+ * El último seguro, y existe porque este mismo cuelgue ya volvió tres veces
+ * por caminos distintos: primero el `fetch` sin tope, luego el `getToken()`
+ * sin tope, luego un `publish` que dejaba `fetched: false` con sesión viva.
+ * Cada arreglo cerró SU puerta y la pantalla se quedó igual de muerta por la
+ * siguiente.
+ *
+ * Así que esto no arregla ninguna causa: garantiza el SÍNTOMA. Pasado el
+ * plazo, el perfil pasa a `failed` —que el lobby sabe ofrecer con un botón de
+ * reintentar— en vez de seguir cargando. Cualquier causa futura que no se nos
+ * haya ocurrido termina en un botón, no en un jugador mirando "Preparando…".
+ *
+ * Va por encima de los dos topes que puede acumular un intento legítimo
+ * (token + perfil), para no cortar una carga lenta pero viva.
+ */
+export const PROFILE_SETTLE_LIMIT_MS = 22_000;
+
 export type ProfileFetchOutcome =
   | { kind: "ok"; response: Response }
   | { kind: "timeout" }

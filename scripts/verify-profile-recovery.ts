@@ -25,6 +25,7 @@ import {
   createSequenceGate,
   decideProfileRefreshAction,
   fetchProfileWithTimeout,
+  PROFILE_SETTLE_LIMIT_MS,
   TOKEN_REQUEST_TIMEOUT_MS,
   type ProfileFetchOutcome,
 } from "../lib/profile-recovery.ts";
@@ -548,6 +549,98 @@ console.log("\n— B. El refresco no puede dispararse en bucle y descartarse a s
     "poner `loading: true` no crea estado nuevo si ya estaba cargando",
     /s\.loading \? s : \{ \.\.\.s, loading: true \}/.test(ctx),
     "un objeto nuevo por render es lo que alimenta el bucle"
+  );
+}
+
+console.log("\n— C. Tirar una ficha de wallet vencida NO puede colgar a quien tiene correo —");
+{
+  /*
+   * El cuelgue de verdad, y el más difícil de ver porque no falla nada.
+   *
+   * `loading` se DERIVA: `state.loading || (authenticated && !state.fetched)`.
+   * `EMPTY` lleva `fetched: false` ("no se ha preguntado"), lo cual es cierto
+   * solo cuando no hay sesión. Publicarlo con la sesión de Privy todavía viva
+   * deja `authenticated` en true y `loading` en true PARA SIEMPRE — y nada
+   * vuelve a disparar el efecto, porque ninguna de sus entradas cambió.
+   *
+   * Se llega así: `getAccessToken()` de Privy devuelve vacío, `getToken()` cae
+   * a la ficha de wallet guardada (de probar MiniPay semanas atrás), el
+   * servidor la rechaza con 401 → `clear_invalid_session`.
+   */
+  const derivarLoading = (p: {
+    authenticated: boolean;
+    loading: boolean;
+    fetched: boolean;
+  }) => p.loading || (p.authenticated && !p.fetched);
+
+  ok(
+    "reproducción: EMPTY con sesión de correo viva deja 'cargando' eterno",
+    derivarLoading({ authenticated: true, loading: false, fetched: false }) === true,
+    "si esto fuera false, EMPTY no explicaría la pantalla congelada"
+  );
+  ok(
+    "en cambio FAILED sí se asienta",
+    derivarLoading({ authenticated: true, loading: false, fetched: true }) === false
+  );
+  ok(
+    "y sin sesión, EMPTY es inofensivo (por eso la otra rama puede usarlo)",
+    derivarLoading({ authenticated: false, loading: false, fetched: false }) === false
+  );
+
+  // Un 401 con ficha de wallet SIGUE limpiándola: eso no se toca.
+  ok(
+    "el 401 de una sesión de wallet se sigue detectando",
+    decideProfileRefreshAction(
+      { kind: "ok", response: { status: 401, ok: false } as Response },
+      { usingWalletSession: true }
+    ).kind === "clear_invalid_session"
+  );
+
+  const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  ok(
+    "al limpiarla, con Privy vivo se publica FAILED (recuperable), no EMPTY",
+    /publish\(privyAuth \? FAILED : EMPTY\);/.test(ctx),
+    "publish(EMPTY) ahí es el cuelgue permanente"
+  );
+  ok(
+    "ya no queda el publish(EMPTY) pelado en esa rama",
+    /clearWalletSession\(\);\s*publish\(EMPTY\);/.test(ctx) === false
+  );
+}
+
+console.log("\n— D. El último seguro: 'cargando' caduca, sea cual sea la causa —");
+{
+  /*
+   * Tres arreglos seguidos cerraron tres puertas distintas (fetch sin tope,
+   * getToken sin tope, publish con fetched:false) y la pantalla se quedó
+   * igual de muerta por la siguiente. Esto no arregla causas: garantiza que
+   * el jugador acabe siempre con un botón en vez de un "Preparando…" eterno.
+   */
+  ok(
+    "el tope global supera lo que puede tardar un intento legítimo (token + perfil)",
+    PROFILE_SETTLE_LIMIT_MS > TOKEN_REQUEST_TIMEOUT_MS + 12_000,
+    `${PROFILE_SETTLE_LIMIT_MS}ms no deja margen a una carga lenta pero viva`
+  );
+  ok(
+    "pero sigue siendo una espera humana, no un minuto",
+    PROFILE_SETTLE_LIMIT_MS <= 30_000
+  );
+
+  const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
+  ok(
+    "existe el vigilante sobre el estado derivado, no sobre una petición",
+    /authenticated && \(state\.loading \|\| !state\.fetched\)/.test(ctx),
+    "vigilar solo el fetch es lo que dejó pasar las otras dos causas"
+  );
+  ok(
+    "y acaba en `failed`, que el lobby ofrece con botón de reintentar",
+    /s\.fetched && !s\.loading \? s : FAILED/.test(ctx)
+  );
+  const lobby = readFileSync(join(ROOT, "components/lobby/HomeLobby.tsx"), "utf8");
+  ok(
+    "el lobby de verdad tiene esa salida",
+    /profile\.authenticated && profile\.failed/.test(lobby) &&
+      /cta\.profile_failed/.test(lobby)
   );
 }
 

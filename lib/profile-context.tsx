@@ -22,6 +22,7 @@ import {
   decideProfileRefreshAction,
   fetchProfileWithTimeout,
   PROFILE_REQUEST_TIMEOUT_MS,
+  PROFILE_SETTLE_LIMIT_MS,
   TOKEN_REQUEST_TIMEOUT_MS,
 } from "./profile-recovery";
 
@@ -214,7 +215,28 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       // confirmada emitirá una sesión nueva; no hace falta borrar alias,
       // historial ni ninguna transacción.
       clearWalletSession();
-      publish(EMPTY);
+      /**
+       * Y aquí estaba el cuelgue de verdad.
+       *
+       * `EMPTY` lleva `fetched: false` —"no se ha preguntado"— y eso es cierto
+       * solo cuando NO hay sesión: por eso la rama de arriba puede usarlo sin
+       * daño. Con sesión de Privy viva, tirar la ficha de wallet vencida no
+       * borra la identidad: `authenticated` sigue en true, y entonces
+       * `loading` (que es `state.loading || (authenticated && !fetched)`) se
+       * queda en TRUE PARA SIEMPRE. Nada vuelve a disparar el efecto, porque
+       * ni `ready` ni `authenticated` ni la wallet embebida cambiaron.
+       *
+       * Se llega con más facilidad de la que parece: si `getAccessToken()` de
+       * Privy devuelve vacío —token vencido, iframe tocado—, `getToken()` cae
+       * al token de wallet guardado, que puede ser de hace semanas; el
+       * servidor lo rechaza con 401 y aterrizamos justo aquí. Un navegador que
+       * probó MiniPay y además tiene cuenta de correo reúne las dos mitades.
+       *
+       * `FAILED` dice lo mismo sin mentir —no sabemos quién eres— y además es
+       * RECUPERABLE: el lobby pinta "reintentar" para `profile.failed`, y ese
+       * toque vuelve a pedir el token, ya sin la ficha vencida de por medio.
+       */
+      publish(privyAuth ? FAILED : EMPTY);
       return;
     }
     if (action.kind === "failed") {
@@ -274,6 +296,26 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     if (!ready) return;
     refreshRef.current();
   }, [ready, authenticated, embeddedWallet]);
+
+  /**
+   * "Cargando" CADUCA — el seguro que no depende de acertar la causa.
+   *
+   * Tres veces seguidas se arregló una puerta distinta y la pantalla se quedó
+   * igual de muerta por la siguiente. Esto no arregla ninguna: garantiza que
+   * el jugador acabe SIEMPRE con un botón. `failed` es recuperable de un
+   * toque (`profile.refresh()`), así que equivocarse por este lado cuesta un
+   * toque; por el otro cuesta la partida.
+   */
+  const stuck = authenticated && (state.loading || !state.fetched);
+  useEffect(() => {
+    if (!stuck) return;
+    const timer = setTimeout(() => {
+      // `sequenceGate` no se toca: si la consulta de verdad llega después,
+      // sigue siendo la actual y pisa esto con la respuesta buena.
+      setState((s) => (s.fetched && !s.loading ? s : FAILED));
+    }, PROFILE_SETTLE_LIMIT_MS);
+    return () => clearTimeout(timer);
+  }, [stuck]);
 
   const setAlias = useCallback(
     async (alias: string) => {
