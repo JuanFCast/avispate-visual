@@ -2,8 +2,7 @@
 
 import { PrivyProvider } from "@privy-io/react-auth";
 import { celo } from "viem/chains";
-import dynamic from "next/dynamic";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { WagmiProvider } from "wagmi";
 import { RainbowKitProvider } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
@@ -54,31 +53,6 @@ function MiniPayBridge() {
 function CanonicalWalletBridge() {
   useCanonicalReconnect();
   return null;
-}
-
-/**
- * DIAGNÓSTICO TEMPORAL — se borra entero al cerrar el caso del congelamiento.
- *
- * `next/dynamic` con `ssr: false` y montado solo si el parámetro está: sin
- * `?debugProfile=1` este chunk NI SIQUIERA se pide a la red, así que no pesa
- * para ningún jugador. No persiste en ningún sitio — quitar el parámetro lo
- * apaga, y no hay forma de que quede encendido para otra persona.
- */
-const ProfileDebugPanel = dynamic(
-  () => import("@/components/debug/ProfileDebugPanel"),
-  { ssr: false }
-);
-
-function DebugGate() {
-  const [on, setOn] = useState(false);
-  // En un efecto, no durante el render: `window` no existe en el servidor y
-  // leerlo antes de montar rompería la hidratación.
-  useEffect(() => {
-    setOn(
-      new URLSearchParams(window.location.search).get("debugProfile") === "1"
-    );
-  }, []);
-  return on ? <ProfileDebugPanel /> : null;
 }
 
 export default function WalletProviders({ children }: { children: ReactNode }) {
@@ -145,8 +119,6 @@ export default function WalletProviders({ children }: { children: ReactNode }) {
               <CanonicalWalletBridge />
               <WelcomeGasBridge />
               <OutboxBridge />
-              {/* TEMPORAL: diagnóstico del congelamiento. Quitar al cerrarlo. */}
-              <DebugGate />
               {children}
             </EmbeddedWalletProvider>
           </ProfileProvider>

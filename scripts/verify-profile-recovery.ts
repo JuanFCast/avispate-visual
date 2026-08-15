@@ -637,7 +637,9 @@ console.log("\n— C. Tirar una ficha de wallet vencida NO puede colgar a quien 
   const ctx = readFileSync(join(ROOT, "lib/profile-context.tsx"), "utf8");
   ok(
     "al limpiarla, con Privy vivo se publica FAILED (recuperable), no EMPTY",
-    /publish\(\s*privyAuth \? FAILED : EMPTY\s*,/.test(ctx),
+    // `[,)]` porque la llamada llevó un segundo argumento mientras existió el
+    // panel de diagnóstico. Lo que se exige es la DECISIÓN, no su forma.
+    /publish\(\s*privyAuth \? FAILED : EMPTY\s*[,)]/.test(ctx),
     "publish(EMPTY) ahí es el cuelgue permanente"
   );
   ok(
