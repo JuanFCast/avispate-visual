@@ -5,6 +5,13 @@ import { usePrivy } from "@privy-io/react-auth";
 import { useAccount } from "wagmi";
 import { useProfile, type ProfileDebugSnapshot } from "@/lib/profile-context";
 import { shortAddress, useActiveWallet } from "@/lib/wallet";
+import { useEmbeddedWalletStatus } from "@/lib/embedded-wallet";
+import { useIsMiniPay } from "@/lib/minipay";
+import { useWalletAlias } from "@/lib/wallet-alias";
+import { useFreePlays } from "@/lib/round";
+import { pendingPlay } from "@/lib/outbox";
+import { decideLobbyCta } from "@/lib/lobby-cta";
+import { DEFAULT_DECK_SIZE } from "@/lib/game";
 
 /**
  * PANEL DE DIAGNÓSTICO — TEMPORAL, SE BORRA AL CERRAR EL CASO.
@@ -72,6 +79,38 @@ export default function ProfileDebugPanel() {
   const profile = useProfile();
   const activa = useActiveWallet();
   const cuenta = useAccount();
+  const embebida = useEmbeddedWalletStatus();
+  const enMiniPay = useIsMiniPay();
+  const { walletAlias, ready: walletAliasReady } = useWalletAlias();
+  const { freeByDeck, ready: entitlementReady } = useFreePlays(activa.address);
+
+  /**
+   * La MISMA decisión que toma el botón, con las MISMAS entradas
+   * (`lib/lobby-cta.ts`). Sin esto había que deducir por qué el botón está
+   * muerto mirando su texto, y "Comprobando…" sale por cuatro motivos
+   * distintos. `reason` dice cuál, sin ambigüedad.
+   *
+   * `blockedByPending` se lee de la bandeja directamente: el `payBlock` vive en
+   * `GameShell` y este panel cuelga de los proveedores, no de la pantalla.
+   */
+  const cta = decideLobbyCta({
+    blockedByPending: pendingPlay() !== null,
+    profileReady: profile.ready,
+    authenticated: profile.authenticated,
+    profileLoading: profile.loading,
+    profileFailed: profile.failed,
+    profileAlias: profile.alias,
+    walletConnected: activa.isConnected,
+    walletReconnecting: activa.reconnecting,
+    embeddedStatus: embebida.status,
+    inMiniPay: enMiniPay,
+    // El panel no monta RainbowKit; para leer el motivo da igual.
+    canOpenConnectModal: true,
+    walletAliasReady,
+    walletAlias,
+    entitlementReady,
+    freeForDeck: Boolean(freeByDeck[DEFAULT_DECK_SIZE]),
+  });
 
   const [snap, setSnap] = useState<ProfileDebugSnapshot | null>(null);
   const [t, setT] = useState(0);
@@ -121,11 +160,22 @@ export default function ProfileDebugPanel() {
       <Fila k="profile.loading (derivado)" v={profile.loading} alarma={profile.loading} />
       <Fila k="state.loading (crudo)" v={snap?.rawLoading ?? "—"} />
       <Fila k="profile.fetched" v={profile.fetched} alarma={!profile.fetched} />
-      <Fila k="profile.failed" v={profile.failed} />
+      <Fila k="profile.failed" v={profile.failed} alarma={profile.failed} />
+      <Fila k="profile.alias" v={profile.alias ?? "null"} alarma={!profile.alias} />
       <Fila
         k="profile.walletAddress"
         v={profile.walletAddress ? shortAddress(profile.walletAddress) : "null"}
       />
+
+      {/* LO QUE DECIDE EL BOTÓN. Si algo va mal, este es el primer renglón que
+          hay que leer: dice por qué, sin tener que interpretar el texto. */}
+      <div style={{ height: 6 }} />
+      <Fila k="CTA · motivo" v={cta.reason} alarma={cta.disabled} />
+      <Fila k="CTA · acción" v={cta.action} alarma={cta.action !== "start"} />
+      <Fila k="CTA · apagado" v={cta.disabled} alarma={cta.disabled} />
+      <Fila k="walletAlias" v={walletAlias ?? "null"} />
+      <Fila k="entitlementReady" v={entitlementReady} alarma={!entitlementReady} />
+      <Fila k="embebida.status" v={embebida.status} />
 
       <div style={{ height: 6 }} />
       <Fila

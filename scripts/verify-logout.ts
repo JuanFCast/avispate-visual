@@ -10,6 +10,7 @@
 //
 // Correr: node scripts/verify-logout.ts
 import { readFileSync } from "node:fs";
+import { decideLobbyCta } from "../lib/lobby-cta.ts";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
@@ -182,30 +183,36 @@ console.log("\n— El callejon sin salida del lobby —");
   // wallet conectada el CTA se quedaba en "Preparando..." PARA SIEMPRE. No
   // habia nada cargando: era una contradiccion entre dos formas de contestar la
   // misma pregunta, y por eso ningun tiempo de espera la destrababa.
-  const lobby = readFileSync(join(ROOT, "components/lobby/HomeLobby.tsx"), "utf8");
-  const rama = lobby.slice(lobby.indexOf('embeddedWallet.status === "idle"'));
-  const hastaElFinal = rama.slice(0, rama.indexOf('embeddedWallet.status === "external"'));
+  // La decision ya no vive dentro del componente sino en `lib/lobby-cta.ts`,
+  // asi que esto pasa de leer JSX a EJECUTAR la decision: mas fuerte, porque
+  // comprueba la respuesta y no como esta escrita.
+  const conSesionSinWallet = {
+    blockedByPending: false,
+    profileReady: true,
+    authenticated: true,
+    profileLoading: false,
+    profileFailed: false,
+    profileAlias: "Pipe",
+    walletConnected: false,
+    walletReconnecting: false,
+    embeddedStatus: "idle" as const,
+    inMiniPay: false,
+    canOpenConnectModal: true,
+    walletAliasReady: true,
+    walletAlias: "Pipe",
+    entitlementReady: true,
+    freeForDeck: true,
+  };
 
-  check(
-    "sin sesion de Privy ya no se espera en seco",
-    /if \(embeddedWallet\.status === "idle"\) return checking;/.test(lobby),
-    false
-  );
-  check(
-    "se ofrece entrar",
-    /cta\.login\.label/.test(hastaElFinal),
-    true
-  );
-  check(
-    "y el boton hace algo",
-    /action: "access"/.test(hastaElFinal),
-    true
-  );
+  const sinPrivy = decideLobbyCta(conSesionSinWallet);
+  check("sin sesion de Privy ya no se espera en seco", sinPrivy.disabled, false);
+  check("se ofrece entrar", sinPrivy.label, "cta.login.label");
+  check("y el boton hace algo", sinPrivy.action, "access");
   // Lo unico que sigue justificando esperar ahi: que wagmi este reenganchando
   // de verdad. Eso si es esperar a algo, y ademas ya caduca.
   check(
     "salvo que wagmi siga reenganchando",
-    /wallet\.reconnecting\) return checking/.test(hastaElFinal),
+    decideLobbyCta({ ...conSesionSinWallet, walletReconnecting: true }).disabled,
     true
   );
 }

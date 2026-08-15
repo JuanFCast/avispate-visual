@@ -31,6 +31,7 @@ import {
   type ProfileFetchOutcome,
 } from "../lib/profile-recovery.ts";
 import { decidePlayStart } from "../lib/pay-guard.ts";
+import { decideLobbyCta } from "../lib/lobby-cta.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -131,13 +132,34 @@ console.log("\n— 2. Reintentar de verdad recupera la cuenta, sin cerrar sesió
     "utf8"
   ).replace(/\r\n/g, "\n");
 
+  // La decisión vive en `lib/lobby-cta.ts` desde que se sacó del componente, y
+  // aquí se EJECUTA en vez de leerse: un perfil fallido tiene que ofrecer
+  // reintentar, y encima habilitado.
+  const perfilCaido = decideLobbyCta({
+    blockedByPending: false,
+    profileReady: true,
+    authenticated: true,
+    profileLoading: false,
+    profileFailed: true,
+    profileAlias: "Pipe",
+    walletConnected: true,
+    walletReconnecting: false,
+    embeddedStatus: "ready",
+    inMiniPay: false,
+    canOpenConnectModal: true,
+    walletAliasReady: true,
+    walletAlias: "Pipe",
+    entitlementReady: true,
+    freeForDeck: true,
+  });
   ok(
     "hay un CTA dedicado para perfil fallido (profile.authenticated && profile.failed)",
-    /profile\.authenticated\s*&&\s*profile\.failed/.test(lobby)
+    perfilCaido.reason === "profile/failed",
+    JSON.stringify(perfilCaido)
   );
   ok(
-    "ese CTA es accionable (action: \"reload\")",
-    /action:\s*"reload"/.test(lobby)
+    'ese CTA es accionable (action: "reload")',
+    perfilCaido.action === "reload" && !perfilCaido.disabled
   );
 
   const onPress = lobby.slice(lobby.indexOf("onPress={() => {"));
@@ -652,11 +674,28 @@ console.log("\n— D. El último seguro: 'cargando' caduca, sea cual sea la caus
     "y acaba en `failed`, que el lobby ofrece con botón de reintentar",
     /s\.fetched && !s\.loading \? s : FAILED/.test(ctx)
   );
-  const lobby = readFileSync(join(ROOT, "components/lobby/HomeLobby.tsx"), "utf8");
+  const salida = decideLobbyCta({
+    blockedByPending: false,
+    profileReady: true,
+    authenticated: true,
+    profileLoading: false,
+    profileFailed: true,
+    profileAlias: "Pipe",
+    walletConnected: true,
+    walletReconnecting: false,
+    embeddedStatus: "ready",
+    inMiniPay: false,
+    canOpenConnectModal: true,
+    walletAliasReady: true,
+    walletAlias: "Pipe",
+    entitlementReady: true,
+    freeForDeck: true,
+  });
   ok(
     "el lobby de verdad tiene esa salida",
-    /profile\.authenticated && profile\.failed/.test(lobby) &&
-      /cta\.profile_failed/.test(lobby)
+    salida.support === "cta.profile_failed.support" &&
+      salida.label === "cta.profile_failed.label",
+    JSON.stringify(salida)
   );
 }
 

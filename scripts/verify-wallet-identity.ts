@@ -11,6 +11,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { decideLobbyCta } from "../lib/lobby-cta.ts";
 import {
   canonicalFromProfile,
   decideEmbeddedAutoConnect,
@@ -540,11 +541,30 @@ console.log("\n— Un perfil que NO cargo no es un perfil vacio —");
     /catch \{\s*setState\(EMPTY\);/.test(ctx),
     false
   );
-  const lobby2 = readFileSync(join(ROOT, "components/lobby/HomeLobby.tsx"), "utf8");
+  // La decisión del botón se mudó a `lib/lobby-cta.ts`, así que en vez de
+  // buscar la condición escrita se EJECUTA: un perfil que falló tiene que
+  // ofrecer reintentar, nunca pedir un nombre que el jugador ya tiene.
+  const conPerfilCaido = decideLobbyCta({
+    blockedByPending: false,
+    profileReady: true,
+    authenticated: true,
+    profileLoading: false,
+    profileFailed: true,
+    profileAlias: null,
+    walletConnected: true,
+    walletReconnecting: false,
+    embeddedStatus: "ready",
+    inMiniPay: false,
+    canOpenConnectModal: true,
+    walletAliasReady: true,
+    walletAlias: "PipeRabby",
+    entitlementReady: true,
+    freeForDeck: true,
+  });
   check(
     "el lobby ofrece reintentar en vez de pedir alias",
-    /profile\.authenticated && profile\.failed/.test(lobby2),
-    true
+    conPerfilCaido.action,
+    "reload"
   );
 }
 
