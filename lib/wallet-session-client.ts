@@ -112,15 +112,68 @@ export async function ensureWalletSession(
   const current = readWalletSession();
   if (current && current.address === address.toLowerCase()) return true;
 
+  for (let intento = 0; intento <= CANJE_DELAYS.length; intento++) {
+    if (intento > 0) await dormir(CANJE_DELAYS[intento - 1]);
+    const resultado = await canjearUnaVez(address, txHash);
+    if (resultado !== "reintentar") return resultado === "ok";
+  }
+  return false;
+}
+
+/**
+ * Reintentos del canje, y por qué existen.
+ *
+ * Esto corre pegado a la transacción recién confirmada, que es el PEOR momento
+ * para preguntarle al servidor: su nodo de Celo va unos cientos de milisegundos
+ * por detrás del que confirmó la transacción en el teléfono. Sin reintentos, el
+ * canje pedía el recibo antes de que existiera, `verifyWalletControl` no lo
+ * encontraba y devolvía 403 — el caso real medido el 2026-08-15: transacción
+ * minada a las 03:04:36.000Z y canje a las 03:04:36.57, 570 ms después.
+ *
+ * `/api/plays` nunca sufrió esto porque va por la bandeja, que reintenta. El
+ * canje se rendía al primer intento, así que DENTRO DE MINIPAY —donde la sesión
+ * de wallet es la única que hay— no se creaba ninguna: sin ella no hay perfil,
+ * ni alias propio, ni Arena, y el jugador se queda con lo mínimo.
+ *
+ * Los tiempos son cortos a propósito: no bloquean nada (el canje es
+ * `void`-eado desde `pay.ts` y la partida ya arrancó), y con esto se cubre de
+ * sobra el retraso que se ha medido.
+ */
+const CANJE_DELAYS = [800, 2000, 5000] as const;
+
+const dormir = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+/**
+ * Un intento de canje.
+ *
+ * "reintentar" es solo para lo que de verdad cambia con el tiempo: que el nodo
+ * todavía no vea la transacción (403 `tx_not_valid`) o que la red falle. Un
+ * hash ya gastado (409) o el login de wallet apagado (503) no mejoran
+ * esperando, así que se abandona en el acto.
+ */
+async function canjearUnaVez(
+  address: string,
+  txHash: string
+): Promise<"ok" | "reintentar" | "no"> {
   try {
     const res = await fetch("/api/session/wallet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address, txHash }),
     });
-    if (!res.ok) return false;
+
+    if (!res.ok) {
+      const data = (await res.json().catch(() => null)) as {
+        error?: string;
+      } | null;
+      // El nodo del servidor va detrás: exactamente lo que hay que reintentar.
+      if (res.status === 403 && data?.error === "tx_not_valid") return "reintentar";
+      if (res.status >= 500) return "reintentar";
+      return "no";
+    }
+
     const data = (await res.json()) as { token?: string; address?: string };
-    if (!data.token || !data.address) return false;
+    if (!data.token || !data.address) return "no";
 
     const stored: StoredSession = {
       token: data.token,
@@ -129,8 +182,9 @@ export async function ensureWalletSession(
     };
     window.localStorage.setItem(KEY, JSON.stringify(stored));
     window.dispatchEvent(new Event(WALLET_SESSION_EVENT));
-    return true;
+    return "ok";
   } catch {
-    return false;
+    // Sin red, o la webview suspendida a mitad del envío.
+    return "reintentar";
   }
 }
