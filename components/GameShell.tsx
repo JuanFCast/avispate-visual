@@ -424,19 +424,36 @@ export default function GameShell() {
     try {
       // 4 y 5. Saldo y firma, siempre con la dirección confirmada. `playForDeck`
       //        vuelve a comprobarla pegado a cada firma.
-      const { txHash, player } = await playForDeck(deck, setPayStage, confirmed);
+      /**
+       * El cobro ya ocurrió y no se deshace. Lo PRIMERO es dejar el txHash
+       * escrito en el dispositivo, de forma síncrona: si el navegador se cierra
+       * en el instante siguiente, el registro sale solo al volver a abrir.
+       *
+       * Por eso se guarda desde `onHash`, que corre DENTRO de `playForDeck` en
+       * cuanto la wallet transmite — y no aquí abajo, que es donde estaba y
+       * llegaba hasta 20 segundos tarde (ver
+       * `scripts/verify-play-receipt-window.ts`). Aquí solo se recoge lo que ya
+       * quedó guardado: `enqueue` devuelve el envío existente cuando el `id` se
+       * repite, así que llamarlo dos veces con el mismo hash no duplica nada.
+       */
+      const guardar = (hash: string, payer: string) =>
+        enqueue(`play:${hash}`, "/api/plays", {
+          txHash: hash,
+          player: payer,
+          deckSize: deck,
+          alias: alias || undefined,
+        });
+
+      const { txHash, player } = await playForDeck(
+        deck,
+        setPayStage,
+        confirmed,
+        guardar
+      );
       txHashRef.current = txHash;
       playerRef.current = player;
 
-      // El cobro ya ocurrió y no se deshace. Lo PRIMERO es dejar el txHash
-      // escrito en el dispositivo, de forma síncrona: si Chrome se cierra en
-      // el instante siguiente, el registro sale solo al volver a abrir.
-      const receipt = enqueue(`play:${txHash}`, "/api/plays", {
-        txHash,
-        player,
-        deckSize: deck,
-        alias: alias || undefined,
-      });
+      const receipt = guardar(txHash, player);
 
       // Y no se reparten cartas hasta que el servidor confirme que la jugada
       // quedó registrada. Se borra de la bandeja al confirmarse, dentro de

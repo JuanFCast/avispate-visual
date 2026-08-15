@@ -177,7 +177,22 @@ export function usePayToPlay() {
        * navegador: TODO el cobro (gratis o paga, saldo, permiso y firma) tiene
        * que construirse sobre la misma dirección que se comprobó.
        */
-      confirmedAddress?: string
+      confirmedAddress?: string,
+      /**
+       * Se llama en el INSTANTE en que existe el hash, antes de esperar nada.
+       *
+       * Hasta ahora el recibo se guardaba al volver a `handleStart`, o sea
+       * después de la espera del recibo — hasta 20 segundos (`RECEIPT_TIMEOUT_MS`)
+       * en los que la entrada ya estaba cobrada y el teléfono no lo sabía. Una
+       * app que muriera ahí perdía una jugada pagada sin dejar rastro, que es
+       * justo lo que le pasó a `0xcb14efdd0b…` el 2026-08-15 y hubo que reponer
+       * a mano. Lo demuestra `scripts/verify-play-receipt-window.ts`.
+       *
+       * Quien llama es quien sabe QUÉ guardar (el mazo, el alias); aquí solo se
+       * decide CUÁNDO, que es lo único que estaba mal. Tiene que ser síncrono:
+       * si hace `await`, la ventana vuelve a abrirse.
+       */
+      onHash: (txHash: string, player: string) => void = () => {}
     ): Promise<PlayResult> => {
       const account = (confirmedAddress || address) as `0x${string}` | undefined;
       if (!account) throw new Error("no_wallet");
@@ -292,12 +307,30 @@ export function usePayToPlay() {
         chainId: celo.id,
         ...feeCurrency,
       });
-      // Con el hash en la mano, la wallet YA transmitió la transacción: el
-      // contrato consumió la jugada gratis o cobró la entrada, pase lo que
-      // pase de aquí en adelante. Por eso esta espera tiene tope y su fracaso
-      // NO cancela la jugada: tratarla como error le quitaría al jugador algo
-      // que la cadena ya le cobró. El servidor vuelve a verificar el hash de
-      // todos modos antes de aceptar nada.
+      /**
+       * Con el hash en la mano, la wallet YA transmitió la transacción: el
+       * contrato consumió la jugada gratis o cobró la entrada, pase lo que pase
+       * de aquí en adelante.
+       *
+       * Así que lo PRIMERO —antes de esperar el recibo, antes de cualquier
+       * `await`— es dejarlo escrito en el dispositivo. Es la misma regla que la
+       * bandeja ya se pone a sí misma ("SÍNCRONO a propósito: se llama antes de
+       * cualquier await", `lib/outbox.ts`); lo único que cambia es que ahora se
+       * cumple en el instante correcto y no un `await` más tarde.
+       *
+       * Si esto lanzara, la jugada no puede caerse por ello: el cobro ya ocurrió
+       * y el hash tiene que llegar a quien llamó igual.
+       */
+      try {
+        onHash(playHash, account.toLowerCase());
+      } catch {
+        // Guardar es lo deseable, no una condición para seguir.
+      }
+
+      // Por eso esta espera tiene tope y su fracaso NO cancela la jugada:
+      // tratarla como error le quitaría al jugador algo que la cadena ya le
+      // cobró. El servidor vuelve a verificar el hash de todos modos antes de
+      // aceptar nada.
       onStage("confirming");
       try {
         await publicClient.waitForTransactionReceipt({
