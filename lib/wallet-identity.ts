@@ -555,10 +555,43 @@ export function canonicalFromProfile(p: {
   failed: boolean;
   authenticated: boolean;
   walletAddress: string | null;
+  /**
+   * La dirección FIRMADA por el servidor dentro de la sesión de wallet
+   * (`walletSessionAddress()`), si hay una viva. Segunda fuente de la canónica.
+   */
+  walletSessionAddress?: string | null;
 }):
   | { status: "loading" }
   | { status: "none" }
   | { status: "known"; address: string } {
+  // 1. El perfil manda cuando de verdad contestó. No cambia nada de antes.
+  if (p.ready && p.authenticated && !p.loading && !p.failed && p.walletAddress) {
+    return { status: "known", address: p.walletAddress };
+  }
+
+  /**
+   * 2. Y si el perfil no puede decirlo —tarda, falló, o volvió sin dirección—,
+   *    todavía se sabe: la sesión de wallet lleva dentro la dirección que el
+   *    servidor firmó DESPUÉS de comprobar en la cadena que esa wallet firmó
+   *    una transacción nuestra (`/api/session/wallet` → `verifyWalletControl`).
+   *
+   *    Esto APRIETA la regla, no la afloja, y por dos sitios a la vez:
+   *
+   *      · donde antes se respondía `loading`, el cobro quedaba frenado para
+   *        siempre y el jugador tenía que cerrar sesión para poder jugar otra
+   *        partida con SU MISMA wallet;
+   *      · y donde antes se respondía `none` —perfil autenticado pero sin
+   *        dirección anotada—, `decidePlayStart` dejaba pagar con CUALQUIER
+   *        wallet conectada. Ahora exige exactamente esta.
+   *
+   *    Lo que no cambia en absoluto: a quién se le atribuye el pago. Eso lo
+   *    lee el servidor del evento `Played` on-chain (`verifyPlayTx`), nunca de
+   *    una sesión.
+   */
+  const firmada = norm(p.walletSessionAddress);
+  if (firmada) return { status: "known", address: firmada };
+
+  // 3. Sin segunda fuente, exactamente lo de siempre.
   if (!p.ready) return { status: "loading" };
   if (p.authenticated && (p.loading || p.failed)) return { status: "loading" };
   if (!p.authenticated) return { status: "none" };

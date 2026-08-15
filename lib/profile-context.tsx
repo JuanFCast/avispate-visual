@@ -13,6 +13,7 @@ import { usePrivy, useWallets } from "@privy-io/react-auth";
 import {
   clearWalletSession,
   readWalletSession,
+  walletSessionAddress,
   WALLET_SESSION_EVENT,
 } from "./wallet-session-client";
 import { SETTLE_LIMIT_MS } from "./wallet-identity";
@@ -88,6 +89,12 @@ interface ProfileContextValue extends ProfileState {
   /** Ya sabemos si hay sesión o no, venga de donde venga. */
   ready: boolean;
   authenticated: boolean;
+  /**
+   * La dirección que el servidor FIRMÓ dentro de la sesión de wallet, si hay
+   * una viva. Es la segunda fuente de la canónica: cuando `/api/profile` tarda,
+   * falla o vuelve sin dirección, esto sigue sabiendo de quién es la cuenta.
+   */
+  walletSessionAddress: string | null;
   refresh: () => Promise<void>;
   setAlias: (alias: string) => Promise<{ ok: boolean; error?: string }>;
   /** Token de acceso de Privy para llamar a las rutas protegidas. */
@@ -148,9 +155,14 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // render: `localStorage` no existe en el servidor y tocarlo antes de montar
   // rompe la hidratación.
   const [walletSession, setWalletSession] = useState(false);
+  /** La dirección firmada dentro de esa sesión, o null. Se sincroniza igual. */
+  const [sessionAddress, setSessionAddress] = useState<string | null>(null);
 
   useEffect(() => {
-    const sync = () => setWalletSession(Boolean(readWalletSession()));
+    const sync = () => {
+      setWalletSession(Boolean(readWalletSession()));
+      setSessionAddress(walletSessionAddress());
+    };
     sync();
     window.addEventListener(WALLET_SESSION_EVENT, sync);
     return () => window.removeEventListener(WALLET_SESSION_EVENT, sync);
@@ -484,6 +496,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         loading,
         ready,
         authenticated,
+        walletSessionAddress: sessionAddress,
         refresh,
         setAlias,
         getToken,

@@ -164,13 +164,21 @@ export function useWalletIdentity(): {
  * que es el error que este tipo existe para hacer imposible.
  */
 export function useCanonicalWallet(): CanonicalWallet {
-  const { ready, loading, failed, authenticated, walletAddress } = useProfile();
+  const {
+    ready,
+    loading,
+    failed,
+    authenticated,
+    walletAddress,
+    walletSessionAddress,
+  } = useProfile();
   return canonicalFromProfile({
     ready,
     loading,
     failed,
     authenticated,
     walletAddress,
+    walletSessionAddress,
   });
 }
 

@@ -110,6 +110,7 @@ export default function ProfileDebugPanel() {
     walletAlias,
     entitlementReady,
     freeForDeck: Boolean(freeByDeck[DEFAULT_DECK_SIZE]),
+    walletSessionAddress: profile.walletSessionAddress,
   });
 
   const [snap, setSnap] = useState<ProfileDebugSnapshot | null>(null);

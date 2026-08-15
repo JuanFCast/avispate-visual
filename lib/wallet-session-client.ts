@@ -21,16 +21,42 @@ interface StoredSession {
   expiresAt: number;
 }
 
-/** Lee el `exp` del token sin verificarlo: el servidor es quien de verdad valida. */
-function readExpiry(token: string): number {
+/**
+ * Lee las afirmaciones del token sin verificarlo: el servidor es quien de
+ * verdad valida (`verifyWalletSession`, HMAC con `WALLET_SESSION_SECRET`).
+ *
+ * Aquí solo se DECODIFICA la parte que el servidor firmó — `a` (la dirección) y
+ * `e` (el vencimiento)—, y eso importa para `a`: es la dirección que el
+ * servidor emitió DESPUÉS de comprobar en la cadena que esa wallet firmó una
+ * transacción nuestra. Manipularla en el navegador no engaña a nadie: el token
+ * deja de cuadrar con su firma y el servidor lo rechaza en la siguiente
+ * llamada. Por eso se lee de aquí y no del campo `address` guardado al lado,
+ * que sí es JSON que escribió el propio cliente.
+ */
+function readClaims(token: string): { address: string | null; expiresAt: number } {
   try {
     const payload = token.split(".")[1];
     const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
-    const claims = JSON.parse(json) as { e?: number };
-    return typeof claims.e === "number" ? claims.e : 0;
+    const claims = JSON.parse(json) as { a?: string; e?: number };
+    return {
+      address: typeof claims.a === "string" ? claims.a.toLowerCase() : null,
+      expiresAt: typeof claims.e === "number" ? claims.e : 0,
+    };
   } catch {
-    return 0;
+    return { address: null, expiresAt: 0 };
   }
+}
+
+/**
+ * La dirección CANÓNICA según la sesión de wallet, o `null` si no hay sesión
+ * viva. Es la segunda fuente de `canonicalFromProfile`: cuando `/api/profile`
+ * tarda, falla o vuelve incompleto, esto sigue sabiendo de quién es la cuenta,
+ * y saberlo es lo que permite seguir jugando sin cerrar sesión.
+ */
+export function walletSessionAddress(): string | null {
+  const stored = readWalletSession();
+  if (!stored) return null;
+  return readClaims(stored.token).address;
 }
 
 /**
@@ -46,6 +72,12 @@ export function readWalletSession(): StoredSession | null {
     const stored = JSON.parse(raw) as StoredSession;
     if (!stored.token || !stored.address) return null;
     if (stored.expiresAt <= Date.now()) {
+      window.localStorage.removeItem(KEY);
+      return null;
+    }
+    // El vencimiento que manda es el FIRMADO, no el que se guardó al lado: un
+    // `expiresAt` editado a mano no puede alargar una sesión vencida.
+    if (readClaims(stored.token).expiresAt <= Date.now()) {
       window.localStorage.removeItem(KEY);
       return null;
     }
@@ -93,7 +125,7 @@ export async function ensureWalletSession(
     const stored: StoredSession = {
       token: data.token,
       address: data.address.toLowerCase(),
-      expiresAt: readExpiry(data.token),
+      expiresAt: readClaims(data.token).expiresAt,
     };
     window.localStorage.setItem(KEY, JSON.stringify(stored));
     window.dispatchEvent(new Event(WALLET_SESSION_EVENT));

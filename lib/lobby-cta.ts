@@ -77,6 +77,15 @@ export interface LobbyCtaInput {
   entitlementReady: boolean;
   /** Este mazo tiene la gratis del día disponible. */
   freeForDeck: boolean;
+  /**
+   * La dirección FIRMADA por el servidor en la sesión de wallet, si hay una.
+   *
+   * Cuando existe, el perfil deja de ser la única forma de saber quién es este
+   * jugador: `/api/session/wallet` ya comprobó en la cadena que esa wallet
+   * firmó una transacción nuestra. Por eso, con sesión de wallet, que
+   * `/api/profile` tarde o falle deja de poder matar el botón.
+   */
+  walletSessionAddress?: string | null;
 }
 
 const checking = (reason: string): LobbyCta => ({
@@ -174,11 +183,34 @@ export function decideLobbyCta(input: LobbyCtaInput): LobbyCta {
       reason: "pending",
     };
   }
-  if (!input.profileReady) return checking("profile/not-ready");
-  if (input.authenticated && input.profileLoading) return checking("profile/loading");
+  /**
+   * ── La sesión de wallet como segunda fuente ────────────────────────────────
+   *
+   * Sin esto, la PRIMERA jugada rompía las siguientes. Cada jugada crea una
+   * sesión de wallet (`pay.ts` → `ensureWalletSession`), eso pone
+   * `authenticated` en true, y el botón pasaba de una rama que no consultaba
+   * `/api/profile` a otra que dependía de él por completo: si el perfil tardaba,
+   * fallaba o volvía sin alias, el botón moría y solo cerrar sesión lo
+   * revivía — porque el logout borra justamente esa sesión.
+   *
+   * Con la sesión viva no hace falta el perfil para saber quién juega: el
+   * servidor firmó esa dirección después de comprobar en la cadena que la
+   * wallet firmó una transacción nuestra. Así que las tres esperas que
+   * dependían del perfil dejan de bloquear, y el nombre sale del que la propia
+   * wallet ya tiene (`/api/wallet-alias`).
+   *
+   * Ofrecer jugar NO es autorizar el cobro: `decidePlayStart` vuelve a correr
+   * entero en cada toque y ahora exige esa MISMA dirección firmada, así que una
+   * wallet distinta a la canónica sigue sin poder pagar.
+   */
+  const sesionDeWallet = Boolean(input.walletSessionAddress);
+
+  if (!input.profileReady && !sesionDeWallet) return checking("profile/not-ready");
+  if (input.authenticated && input.profileLoading && !sesionDeWallet)
+    return checking("profile/loading");
   if (input.walletReconnecting) return checking("wallet/reconnecting");
   // El perfil no se pudo cargar. NO es un jugador sin alias.
-  if (input.authenticated && input.profileFailed) {
+  if (input.authenticated && input.profileFailed && !sesionDeWallet) {
     return {
       support: "cta.profile_failed.support",
       label: "cta.profile_failed.label",
@@ -188,7 +220,14 @@ export function decideLobbyCta(input: LobbyCtaInput): LobbyCta {
     };
   }
   if (input.authenticated) {
-    if (!input.profileAlias) {
+    // El del perfil manda; el de la wallet lo respalda cuando el perfil no
+    // pudo traerlo. Los dos nombran a la misma dirección.
+    const alias = input.profileAlias ?? (sesionDeWallet ? input.walletAlias : null);
+    if (!alias) {
+      // Todavía se está preguntando por el nombre de la wallet: esperar es
+      // correcto, pedir un nombre que quizá ya tiene no lo es.
+      if (sesionDeWallet && !input.walletAliasReady)
+        return checking("session/alias-loading");
       return {
         support: "cta.alias.support",
         label: "cta.alias.label",

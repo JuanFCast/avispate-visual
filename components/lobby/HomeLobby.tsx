@@ -102,6 +102,7 @@ export default function HomeLobby({
     walletAlias,
     entitlementReady,
     freeForDeck: Boolean(freeByDeck[deckSize]),
+    walletSessionAddress: profile.walletSessionAddress,
   });
 
   const baseCta: CtaState = {
