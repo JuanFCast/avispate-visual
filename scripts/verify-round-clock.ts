@@ -10,7 +10,6 @@
 // Sin dependencias: Node 22+ ejecuta TypeScript quitando los tipos.
 import {
   DAY_MS,
-  closeHintFor,
   formatCountdown,
   previousRoundId,
   roundClosesAt,
@@ -119,37 +118,6 @@ check(
     remainingMs(closesAt, "2026-07-27T01:00:00.000Z", Date.parse("2026-07-27T01:00:00Z"))
   ),
   "00:00:00"
-);
-
-// ---------- Copy de la hora local ----------
-console.log("\nEquivalencia local (solo informativa)");
-const bogotaHint = closeHintFor(
-  Date.parse(closesAt),
-  Date.parse(serverNow),
-  'es',
-  'America/Bogota'
-);
-const madridHint = closeHintFor(
-  Date.parse(closesAt),
-  Date.parse(serverNow),
-  'es',
-  'Europe/Madrid'
-);
-console.log(`         Bogotá: "${bogotaHint}"`);
-console.log(`         Madrid: "${madridHint}"`);
-
-/** Intl separa "p. m." con espacios finos; se normalizan para comparar. */
-const plain = (s: string) => s.normalize("NFKC").replace(/\s/g, " ");
-
-check(
-  'en Colombia no repite la equivalencia',
-  plain(bogotaHint),
-  'Hoy, 7:00 p. m. (Colombia)'
-);
-check(
-  'fuera de Colombia nombra las dos horas',
-  plain(madridHint),
-  '7:00 p. m. Colombia · 2:00 a. m. en tu zona'
 );
 
 console.log(

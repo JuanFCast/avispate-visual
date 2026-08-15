@@ -69,7 +69,7 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
           <span className="pot-label">{t("lb.pot_label")}</span>
           <span className="pot-amount">{fmtUsdt(potUnits as bigint | undefined)} USDT</span>
           <span className="pot-timer">⏳ {clockCopy.primary}</span>
-          {clockCopy.retry ? (
+          {clockCopy.retry && (
             <button
               type="button"
               className="pot-retry"
@@ -77,12 +77,6 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
             >
               {clockCopy.secondary}
             </button>
-          ) : (
-            clockCopy.secondary && (
-              <span className="pot-hint" aria-live="polite">
-                {clockCopy.secondary}
-              </span>
-            )
           )}
         </div>
       )}

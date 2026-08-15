@@ -138,7 +138,7 @@ export default function DailyChallengeCard({
               {/* El principal cambia cada segundo: sin aria-live para no
                   convertir el lector de pantalla en un metrónomo. */}
               <span className="lobby-prize-close">{clockCopy.primary}</span>
-              {clockCopy.retry ? (
+              {clockCopy.retry && (
                 <button
                   type="button"
                   className="lobby-prize-retry"
@@ -146,10 +146,6 @@ export default function DailyChallengeCard({
                 >
                   {clockCopy.secondary}
                 </button>
-              ) : (
-                <span className="lobby-prize-hint" aria-live="polite">
-                  {clockCopy.secondary}
-                </span>
               )}
             </>
           ) : (

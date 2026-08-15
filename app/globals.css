@@ -3033,9 +3033,9 @@ body {
 }
 
 /* Premio + cierre. min-height reserva el alto mientras llega el monto; cubre
-   las cuatro líneas (rótulo, monto, contador y equivalencia local). */
+   las tres líneas (rótulo, monto y contador). */
 .lobby-prize {
-  min-height: 118px;
+  min-height: 100px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5369,7 +5369,7 @@ body {
   }
 
   .lobby-prize {
-    min-height: 78px;
+    min-height: 66px;
   }
 
   .lobby-title {
@@ -5456,18 +5456,6 @@ body {
 }
 
 /* ---------- Contador de ronda (servidor) ---------- */
-
-/*
- * Segunda línea del cierre: la hora de Colombia y, si la zona del visitante es
- * otra, su equivalencia local. Es informativa; el corte lo decide `closesAt`.
- */
-.lobby-prize-hint,
-.pot-hint {
-  font-size: 0.72rem;
-  font-weight: 600;
-  opacity: 0.9;
-  min-height: 1.05rem;
-}
 
 .lobby-prize-retry,
 .pot-retry {

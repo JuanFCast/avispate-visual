@@ -11,8 +11,7 @@ import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-quer
 import { useReadContract, useReadContracts } from "wagmi";
 import { celo } from "viem/chains";
 import { DECK_OPTIONS } from "./game";
-import { closeHintFor, formatCountdown } from "./round-time";
-import { useI18n } from "./i18n/client";
+import { formatCountdown } from "./round-time";
 import type { Translate } from "./i18n";
 import {
   AVISPATE_POT_ADDRESS,
@@ -80,7 +79,6 @@ export interface RoundClock {
   remainingMs: number;
   /** El corte ya pasó según el reloj del servidor. */
   reachedCut: boolean;
-  closeHint: string;
   refetch: () => void;
 }
 
@@ -95,7 +93,6 @@ export interface RoundClock {
  * pregunta al servidor hasta que entregue la ronda siguiente.
  */
 export function useRoundClock(deck: number): RoundClock {
-  const { lang } = useI18n();
   const query = useQuery({
     queryKey: ["round", deck],
     queryFn: () => fetchRound(deck),
@@ -166,15 +163,14 @@ export function useRoundClock(deck: number): RoundClock {
     remaining: formatCountdown(remainingMs),
     remainingMs,
     reachedCut: Boolean(snapshot) && remainingMs <= 0,
-    closeHint: snapshot ? closeHintFor(snapshot.closesAtMs, now, lang) : "",
     refetch: () => void query.refetch(),
   };
 }
 
 export interface RoundCopy {
   primary: string;
+  /** Etiqueta del botón de reintento; vacía cuando no hay nada que reintentar. */
   secondary: string;
-  /** El secundario es un botón de reintento, no un texto informativo. */
   retry: boolean;
 }
 
@@ -200,7 +196,7 @@ export function roundCopy(clock: RoundClock, t: Translate): RoundCopy {
   }
   return {
     primary: t("round.closes_in", { time: clock.remaining }),
-    secondary: clock.closeHint,
+    secondary: "",
     retry: false,
   };
 }
