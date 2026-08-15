@@ -22,6 +22,19 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid_address" }, { status: 400 });
   }
 
+  /**
+   * DIAGNÓSTICO TEMPORAL — se quita al cerrar el caso de MiniPay.
+   *
+   * Esta ruta se está pidiendo 8 veces en 22 segundos dentro de MiniPay, y con
+   * `staleTime` de 5 minutos eso solo puede significar que la CLAVE cambia, o
+   * sea que la dirección conectada oscila. Los logs de Vercel no traen la
+   * query, así que aquí queda anotada — abreviada, igual que en toda la app, y
+   * la pareja alias ↔ wallet ya es pública en el ranking.
+   */
+  console.log("wallet_alias_lookup", {
+    address: `${address.slice(0, 8)}…${address.slice(-4)}`.toLowerCase(),
+  });
+
   try {
     const db = getSupabaseAdmin();
     const { data, error } = await db
