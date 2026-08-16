@@ -10,6 +10,13 @@ next-env.d.ts
 !.env.example
 docs/~$*
 *.local.sql
+# Documentación fuera de git POR AHORA (2026-08-16). La carpeta se reorganizó a
+# mano (todo pasó a docs/Archivo/) y de momento se lleva en local. Los archivos
+# siguen en disco y el historial conserva lo que había hasta este commit; lo que
+# se pierde es el versionado de los cambios NUEVOS. Si se vuelve a rastrear,
+# quitar esta línea y dejar las reglas concretas de abajo, que siguen valiendo.
+docs/
+
 # Archivos privados de pendientes y notas de sesión
 docs/Pendientes de Avíspate.txt
 docs/Pendientes de Avíspate.md
