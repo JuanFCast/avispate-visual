@@ -1,0 +1,74 @@
+# Último recurso y ALARMA de la siembra de los pozos.
+#
+# El reloj de verdad es el pg_cron de Supabase: 00:02 UTC (justo después de que
+# `settle` vacíe los pozos) y cada hora en el minuto :35. Este workflow NO es un
+# reloj: GitHub entrega los `schedule` con dos y tres horas de retraso. Sirve
+# para dos cosas:
+#
+#   1. reintentar la siembra si las capas puntuales fallaron, y
+#   2. AVISAR. Si al llegar aquí algún pozo sigue por debajo del suelo, el
+#      workflow falla y GitHub manda el correo. Un correo de "seed-pots failed"
+#      significa que el juego está abierto con un premio incompleto — y eso es
+#      exactamente lo que pasó desapercibido el 2026-08-16, cuando los tres
+#      pozos quedaron en 0,00 durante un día entero sin que nada lo dijera.
+#
+# Requiere el secret CRON_SECRET en el repo (Settings → Secrets → Actions), con
+# EXACTAMENTE el mismo valor que la variable CRON_SECRET de producción en
+# Vercel. Si no coinciden, el endpoint responde 401 y el paso 1 lo dice claro.
+name: seed-pots
+
+on:
+  schedule:
+    # Horas nominales; GitHub los entrega cuando puede. Dos intentos bastan:
+    # más triggers multiplican los correos, no la puntualidad.
+    - cron: "40 1 * * *"
+    - cron: "40 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # No falla el job: a esta hora lo normal es que los pozos YA estén en su
+      # suelo y la ruta conteste 200 con los tres "ya-en-suelo". Quien decide si
+      # hay problema es el paso de verificación.
+      - name: Reintentar la siembra
+        id: seed
+        run: |
+          code=$(curl -sS --max-time 120 --retry 2 --retry-delay 15 \
+            -o /tmp/seed.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://avispate.fun/api/cron/seed-pots" || echo 000)
+          echo "HTTP $code"
+          cat /tmp/seed.json || true
+          echo ""
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+
+      # La única pregunta que importa: ¿hay premio de verdad en los tres mazos?
+      # `?check=1` solo lee la cadena — no firma, no escribe y no cuesta gas.
+      - name: Verificar que los tres pozos llegan al suelo
+        run: |
+          code=$(curl -sS --max-time 60 \
+            -o /tmp/check.json -w '%{http_code}' \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "https://avispate.fun/api/cron/seed-pots?check=1" || echo 000)
+          echo "HTTP $code"
+          jq -r '.decks[] | "mazo \(.deck) = \(.pot) USDT\(if .belowFloor then "  ← POR DEBAJO DEL SUELO" else "" end)"' \
+            /tmp/check.json 2>/dev/null || cat /tmp/check.json
+
+          if [ "${{ steps.seed.outputs.code }}" = "401" ]; then
+            echo "::error::El endpoint respondió 401: el secret CRON_SECRET del repo no coincide con el CRON_SECRET de producción en Vercel. Ninguna capa de respaldo puede sembrar así."
+            exit 1
+          fi
+
+          if [ "$code" != "200" ]; then
+            echo "::error::Los pozos NO están en su suelo (o no se pudieron leer). Revisa el saldo USDT del Funder, cron.job / net._http_response en Supabase y los logs de /api/cron/seed-pots en Vercel."
+            exit 1
+          fi
+
+          echo "Los tres pozos están en su suelo."
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}

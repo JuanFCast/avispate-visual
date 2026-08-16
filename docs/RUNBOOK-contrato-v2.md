@@ -38,10 +38,15 @@ Hacerlo idealmente justo DESPUÉS de una liquidación de las 7 p. m. para no
 interferir con una ronda en curso.
 
 ### 4. Sembrar los pozos del contrato nuevo
+Primero apuntar `.env.local` al contrato nuevo (paso 5), porque el sembrador lee
+de ahí la dirección. Después:
 ```
-node scripts/seed-pots.mjs 0xNUEVO
+node scripts/seed-now.ts          # enseña el plan, no firma
+node scripts/seed-now.ts --yes    # firma
 ```
-(1 USDT por mazo desde el Funder.)
+Completa cada mazo hasta el suelo (0,30 USDT) desde el Funder. Es la misma regla
+que usa el robot horario `/api/cron/seed-pots`; correrlo dos veces no pone nada
+de más.
 
 ### 5. Actualizar variables de entorno
 - `.env.local`: `NEXT_PUBLIC_AVISPATE_POT_ADDRESS=0xNUEVO`

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readPot, settleDecks } from "@/lib/settle";
-import { seedPots } from "@/lib/seed";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -87,10 +86,12 @@ async function topOfRound(
  * Bearer). Idempotente por (round_date, deck) vía round_settlements.
  *
  * Está escrito para pagar en segundos, no en minutos: los tres mazos se
- * consultan, se liquidan y se resiembran EN PARALELO, y la fila de
- * round_settlements se escribe apenas confirma el pago (antes de resembrar)
- * para cerrar cuanto antes la ventana en la que un segundo disparador podría
- * pagar dos veces.
+ * consultan y se liquidan EN PARALELO, y la fila de round_settlements se
+ * escribe apenas confirma el pago, para cerrar cuanto antes la ventana en la
+ * que un segundo disparador podría pagar dos veces.
+ *
+ * Esta ruta SOLO paga. Volver a llenar los pozos es cosa de
+ * `/api/cron/seed-pots`, que corre cada hora por su cuenta — ver el paso 5.
  */
 export async function GET(req: Request) {
   // Fail-closed: sin CRON_SECRET configurado, o con Bearer incorrecto, se bloquea
@@ -179,17 +180,22 @@ export async function GET(req: Request) {
     );
   }
 
-  // 5. Resembrar SOLO lo que se pagó (si no hubo ganador, el pozo se conserva;
-  //    así no se infla ni se drena el Funder en días sin jugadores).
-  const seeds = await seedPots([...txByDeck.keys()]);
-  const seedByDeck = new Map(seeds.map((s) => [s.deck, s]));
-
+  // 5. Aquí NO se siembra. Antes esto llamaba `seedPots([...txByDeck.keys()])`
+  //    —"resiembro los mazos que acabo de pagar"— y esa única línea es la que
+  //    dejó los tres pozos en 0,00 la madrugada del 2026-08-16: la siembra no
+  //    salió, el respaldo de las 00:05 devolvía `already_settled` sin llegar
+  //    hasta aquí, y desde el día siguiente un pozo en cero ya ni entraba a
+  //    liquidarse (el filtro `pot > 0n` de arriba), así que nunca volvía a
+  //    haber un pago que disparara la resiembra. Cero era un estado del que no
+  //    se salía.
+  //
+  //    Sembrar es ahora un trabajo aparte, idempotente y con su propio reloj:
+  //    `/api/cron/seed-pots`, cada hora en el minuto :35. Que este cierre falle
+  //    ya no puede dejar el pozo muerto, y que la siembra falle tampoco.
   const results = plans.map((p) => ({
     deck: p.deck,
     winner: txByDeck.has(p.deck) ? p.winner : null,
     settleTx: txByDeck.get(p.deck) ?? null,
-    reseeded: seedByDeck.get(p.deck)?.ok ?? false,
-    seedError: seedByDeck.get(p.deck)?.error,
     error: p.queryFailed ? "query_failed" : errByDeck.get(p.deck),
   }));
 
