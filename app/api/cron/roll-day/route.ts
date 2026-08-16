@@ -2,12 +2,22 @@ import { NextResponse } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSupabaseAdmin } from "@/lib/supabase/server";
 import { readPot, settleDecks } from "@/lib/settle";
+import { seedAfterSettle } from "@/lib/seed-floor";
+import { seedDeps } from "@/lib/seed-deps";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const DECKS = [10, 15, 20];
 const DAY_MS = 86_400_000;
+
+/**
+ * Hasta qué punto del presupuesto de 60 s se puede seguir sembrando. El cierre
+ * ya gastó lo suyo esperando el corte y pagando; a partir de aquí no se empieza
+ * un mazo nuevo y lo que quede se lo lleva el cron. Cortar limpio es gratis;
+ * que Vercel mate la función a mitad deja un cerrojo tomado hasta que vence.
+ */
+const SEED_BUDGET_MS = 48_000;
 
 /**
  * Colchón tras el cierre (00:00 UTC = 7:00 p. m. Colombia) antes de leer el
@@ -90,8 +100,11 @@ async function topOfRound(
  * escribe apenas confirma el pago, para cerrar cuanto antes la ventana en la
  * que un segundo disparador podría pagar dos veces.
  *
- * Esta ruta SOLO paga. Volver a llenar los pozos es cosa de
- * `/api/cron/seed-pots`, que corre cada hora por su cuenta — ver el paso 5.
+ * Tras pagar, ENCADENA la siembra (paso 5) para que el pozo vuelva a su suelo
+ * en segundos y la ronda nueva no abra en 0,00 justo a las 7 p. m. Es el mismo
+ * trabajo idempotente que corre solo cada hora, con el mismo cerrojo; llamarlo
+ * aquí solo adelanta la primera pasada. Si falla, el cierre sigue siendo un
+ * éxito y lo recogen el respaldo de las 00:07 y el horario de las :35.
  */
 export async function GET(req: Request) {
   // Fail-closed: sin CRON_SECRET configurado, o con Bearer incorrecto, se bloquea
@@ -132,7 +145,26 @@ export async function GET(req: Request) {
   const settled = new Set((done ?? []).map((r) => r.deck_size as number));
   const decks = DECKS.filter((d) => !settled.has(d));
   if (decks.length === 0) {
-    return NextResponse.json({ round, waitedMs, results: [], note: "already_settled" });
+    // Ya pagó otro disparador. Pero SÍ se siembra igual, y esto no es un detalle:
+    // por esta salida temprana es por donde se perdió la siembra del 2026-08-16.
+    // El disparador de las 00:00 pagó, su resiembra no salió, y el respaldo de
+    // las 00:05 llegó hasta aquí, dijo "already_settled" y se fue sin mirar los
+    // pozos — que estaban en cero. Un reintento que no comprueba lo único que
+    // podía haber quedado a medias no es un reintento.
+    const late = await seedAfterSettle(seedDeps(), DECKS, {
+      deadlineMs: started + SEED_BUDGET_MS,
+    });
+    for (const line of late.lines) console.log(`[roll-day/seed] ${line}`);
+    if (late.alarm) {
+      console.error(`[roll-day/seed] ALARMA · ${late.lines.join(" | ")}`);
+    }
+    return NextResponse.json({
+      round,
+      waitedMs,
+      results: [],
+      note: "already_settled",
+      seed: { alarm: late.alarm, decks: late.decks },
+    });
   }
 
   // 2. Pozo y ganador de cada mazo, todo a la vez.
@@ -180,18 +212,36 @@ export async function GET(req: Request) {
     );
   }
 
-  // 5. Aquí NO se siembra. Antes esto llamaba `seedPots([...txByDeck.keys()])`
-  //    —"resiembro los mazos que acabo de pagar"— y esa única línea es la que
-  //    dejó los tres pozos en 0,00 la madrugada del 2026-08-16: la siembra no
-  //    salió, el respaldo de las 00:05 devolvía `already_settled` sin llegar
-  //    hasta aquí, y desde el día siguiente un pozo en cero ya ni entraba a
-  //    liquidarse (el filtro `pot > 0n` de arriba), así que nunca volvía a
-  //    haber un pago que disparara la resiembra. Cero era un estado del que no
-  //    se salía.
+  // 5. Rellenar los pozos YA, sin que el cierre dependa de ello.
   //
-  //    Sembrar es ahora un trabajo aparte, idempotente y con su propio reloj:
-  //    `/api/cron/seed-pots`, cada hora en el minuto :35. Que este cierre falle
-  //    ya no puede dejar el pozo muerto, y que la siembra falle tampoco.
+  //    Esto NO es la vieja `seedPots([...txByDeck.keys()])` —"resiembro los
+  //    mazos que acabo de pagar"—, que es la línea que dejó los tres pozos en
+  //    0,00 la madrugada del 2026-08-16: al no salir, el respaldo de las 00:05
+  //    devolvía `already_settled` sin llegar hasta aquí, y desde el día
+  //    siguiente un pozo en cero ya ni entraba a liquidarse (el filtro
+  //    `pot > 0n` de arriba). Cero era un estado del que no se salía.
+  //
+  //    Lo que se llama aquí es el MISMO trabajo idempotente que corre solo cada
+  //    hora, con su mismo cerrojo: completa hasta el suelo, nunca suma. Llamarlo
+  //    desde aquí solo adelanta la primera pasada para que el premio reaparezca
+  //    en segundos en vez de a las 00:07 — a las 7 p. m. de Colombia, que es
+  //    cuando más gente está mirando. Si se pisara con el cron, uno de los dos
+  //    se va de vacío por el cerrojo.
+  //
+  //    Va DESPUÉS de escribir round_settlements a propósito: la guarda
+  //    `cierre-pendiente` lee esa tabla, así que sembrar antes se saltaría solo.
+  //
+  //    Y `seedAfterSettle` no lanza nunca. El cierre ya pagó premios cuando esto
+  //    corre; su resultado no puede cambiar porque la siembra falle. Si falla,
+  //    quedan el respaldo de las 00:07 y el horario de las :35.
+  const seed = await seedAfterSettle(seedDeps(), DECKS, {
+    deadlineMs: started + SEED_BUDGET_MS,
+  });
+  for (const line of seed.lines) console.log(`[roll-day/seed] ${line}`);
+  if (seed.alarm) {
+    console.error(`[roll-day/seed] ALARMA · ${seed.lines.join(" | ")}`);
+  }
+
   const results = plans.map((p) => ({
     deck: p.deck,
     winner: txByDeck.has(p.deck) ? p.winner : null,
@@ -204,5 +254,8 @@ export async function GET(req: Request) {
     waitedMs,
     elapsedMs: Date.now() - started,
     results,
+    // Informativo. El estado de la respuesta NO lo mira: si la siembra falló,
+    // el cierre siguió siendo un éxito y el premio ya está pagado.
+    seed: { alarm: seed.alarm, decks: seed.decks },
   });
 }

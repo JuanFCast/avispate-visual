@@ -20,10 +20,17 @@
 --
 -- LAS CAPAS, Y QUÉ HACE CADA UNA
 --
---   1. ESTE cron, job `-close` ....... 00:07 UTC. Rellena el pozo justo después
---                                      de que `settle` lo vacíe (00:00:10), para
---                                      que la ronda nueva no abra en 0,00 a las
---                                      7 p. m. de Colombia, que es la hora pico.
+--   0. `roll-day` ENCADENA la siembra . 00:00:1x. El camino normal: en cuanto el
+--                                      cierre acaba de pagar y escribir
+--                                      round_settlements, llama al mismo trabajo
+--                                      en proceso. El premio reaparece en
+--                                      segundos, no en minutos. Si falla, el
+--                                      cierre sigue siendo un éxito.
+--   1. ESTE cron, job `-close` ....... 00:07 UTC. Respaldo CERCANO del anterior.
+--                                      Ya no es el mecanismo principal, pero sin
+--                                      él un encadenado fallido dejaría el pozo
+--                                      en 0,00 hasta las :35 — 35 minutos, y a la
+--                                      hora en que más gente mira la pantalla.
 --   2. ESTE cron, job `-hourly` ...... cada hora en el minuto :35. Es el que
 --                                      hace que ningún fallo sea definitivo.
 --   3. GitHub Actions seed-pots ...... 2-3 h tarde. Último recurso y ALARMA: si
@@ -31,23 +38,28 @@
 --                                      debajo del suelo, el workflow falla y
 --                                      GitHub manda el correo.
 --
+-- Las cuatro son el MISMO trabajo idempotente y comparten el cerrojo de
+-- `pot_seed_runs`, así que solaparse no puede sembrar dos veces: la que llegue
+-- segunda se va de vacío.
+--
 -- SOBRE LOS MINUTOS ELEGIDOS, Y POR QUÉ NO SON LA DEFENSA DE VERDAD
 --
--- El primer borrador de esto ponía el job de cierre a las 00:02, que resultó ser
--- el peor minuto posible: TypeRush V3 firma su siembra a las 00:00:1x (la
--- encadena a su `settle-v3`) y reintenta a las 00:04:0x, y TypeRush V2 concentra
--- 108 de sus 116 `fundPot` en el minuto :02. Las 00:07 caen fuera de esas dos
--- ráfagas, y el :35 horario cae lejos del :20 en que corre el sembrador de
--- TypeRush.
+-- El primer borrador ponía el job de cierre a las 00:02, que resultó ser el peor
+-- minuto posible: TypeRush V3 firma su siembra a las 00:00:1x (la encadena a su
+-- `settle-v3`) y reintenta a las 00:04:0x, y TypeRush V2 concentra 108 de sus
+-- 116 `fundPot` en el minuto :02. Las 00:07 caen fuera de esas dos ráfagas.
 --
--- Pero elegir minutos NO es la solución, solo un colchón. La wallet Funder
--- 0x46d5F9fE ha tocado 17 contratos en 40 días: siembra TypeRush V2, V3 (dos
--- despliegues) y Avíspate, entra a Arena, y ADEMÁS es el teléfono con el que se
--- juega — 35 `play` en Avíspate, y su minuto más frecuente es justamente el :35.
--- Cuatro robots y una persona sobre una sola secuencia de nonce no se coordinan
--- con un cron. La defensa de verdad es que Avíspate use su PROPIA wallet Funder
--- (basta cambiar FUNDER_PRIVATE_KEY: el código no distingue), y el reintento con
--- nonce fresco de `lib/seed-chain.ts` como último colchón.
+-- Y la capa 0 cae DENTRO de esa ventana a propósito: encadenar al cierre es
+-- justamente firmar a las 00:00:1x, el mismo segundo en que firma TypeRush. Eso
+-- solo es seguro porque Avíspate tiene desde el 2026-08-16 su PROPIA wallet
+-- Funder (0x6189E681), con su propia secuencia de nonce. Antes eran cuatro
+-- robots y un teléfono sobre una sola cuenta —la vieja 0x46d5F9fE tocó 17
+-- contratos en 40 días— y las dos siembras se repartían la medianoche a suertes:
+-- el 15 de agosto ganó Avíspate, el 16 ganó TypeRush y los tres pozos de
+-- Avíspate se quedaron en cero.
+--
+-- O sea: los minutos son el colchón, la wallet separada es la defensa. Y por
+-- debajo de las dos, el reintento con nonce fresco de `lib/seed-chain.ts`.
 --
 -- No hay cron de Vercel para esto. En Hobby solo caben dos jobs diarios y ya
 -- están ocupados por roll-day y arena-settle; además Vercel no da horarios

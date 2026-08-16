@@ -324,6 +324,43 @@ async function runDeck(
   }
 }
 
+/**
+ * La siembra ENCADENADA al cierre. Igual que `seedToFloor`, pero no lanza nunca.
+ *
+ * `roll-day` la llama justo después de escribir `round_settlements` para que el
+ * pozo vuelva a su suelo en segundos en vez de esperar al cron — a las 7 p. m.
+ * de Colombia, que es la hora en la que más gente está mirando la pantalla.
+ *
+ * El contrato con el cierre es de una sola dirección: el cierre ya PAGÓ premios
+ * cuando esto corre, así que su resultado no puede depender de que la siembra
+ * salga bien. Aquí se traga cualquier excepción y se devuelve un informe con la
+ * alarma encendida; quien llama lo adjunta a su respuesta y sigue como si nada.
+ * Si falla, lo recoge el respaldo de las 00:07 y, tras él, el horario de las :35.
+ */
+export async function seedAfterSettle(
+  deps: SeedDeps,
+  decks: number[] = SEED_DECKS,
+  opts: SeedRunOptions = {}
+): Promise<SeedRunReport> {
+  try {
+    return await seedToFloor(deps, decks, opts);
+  } catch (e) {
+    const motivo = errMsg(e, "seed_failed");
+    let round = "?";
+    try {
+      round = currentRound(deps.now());
+    } catch {
+      // Ni la hora se pudo leer. Da igual: lo que importa es no relanzar.
+    }
+    return {
+      round,
+      decks: [],
+      alarm: true,
+      lines: [`la siembra encadenada se cayó entera: ${motivo}`],
+    };
+  }
+}
+
 function describe(r: DeckReport): string {
   const head = `mazo ${r.deck} · pozo ${r.potBefore}`;
   if (r.action === "sembrado") {

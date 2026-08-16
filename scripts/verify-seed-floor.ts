@@ -26,6 +26,7 @@ import {
 } from "../lib/seed-rules.ts";
 import {
   seedToFloor,
+  seedAfterSettle,
   currentRound,
   closedRound,
   type SeedDeps,
@@ -485,6 +486,120 @@ console.log("\n— El cerrojo se suelta aunque explote la lectura del pozo —")
   m.deps.readPot = async () => 0n;
   const r2 = await seedToFloor(m.deps, [10]);
   check("la corrida siguiente siembra", r2.decks[0].action, "sembrado");
+}
+
+console.log("\n— La siembra encadenada al cierre NUNCA puede tumbar el cierre —");
+{
+  // `roll-day` la llama cuando ya ha PAGADO premios. Pase lo que pase aquí, no
+  // puede lanzar: el cierre fue un éxito y su respuesta no depende de esto.
+  const m = mundo({ pozos: { 10: 0n, 15: 0n, 20: 0n } });
+  const r = await seedAfterSettle(m.deps);
+  check("caso normal: siembra igual que siempre", r.decks.map((d) => d.action), [
+    "sembrado",
+    "sembrado",
+    "sembrado",
+  ]);
+  check("y deja los pozos en el suelo", r.decks.map((d) => d.potAfter), [
+    "0.30",
+    "0.30",
+    "0.30",
+  ]);
+}
+{
+  // Lo peor imaginable: se rompe hasta el reloj, o sea revienta `seedToFloor`
+  // entero antes de llegar a ningún mazo.
+  const m = mundo({ pozos: { 10: 0n } });
+  m.deps.now = () => {
+    throw new Error("reloj roto");
+  };
+  let lanzó = false;
+  let r;
+  try {
+    r = await seedAfterSettle(m.deps, [10]);
+  } catch {
+    lanzó = true;
+  }
+  check("NO lanza", lanzó, false);
+  check("devuelve informe con alarma", r?.alarm, true);
+  check("y dice qué pasó", r?.lines[0], "la siembra encadenada se cayó entera: reloj roto");
+  check("sin firmar nada", m.log.envíos.length, 0);
+}
+
+console.log("\n— El cierre siembra y el cron llega detrás: NO se paga doble —");
+{
+  // El caso real de esta noche: roll-day encadena a las 00:00:1x y el respaldo
+  // de las 00:07 llega siete minutos después. El segundo tiene que ser un no-op.
+  const m = mundo({ pozos: { 10: 0n, 15: 0n, 20: 0n } });
+
+  const cierre = await seedAfterSettle(m.deps);
+  check("el cierre repone los tres", cierre.decks.map((d) => d.amount), [
+    "0.30",
+    "0.30",
+    "0.30",
+  ]);
+  const firmadasTrasCierre = m.log.envíos.length;
+
+  m.avanzar(7 * 60_000); // llega el respaldo de las 00:07
+  const respaldo = await seedToFloor(m.deps);
+  check("el respaldo no pone nada", respaldo.decks.map((d) => d.reason), [
+    SKIP.AT_FLOOR,
+    SKIP.AT_FLOOR,
+    SKIP.AT_FLOOR,
+  ]);
+  check("ni una transacción de más", m.log.envíos.length, firmadasTrasCierre);
+
+  m.avanzar(28 * 60_000); // y el horario de las :35
+  const horario = await seedToFloor(m.deps);
+  check("el horario tampoco", m.log.envíos.length, firmadasTrasCierre);
+  check("sin alarma en ninguno", [respaldo.alarm, horario.alarm], [false, false]);
+}
+
+console.log("\n— Si el encadenado falla, el respaldo lo recoge —");
+{
+  // La siembra del cierre se cae entera (choque de nonce en los tres mazos).
+  const fallar = new Set([10, 15, 20]);
+  const m = mundo({ pozos: { 10: 0n, 15: 0n, 20: 0n }, fallar });
+
+  const cierre = await seedAfterSettle(m.deps);
+  check("el cierre no consigue sembrar", cierre.decks.map((d) => d.action), [
+    "falló",
+    "falló",
+    "falló",
+  ]);
+  check("y lo grita", cierre.alarm, true);
+
+  // Siete minutos después, con la cadena despejada.
+  fallar.clear();
+  m.avanzar(7 * 60_000);
+  const respaldo = await seedToFloor(m.deps);
+  check("el respaldo de las 00:07 los repone", respaldo.decks.map((d) => d.action), [
+    "sembrado",
+    "sembrado",
+    "sembrado",
+  ]);
+  check("con los 0.30 enteros", respaldo.decks.map((d) => d.amount), [
+    "0.30",
+    "0.30",
+    "0.30",
+  ]);
+  check("y ya sin alarma", respaldo.alarm, false);
+}
+
+console.log("\n— El presupuesto: se corta limpio y lo recoge la vuelta siguiente —");
+{
+  const m = mundo({ pozos: { 10: 0n, 15: 0n, 20: 0n } });
+  // Fecha tope ya vencida: no debe empezar ningún mazo.
+  const r = await seedAfterSettle(m.deps, [10, 15, 20], {
+    deadlineMs: m.deps.now() - 1,
+  });
+  check("los tres se saltan por tiempo", r.decks.map((d) => d.reason), [
+    SKIP.NO_TIME,
+    SKIP.NO_TIME,
+    SKIP.NO_TIME,
+  ]);
+  check("sin firmar nada", m.log.envíos.length, 0);
+  check("y sin alarma: no es un fallo", r.alarm, false);
+  check("ningún cerrojo quedó tomado", [...m.cerrojos.keys()].length, 0);
 }
 
 console.log("\n— El formateador, que es lo que se lee en el informe —");
