@@ -150,7 +150,7 @@ export const en = {
   "pay.register.retry":
     "Your payment went through, but we couldn't tell the server. It's saved on this device and will be sent on its own: check your connection and open the app again. Do not pay again.",
   "pay.register.rejected":
-    "The server didn't accept this game. Write to soporte@avispate.fun with the time and your wallet and we'll look into it.",
+    "The server didn't accept this game. Write to hi@casgostudio.com with the time and your wallet and we'll look into it.",
 
   /* ----------------------- Pasos del botón de jugar ---------------------- */
   "stage.checking": "Checking your name…",
@@ -808,13 +808,14 @@ export const en = {
   "turnstile.text":
     "One second: confirm you're human to unlock your free game.",
 
-  /* ------------------------------ Legales -------------------------------- */
+  /* ------------------------------ Legales --------------------------------
+     Solo los títulos. El cuerpo de ambos documentos vive como componentes de
+     servidor en `app/terminos/content.tsx` y `app/privacidad/content.tsx`:
+     este módulo exporta `en` y `es` juntos y lo importan decenas de
+     componentes cliente, así que el texto legal viajaría en el JS de todas
+     las rutas del juego. */
   "terms.title": "Terms",
-  "terms.body":
-    "Terms and conditions in preparation. Avíspate is a visual reflex game; paid games and prizes are processed on the Celo network.",
   "privacy.title": "Privacy",
-  "privacy.body":
-    "Privacy policy in preparation. Avíspate stores your alias and your scores for the ranking; your wallet is used for payments and prizes on the Celo network.",
 
   /* ------------------------ Formulario suelto (legacy) ------------------- */
   "form.pay_and_play": "Pay 0.10 USDT and play",
@@ -947,7 +948,7 @@ export const es: Record<MessageKey, string> = {
   "pay.register.retry":
     "Tu pago quedó confirmado, pero no pudimos avisarle al servidor. Quedó guardado en este dispositivo y se enviará solo: revisa tu conexión y vuelve a abrir la app. No vuelvas a pagar.",
   "pay.register.rejected":
-    "El servidor no aceptó esta jugada. Escríbenos a soporte@avispate.fun con la hora y tu wallet y lo revisamos.",
+    "El servidor no aceptó esta jugada. Escríbenos a hi@casgostudio.com con la hora y tu wallet y lo revisamos.",
 
   /* ----------------------- Pasos del botón de jugar ---------------------- */
   "stage.checking": "Comprobando tu nombre…",
@@ -1575,11 +1576,7 @@ export const es: Record<MessageKey, string> = {
 
   /* ------------------------------ Legales -------------------------------- */
   "terms.title": "Términos",
-  "terms.body":
-    "Contenido de términos y condiciones en preparación. Avíspate es un juego de agilidad visual; las partidas pagadas y los premios se procesan en la red Celo.",
   "privacy.title": "Privacidad",
-  "privacy.body":
-    "Política de privacidad en preparación. Avíspate guarda tu alias y tus puntajes para el ranking; tu wallet se usa para pagos y premios en la red Celo.",
 
   /* ------------------------ Formulario suelto (legacy) ------------------- */
   "form.pay_and_play": "Pagar 0.10 USDT y jugar",

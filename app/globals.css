@@ -6329,3 +6329,58 @@ body {
     font-size: 0.92rem;
   }
 }
+
+/* ---------- Términos y Privacidad ----------
+   Reutilizan la tarjeta blanca de /perfil, pero aquí el cuerpo es texto para
+   leer seguido, no una nota al pie: más grande y más oscuro que
+   .section-note, y con el ancho de lectura que ya fija --read-w. */
+.legal-doc {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.legal-section p,
+.legal-section li {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.legal-section a {
+  color: #0b6d77;
+  font-weight: 700;
+  word-break: break-word;
+}
+
+.legal-list,
+.legal-parties {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+/* Los terceros se leen como fichas, no como viñetas de una frase. */
+.legal-parties {
+  list-style: none;
+  padding-left: 0;
+  gap: 12px;
+}
+
+.legal-party {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.legal-party strong {
+  font-family: var(--font-title);
+  font-weight: 600;
+}
+
+.legal-party span {
+  font-size: 0.88rem;
+  color: var(--gray);
+}

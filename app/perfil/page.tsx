@@ -177,7 +177,7 @@ export default function PerfilPage() {
         <Link className="profile-link-row" href="/stats">
           {t("common.live_stats")}
         </Link>
-        <a className="profile-link-row" href="mailto:soporte@avispate.fun">
+        <a className="profile-link-row" href="mailto:hi@casgostudio.com">
           {t("profile.link.support")}
         </a>
         <LanguageToggle />
