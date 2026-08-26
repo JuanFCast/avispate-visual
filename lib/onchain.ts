@@ -1,6 +1,7 @@
 import { createPublicClient, parseEventLogs, type Hash } from "viem";
 import { celo } from "viem/chains";
 import { CELO_TRANSPORT } from "./chain";
+import { probeTxPresence } from "./tx-probe";
 import { AVISPATE_POT_ADDRESS, AVISPATE_POT_ABI } from "./contracts";
 import { ARENA_ESCROW_ADDRESS } from "./arena-escrow";
 
@@ -97,8 +98,32 @@ export async function verifyWalletControl(
   }
 }
 
+/**
+ * En qué estado está el pago, con el detalle que hace falta para saber si la
+ * jugada se conserva, se espera o se descarta.
+ *
+ * Antes todo esto era un `ok: false` y el endpoint lo traducía a
+ * `invalid_payment`, un error reintentable: un hash que la red nunca vio se
+ * quedaba 48 h en la bandeja del dispositivo, reintentándose contra la nada.
+ */
+export type PlayStatus =
+  /** Minada, correcta y con su evento `Played`. */
+  | "confirmed"
+  /** Minada y revertida: no cobró la entrada ni gastó la jugada gratis. */
+  | "reverted"
+  /** Minada y correcta, pero sin un `Played` que corresponda a este mazo. */
+  | "mined_no_event"
+  /** La red la conoce y todavía no la mina. */
+  | "pending"
+  /** Con consenso de varios nodos: ese hash no existe. */
+  | "unknown"
+  /** No se pudo preguntar a la cadena. No se afirma nada. */
+  | "unavailable";
+
 export interface PlayVerification {
   ok: boolean;
+  /** El detalle de por qué. `ok` es `status === "confirmed"`. */
+  status?: PlayStatus;
   /**
    * Quién pagó DE VERDAD, leído del evento del contrato (minúsculas). Es la
    * dirección que hay que usar: la que manda el cliente solo sirve para saber
@@ -130,12 +155,35 @@ export async function verifyPlayTx(
   expectedPlayer: string,
   expectedDeck: number
 ): Promise<PlayVerification> {
-  if (!AVISPATE_POT_ADDRESS) return { ok: false };
+  if (!AVISPATE_POT_ADDRESS) return { ok: false, status: "unavailable" };
+
+  /**
+   * Si no hay recibo, la pregunta cambia: ya no es "¿es válida?" sino
+   * "¿existe?". Y esa se le hace a TODOS los nodos, porque uno solo atrasado
+   * diciendo "no la tengo" es la situación normal de los primeros segundos.
+   */
+  const sinRecibo = async (): Promise<PlayVerification> => {
+    const presencia = await probeTxPresence(txHash);
+    switch (presencia) {
+      case "pending":
+        return { ok: false, status: "pending" };
+      case "unknown":
+        return { ok: false, status: "unknown" };
+      // Otro nodo SÍ la tiene minada y el nuestro no pudo leerla: eso es un
+      // tropiezo de lectura, no un veredicto. Se conserva y se reintenta.
+      case "mined":
+      case "unavailable":
+        return { ok: false, status: "unavailable" };
+    }
+  };
+
   try {
     const receipt = await client.getTransactionReceipt({
       hash: txHash as Hash,
     });
-    if (receipt.status !== "success") return { ok: false };
+    // Revirtió: el estado volvió atrás, así que no se cobró nada. Quien llama
+    // puede cerrar ese pendiente y dejar jugar de nuevo sin cobrar dos veces.
+    if (receipt.status !== "success") return { ok: false, status: "reverted" };
 
     /**
      * Quién emitió el evento importa más que a quién iba dirigida la
@@ -158,11 +206,14 @@ export async function verifyPlayTx(
     // El mazo NO se negocia: una transacción del mazo de 10 no puede registrar
     // una partida de 20. Pero el jugador se LEE, no se exige.
     const match = logs.find((l) => Number(l.args.deck) === expectedDeck);
-    if (!match) return { ok: false };
+    // Minada y correcta, pero sin un `Played` de este mazo. Puede que la jugada
+    // SÍ se haya cobrado con otro mazo, así que esto no autoriza a tirarla.
+    if (!match) return { ok: false, status: "mined_no_event" };
 
     const player = match.args.player.toLowerCase();
     return {
       ok: true,
+      status: "confirmed",
       player,
       deck: expectedDeck,
       wasFree: Boolean(match.args.wasFree),
@@ -170,6 +221,16 @@ export async function verifyPlayTx(
       payerMismatch: player !== expectedPlayer.toLowerCase(),
     };
   } catch {
-    return { ok: false };
+    /**
+     * Aquí cae tanto "no hay recibo" (`TransactionReceiptNotFoundError`, que
+     * viem lanza cuando el nodo devuelve nulo) como un fallo de lectura. Los
+     * dos se resuelven igual: preguntándoles a todos los nodos, que es lo único
+     * que distingue una transacción inexistente de una que no se pudo mirar.
+     */
+    try {
+      return await sinRecibo();
+    } catch {
+      return { ok: false, status: "unavailable" };
+    }
   }
 }

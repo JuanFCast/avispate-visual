@@ -56,6 +56,8 @@ interface Props {
   onPickAnotherName: () => void;
   /** Reintentar el registro de una jugada YA pagada. Nunca cobra. */
   onResumePending: () => void;
+  /** Descartar una jugada que la red nunca vio. Solo la ofrece `pending_unknown`. */
+  onDiscardPending: () => void;
   onShowHowTo: () => void;
   /** Vista previa del ranking: columna derecha en escritorio. */
   children: ReactNode;
@@ -78,6 +80,7 @@ export default function DailyChallengeCard({
   onReconnect,
   onPickAnotherName,
   onResumePending,
+  onDiscardPending,
   onShowHowTo,
   children,
 }: Props) {
@@ -117,6 +120,10 @@ export default function DailyChallengeCard({
               address: shortAddress(block.payer),
             })
           : t("pay.block.resume");
+      case "pending_waiting":
+        return t("pay.block.pending_waiting");
+      case "pending_unknown":
+        return t("pay.block.pending_unknown");
     }
   }
 
@@ -190,7 +197,9 @@ export default function DailyChallengeCard({
             <p className="alias-error">{blockText(payBlock)}</p>
             <div className="lobby-block-actions">
               {payBlock.kind === "resume_pending" ||
-              payBlock.kind === "payer_mismatch" ? (
+              payBlock.kind === "payer_mismatch" ||
+              payBlock.kind === "pending_waiting" ||
+              payBlock.kind === "pending_unknown" ? (
                 <button
                   type="button"
                   className="access-btn access-btn-primary"
@@ -199,7 +208,23 @@ export default function DailyChallengeCard({
                   {t("pay.action.resume")}
                 </button>
               ) : null}
-              {payBlock.kind !== "resume_pending" && (
+              {/**
+                * La salida manual, y SOLO aquí: varios nodos coinciden en que
+                * ese hash no existe y ya pasó la gracia de propagación. Es la
+                * persona quien descarta la jugada; la app nunca lo hace sola.
+                */}
+              {payBlock.kind === "pending_unknown" && (
+                <button
+                  type="button"
+                  className="access-btn access-btn-secondary"
+                  onClick={onDiscardPending}
+                >
+                  {t("pay.action.discard")}
+                </button>
+              )}
+              {payBlock.kind !== "resume_pending" &&
+                payBlock.kind !== "pending_waiting" &&
+                payBlock.kind !== "pending_unknown" && (
                 <button
                   type="button"
                   className="access-btn access-btn-primary"

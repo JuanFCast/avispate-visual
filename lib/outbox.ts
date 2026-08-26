@@ -1,6 +1,11 @@
 "use client";
 
-import { postWithRetry, type SendOutcome } from "./submit.ts";
+import {
+  BACKGROUND_LIMITS,
+  postWithRetry,
+  type PostLimits,
+  type SendOutcome,
+} from "./submit.ts";
 
 /**
  * Bandeja de salida en el dispositivo.
@@ -204,9 +209,10 @@ export function pendingPlay(): {
  */
 export async function deliver(
   item: OutboxItem,
-  delays: readonly number[] = BACKGROUND_DELAYS
+  delays: readonly number[] = BACKGROUND_DELAYS,
+  limits: PostLimits = BACKGROUND_LIMITS
 ): Promise<SendOutcome> {
-  const outcome = await postWithRetry(item.url, item.body, delays);
+  const outcome = await postWithRetry(item.url, item.body, delays, limits);
   if (outcome.result !== "retry") drop(item.id);
   return outcome;
 }
@@ -239,7 +245,8 @@ let flushing = false;
  * que quien llame decida si tiene que refrescar algo (el ranking, por ejemplo).
  */
 export async function flushOutbox(
-  delays: readonly number[] = BACKGROUND_DELAYS
+  delays: readonly number[] = BACKGROUND_DELAYS,
+  limits: PostLimits = BACKGROUND_LIMITS
 ): Promise<number> {
   if (flushing) return 0;
   flushing = true;
@@ -247,7 +254,7 @@ export async function flushOutbox(
     let delivered = 0;
     // En orden de llegada: el recibo de una jugada antes que su resultado.
     for (const item of pending()) {
-      const outcome = await deliver(item, delays);
+      const outcome = await deliver(item, delays, limits);
       if (outcome.result === "ok") delivered++;
     }
     return delivered;

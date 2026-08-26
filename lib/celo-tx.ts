@@ -11,6 +11,7 @@
  */
 
 import { CIP64_FEE_ADAPTER } from "./contracts.ts";
+import { EMBEDDED_WALLET_NAME } from "./wallet-identity.ts";
 
 /** Lo mínimo que necesitamos de un cliente público para decidir el gas. */
 export interface BalanceReader {
@@ -58,12 +59,54 @@ export const RECEIPT_TIMEOUT_MS = 20_000;
  * función queda pura —sin `window`— y `scripts/verify-arena-fee-currency.ts`
  * puede recorrer el caso "MiniPay con 0 CELO" sin un navegador de por medio.
  */
+/** Con qué se paga el gas, o por qué no se puede pagar. */
+export interface FeePlan {
+  /** Adaptador CIP-64 con el que pagar en USDT. Ausente = se paga en CELO. */
+  feeCurrency?: `0x${string}`;
+  /**
+   * Ni hay CELO suficiente ni la wallet sabe pagar en USDT. No se firma.
+   * Presente solo en ese caso: el resto de respuestas no cambian de forma.
+   */
+  shortOfGas?: true;
+}
+
+/**
+ * ¿Esta wallet sabe firmar una transacción CIP-64?
+ *
+ * La respuesta por defecto es que sí, y la lista de excepciones tiene UN
+ * nombre, con su motivo documentado:
+ *
+ * **La wallet embebida de Privy no.** Su API de `eth_sendTransaction` acepta
+ * `to`, `from`, `value`, `data`, `chainId`, `gasLimit`, `gasPrice`,
+ * `maxFeePerGas`, `maxPriorityFeePerGas`, `nonce` y `type` — `feeCurrency` no
+ * está en esa lista, y Privy rellena `type` por su cuenta. Mandárselo no da
+ * error: descarta el campo, firma una transacción normal que paga el gas en
+ * CELO —desde una wallet que, por definición, no tiene CELO suficiente, que es
+ * por lo que se pidió USDT— y devuelve un hash que la red rechaza al
+ * difundirlo. El 2026-08-26 eso dejó a las jugadas colgadas en "Registrando
+ * jugada…" contra transacciones que la cadena nunca vio.
+ *
+ * La comprobación es por nombre porque es lo que wagmi expone del conector, y
+ * es el mismo nombre con el que la anunciamos por EIP-6963.
+ */
+export function walletSupportsFeeCurrency(
+  connectorName: string | null | undefined
+): boolean {
+  return connectorName !== EMBEDDED_WALLET_NAME;
+}
+
 export async function resolveFeeCurrency(
   publicClient: BalanceReader,
   address: `0x${string}`,
   gasLimit: bigint,
-  inMiniPay: boolean
-): Promise<{ feeCurrency?: `0x${string}` }> {
+  inMiniPay: boolean,
+  /**
+   * Si la wallet que va a firmar sabe construir una transacción CIP-64.
+   * Por defecto sí: la mayoría de wallets de Celo la soportan y quien no,
+   * se nombra (ver `walletSupportsFeeCurrency`).
+   */
+  supportsFeeCurrency = true
+): Promise<FeePlan> {
   let payFeeInUsdt = inMiniPay;
   if (!payFeeInUsdt) {
     const [celoBalance, gasPrice] = await Promise.all([
@@ -73,7 +116,16 @@ export async function resolveFeeCurrency(
     const needed = (gasLimit * gasPrice * GAS_SAFETY) / 4n;
     payFeeInUsdt = celoBalance < needed;
   }
-  return payFeeInUsdt
-    ? { feeCurrency: CIP64_FEE_ADAPTER as `0x${string}` }
-    : {};
+  if (!payFeeInUsdt) return {};
+  if (supportsFeeCurrency) {
+    return { feeCurrency: CIP64_FEE_ADAPTER as `0x${string}` };
+  }
+  /**
+   * No le alcanza el CELO y su wallet no sabe pagar en USDT. No hay con qué
+   * firmar, y lo que NO se puede hacer es mandarla igual: eso es exactamente
+   * el agujero negro del 2026-08-26 —hash devuelto, transacción nunca
+   * difundida, botón eterno en "Registrando jugada…"—. Se dice que falta gas
+   * y se para con la plata todavía dentro.
+   */
+  return { shortOfGas: true };
 }

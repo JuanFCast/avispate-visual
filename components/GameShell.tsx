@@ -23,15 +23,22 @@ import {
 } from "@/lib/pay";
 import { fmtUsdt, refreshLeaderboard, useFreePlays } from "@/lib/round";
 import { FEE_AMOUNT } from "@/lib/contracts";
+import { BLOCKING_LIMITS, type SendOutcome } from "@/lib/submit";
 import {
   BLOCKING_DELAYS,
   deliver,
   enqueue,
   pending,
+  drop,
   pendingPlay,
   repairPendingPlayer,
   subscribeOutbox,
 } from "@/lib/outbox";
+import {
+  decidePendingFate,
+  verdictFromError,
+  type PendingAction,
+} from "@/lib/pending-fate";
 import {
   decidePendingBlockRelease,
   decidePlayStart,
@@ -122,6 +129,9 @@ function describePayError(err: unknown): MessageKey {
   if (err instanceof InsufficientFundsError) {
     // Aquí el saldo se leyó antes de firmar: si no alcanza para la tarifa es
     // porque tampoco hay USDT (con CELO se habría pagado con CELO).
+    // `gas_celo` es la carencia que no se arregla teniendo USDT: la wallet no
+    // sabe pagar el gas con él, así que lo que falta es CELO.
+    if (err.missing === "gas_celo") return "pay.error.fee_celo";
     return err.missing === "gas"
       ? "pay.error.fee_usdt"
       : "pay.error.insufficient";
@@ -177,7 +187,18 @@ export type PayBlock =
   /** Jugada pagada sin registrar: se termina esa, JAMÁS se cobra otra. */
   | { kind: "resume_pending"; pending: PendingPlay }
   /** La cadena dice que pagó otra dirección. Ni se pierde ni se atribuye sola. */
-  | { kind: "payer_mismatch"; txHash: string; payer?: string };
+  | { kind: "payer_mismatch"; txHash: string; payer?: string }
+  /**
+   * La red conoce la transacción y todavía no la mina. Se espera —sin spinner,
+   * porque puede tardar— y NO se puede volver a cobrar: existe de verdad.
+   */
+  | { kind: "pending_waiting" }
+  /**
+   * Varios nodos coinciden en que ese hash no existe, y ya pasó la gracia de
+   * propagación. Es el único caso con salida manual: se le enseña el hecho y
+   * decide la persona. La app nunca descarta una jugada por su cuenta.
+   */
+  | { kind: "pending_unknown"; txHash: string };
 
 export default function GameShell() {
   const [phase, setPhase] = useState<Phase>("setup");
@@ -497,7 +518,7 @@ export default function GameShell() {
           alias: alias || undefined,
         });
 
-      const { txHash, player } = await playForDeck(
+      const { txHash, player, presence } = await playForDeck(
         deck,
         setPayStage,
         confirmed,
@@ -508,11 +529,31 @@ export default function GameShell() {
 
       const receipt = guardar(txHash, player);
 
+      /**
+       * Antes de anunciar que se está registrando, que la red la haya VISTO.
+       *
+       * Este es el freno que faltaba el 2026-08-26: la wallet devolvía un hash,
+       * la espera del recibo se agotaba en silencio y la pantalla pasaba igual
+       * a "Registrando jugada…" sobre una transacción que la cadena nunca
+       * recibió. El envío se quedaba 48 h reintentándose contra la nada.
+       *
+       * `unknown` es el único caso que corta, y exige que VARIOS nodos
+       * coincidan (`lib/tx-presence.ts`): un nodo lento no puede parar una
+       * jugada. El envío NO se borra —eso sería decidir por la persona— y el
+       * candado del segundo cobro sigue puesto; lo que cambia es que ahora se
+       * dice lo que pasa en vez de girar un spinner.
+       */
+      if (presence === "unknown") {
+        setPayStage(null);
+        applyRegisterOutcome({ result: "retry", error: "payment_unknown" }, receipt);
+        return;
+      }
+
       // Y no se reparten cartas hasta que el servidor confirme que la jugada
       // quedó registrada. Se borra de la bandeja al confirmarse, dentro de
       // `deliver`.
       setPayStage("registering");
-      const sent = await deliver(receipt, BLOCKING_DELAYS);
+      const sent = await deliver(receipt, BLOCKING_DELAYS, BLOCKING_LIMITS);
       if (sent.result !== "ok") {
         setPayStage(null);
         /**
@@ -524,7 +565,7 @@ export default function GameShell() {
         if (sent.error === "payer_mismatch") {
           setPayBlock({ kind: "payer_mismatch", txHash, payer: sent.payer });
         } else {
-          setPayError(describeRegisterError(sent.result));
+          applyRegisterOutcome(sent, receipt);
         }
         return;
       }
@@ -664,6 +705,71 @@ export default function GameShell() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payBlock, activeWallet.address]);
 
+  /**
+   * Qué enseñar cuando un registro no sale, según lo que diga la CADENA.
+   *
+   * Antes todo esto era una sola frase ("no pudimos registrar, reintenta") y un
+   * envío que se quedaba en la bandeja 48 h. Ahora el servidor distingue en qué
+   * estado está el pago (`lib/onchain.ts`) y la regla de qué hacer con cada
+   * estado es pura (`lib/pending-fate.ts`); aquí solo se pinta.
+   *
+   * Lo que NO cambia: salvo que la cadena confirme que la transacción revirtió
+   * —y revertir significa que no cobró nada—, el envío se conserva y el botón
+   * no vuelve a ofrecer jugar.
+   */
+  function applyRegisterOutcome(
+    outcome: SendOutcome,
+    item: { createdAt: number; body: unknown }
+  ): PendingAction {
+    const txHash =
+      (item.body as { txHash?: string } | null)?.txHash ?? "";
+    const fate = decidePendingFate({
+      verdict: verdictFromError(outcome.error),
+      ageMs: Date.now() - item.createdAt,
+    });
+    switch (fate.action) {
+      case "drop_and_allow":
+        // `deliver` ya lo sacó de la bandeja (rechazo definitivo). Se limpia el
+        // aviso y se dice qué pasó: la transacción falló y no se cobró nada.
+        setPayBlock(null);
+        setPayError("pay.error.reverted");
+        break;
+      case "keep_waiting":
+        setPayError(null);
+        setPayBlock({ kind: "pending_waiting" });
+        break;
+      case "offer_discard":
+        setPayError(null);
+        setPayBlock({ kind: "pending_unknown", txHash });
+        break;
+      case "keep_retrying":
+        // Aquí nunca llega un "ok" —esto solo corre con un envío que falló—
+        // pero se estrecha explícitamente en vez de forzar el tipo.
+        setPayError(
+          describeRegisterError(
+            outcome.result === "rejected" ? "rejected" : "retry"
+          )
+        );
+        break;
+      case "start":
+        break;
+    }
+    return fate.action;
+  }
+
+  /**
+   * Descartar una jugada que la red nunca vio. Lo pide la PERSONA y solo se le
+   * ofrece cuando varios nodos coinciden en que ese hash no existe y ya pasó la
+   * gracia de propagación — nunca porque un nodo no lo encuentre.
+   */
+  function discardUnknownPending() {
+    const txHash = payBlock?.kind === "pending_unknown" ? payBlock.txHash : "";
+    if (txHash) drop(`play:${txHash}`);
+    setPayBlock(null);
+    setPayError(null);
+    refetchFreePlays();
+  }
+
   /** Reintenta el registro de una jugada ya pagada. NUNCA vuelve a cobrar. */
   async function resumePendingPlay() {
     const items = pending().filter((it) => it.id.startsWith("play:"));
@@ -673,19 +779,22 @@ export default function GameShell() {
     }
     setPayStage("registering");
     for (const item of items) {
-      const outcome = await deliver(item, BLOCKING_DELAYS);
+      const outcome = await deliver(item, BLOCKING_DELAYS, BLOCKING_LIMITS);
       if (outcome.result === "ok") continue;
-      setPayStage(null);
       if (outcome.error === "payer_mismatch") {
         const body = item.body as { txHash?: string };
+        setPayStage(null);
         setPayBlock({
           kind: "payer_mismatch",
           txHash: body?.txHash ?? "",
           payer: outcome.payer,
         });
-      } else {
-        setPayError(describeRegisterError(outcome.result));
+        return;
       }
+      // Revirtió: ese envío ya salió de la bandeja y los demás siguen su turno,
+      // así que el spinner tampoco se apaga todavía.
+      if (applyRegisterOutcome(outcome, item) === "drop_and_allow") continue;
+      setPayStage(null);
       return;
     }
     setPayStage(null);
@@ -754,7 +863,7 @@ export default function GameShell() {
     });
 
     return async () => {
-      const sent = await deliver(item, BLOCKING_DELAYS);
+      const sent = await deliver(item, BLOCKING_DELAYS, BLOCKING_LIMITS);
       if (sent.result !== "ok") return;
       // La marca ya está guardada: recarga el ranking de este mazo ANTES de
       // que el jugador vuelva al lobby. Invalidar no basta — el top no está
@@ -954,6 +1063,7 @@ export default function GameShell() {
               setAccessOpen(true);
             }}
             onResumePending={resumePendingPlay}
+            onDiscardPending={discardUnknownPending}
             deckSize={deckSize}
             onDeckChange={setDeckSize}
             freeByDeck={freeByDeck}

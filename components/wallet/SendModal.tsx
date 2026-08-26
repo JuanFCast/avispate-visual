@@ -3,10 +3,15 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import { celo } from "viem/chains";
-import { usePublicClient, useSwitchChain, useWriteContract } from "wagmi";
+import {
+  useAccount,
+  usePublicClient,
+  useSwitchChain,
+  useWriteContract,
+} from "wagmi";
 import { ERC20_ABI } from "@/lib/contracts";
 import { GAS_MARGIN_USDT } from "@/lib/pay";
-import { resolveFeeCurrency } from "@/lib/celo-tx";
+import { resolveFeeCurrency, walletSupportsFeeCurrency } from "@/lib/celo-tx";
 import { isMiniPay } from "@/lib/minipay";
 import { formatBalance, type TokenInfo } from "@/lib/tokens";
 import { useI18n } from "@/lib/i18n/client";
@@ -53,6 +58,8 @@ export default function SendModal({
   const publicClient = usePublicClient({ chainId: celo.id });
   const { writeContractAsync } = useWriteContract();
   const { switchChainAsync } = useSwitchChain();
+  // Para saber si esta wallet sabe pagar el gas en USDT (`lib/celo-tx.ts`).
+  const { connector } = useAccount();
 
   const [to, setTo] = useState("");
   const [amount, setAmount] = useState("");
@@ -71,7 +78,13 @@ export default function SendModal({
     // `resolveFeeCurrency` pidiera el límite explícito (`lib/celo-tx.ts`):
     // el de una jugada del reto diario, con holgura de sobra para un
     // `transfer()` de ERC-20, que gasta menos.
-    resolveFeeCurrency(publicClient, from as `0x${string}`, 150_000n, isMiniPay())
+    resolveFeeCurrency(
+      publicClient,
+      from as `0x${string}`,
+      150_000n,
+      isMiniPay(),
+      walletSupportsFeeCurrency(connector?.name)
+    )
       .then((o) => {
         if (alive) setGasInUsdt(Boolean(o.feeCurrency));
       })
@@ -130,8 +143,15 @@ export default function SendModal({
         publicClient,
         from as `0x${string}`,
         150_000n,
-        isMiniPay()
+        isMiniPay(),
+        walletSupportsFeeCurrency(connector?.name)
       );
+      // Misma regla que jugar: sin CELO y sin CIP-64 no se manda nada.
+      if (feeCurrency.shortOfGas) {
+        setError("pay.error.fee_celo");
+        setPhase("form");
+        return;
+      }
       // Firmar siempre en Celo: si la wallet está en otra red, se cambia.
       await switchChainAsync({ chainId: celo.id }).catch(() => {
         // Ya estaba en Celo, o la wallet no permite cambiar: el envío de

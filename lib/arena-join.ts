@@ -4,7 +4,11 @@ import { useCallback, useState } from "react";
 import { useAccount, useWriteContract, usePublicClient, useSwitchChain } from "wagmi";
 import { celo } from "viem/chains";
 import { ERC20_ABI, USDT_CELO_ADDRESS } from "./contracts";
-import { resolveFeeCurrency, RECEIPT_TIMEOUT_MS } from "./celo-tx";
+import {
+  resolveFeeCurrency,
+  walletSupportsFeeCurrency,
+  RECEIPT_TIMEOUT_MS,
+} from "./celo-tx";
 import { ensureAllowance, submitJoin } from "./arena-pay-sequence";
 import { isMiniPay } from "./minipay";
 import { decidePlayStart, confirmBeforeSigning } from "./pay-guard";
@@ -288,8 +292,12 @@ export function useArenaJoin(): ArenaJoinApi {
           publicClient,
           account,
           ARENA_TX_GAS_LIMIT,
-          isMiniPay()
+          isMiniPay(),
+          walletSupportsFeeCurrency(connector?.name)
         );
+        // Sin CELO y sin poder pagar en USDT no hay firma posible. Se para
+        // antes de tocar el escrow, no a mitad de la secuencia.
+        if (feeCurrency.shortOfGas) throw new Error("insufficient_gas_celo");
 
         // 3. Permiso de USDT, solo si falta. La secuencia (leer, aprobar,
         //    esperar y recuperarse de un recibo lento) es la misma función

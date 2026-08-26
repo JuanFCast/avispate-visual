@@ -144,6 +144,13 @@ export const en = {
   "pay.action.retry": "Try again",
   "pay.action.another_name": "Use a different name",
   "pay.action.resume": "Finish registering my game",
+  "pay.action.discard": "Discard it and play again",
+  "pay.block.pending_waiting":
+    "Your game is paid for and the network hasn't confirmed it yet. We keep checking — don't pay again.",
+  "pay.block.pending_unknown":
+    "We can't find that transaction on the network: several Celo nodes say it never arrived, so most likely you were not charged. You can discard it and play again.",
+  "pay.error.reverted":
+    "That transaction failed on the network, so you were not charged. You can play again.",
   "pay.error.generic": "We couldn't register the game. Try again.",
   "pay.error.unavailable":
     "The game isn't available yet (contract not configured, or no wallet connected).",
@@ -942,6 +949,13 @@ export const es: Record<MessageKey, string> = {
   "pay.action.retry": "Reintentar",
   "pay.action.another_name": "Usar otro nombre",
   "pay.action.resume": "Terminar de registrar mi jugada",
+  "pay.action.discard": "Descartarla y volver a jugar",
+  "pay.block.pending_waiting":
+    "Tu jugada está pagada y la red todavía no la confirma. Seguimos comprobando — no vuelvas a pagar.",
+  "pay.block.pending_unknown":
+    "No encontramos esa transacción en la red: varios nodos de Celo dicen que nunca llegó, así que lo más probable es que no se te haya cobrado. Puedes descartarla y volver a jugar.",
+  "pay.error.reverted":
+    "Esa transacción falló en la red, así que no se te cobró. Puedes volver a jugar.",
   "pay.error.generic": "No se pudo registrar la jugada. Inténtalo de nuevo.",
   "pay.error.unavailable":
     "El juego aún no está disponible (contrato no configurado o wallet sin conectar).",

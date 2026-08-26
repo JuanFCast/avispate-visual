@@ -10,11 +10,13 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import {
   resolveFeeCurrency,
+  walletSupportsFeeCurrency,
   GAS_SAFETY,
   RECEIPT_TIMEOUT_MS,
   type BalanceReader,
 } from "../lib/celo-tx.ts";
 import { CIP64_FEE_ADAPTER } from "../lib/contracts.ts";
+import { EMBEDDED_WALLET_NAME } from "../lib/wallet-identity.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -80,6 +82,70 @@ console.log("\n— Fuera de MiniPay: se conserva la decisión CELO/USDT de antes
     await resolveFeeCurrency(clienteCon(0n), ADDR, gasLimit, false),
     FEE
   );
+}
+
+console.log("\n— Una wallet que NO sabe CIP-64 nunca recibe feeCurrency —");
+{
+  /**
+   * La causa raíz del 2026-08-26. La wallet embebida de Privy no acepta
+   * `feeCurrency` —no está entre los campos que documenta su API—: descarta el
+   * campo, firma una transacción normal que paga el gas en CELO desde una
+   * wallet que no tiene CELO (que es por lo que se pidió USDT), y devuelve un
+   * hash que la red rechaza al difundirlo. Sin error. Mandárselo era el
+   * agujero negro; no mandárselo es este bloque.
+   */
+  const gasLimit = 100_000n;
+  const gasPrice = 1_000_000_000n;
+  const needed = (gasLimit * gasPrice * GAS_SAFETY) / 4n;
+  const clienteCon = (balance: bigint): BalanceReader => ({
+    getBalance: async () => balance,
+    getGasPrice: async () => gasPrice,
+  });
+
+  check(
+    "sin CELO y sin CIP-64: NO se firma, se avisa que falta gas",
+    await resolveFeeCurrency(clienteCon(0n), ADDR, gasLimit, false, false),
+    { shortOfGas: true }
+  );
+  check(
+    "un wei por debajo del borde, sin CIP-64: se para en vez de mandar algo que no se difunde",
+    await resolveFeeCurrency(clienteCon(needed - 1n), ADDR, gasLimit, false, false),
+    { shortOfGas: true }
+  );
+  check(
+    "con CELO de sobra, no saber CIP-64 da igual: se paga en CELO",
+    await resolveFeeCurrency(clienteCon(needed * 10n), ADDR, gasLimit, false, false),
+    {}
+  );
+  check(
+    "justo en el borde tampoco hace falta CIP-64",
+    await resolveFeeCurrency(clienteCon(needed), ADDR, gasLimit, false, false),
+    {}
+  );
+  check(
+    "quien SÍ sabe CIP-64 sigue cayendo a USDT igual que siempre",
+    await resolveFeeCurrency(clienteCon(0n), ADDR, gasLimit, false, true),
+    FEE
+  );
+  check(
+    "y el valor por defecto no cambia nada de lo que ya hacía",
+    await resolveFeeCurrency(clienteCon(0n), ADDR, gasLimit, false),
+    FEE
+  );
+
+  // Quién es quién, por el nombre que wagmi expone del conector.
+  check(
+    "la embebida de Privy no sabe CIP-64",
+    walletSupportsFeeCurrency(EMBEDDED_WALLET_NAME),
+    false
+  );
+  for (const nombre of ["MiniPay", "Rabby", "MetaMask", "Valora", undefined]) {
+    check(
+      `"${nombre ?? "(sin nombre)"}" se da por capaz, como hasta ahora`,
+      walletSupportsFeeCurrency(nombre),
+      true
+    );
+  }
 }
 
 console.log("\n— El adaptador es el de USDT (6 decimales) importado de contracts.ts, no uno suelto —");

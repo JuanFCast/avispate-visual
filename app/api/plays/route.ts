@@ -46,8 +46,38 @@ export async function POST(req: Request) {
     // Mismo cheque que en /api/scores: la transacción ES la prueba de que la
     // wallet pagó. Sin esto, cualquiera podría inventarse jugadas.
     const check = await verifyPlayTx(txHash, player, deckSize);
-    if (!check.ok || !check.player)
-      return NextResponse.json({ error: "invalid_payment" }, { status: 400 });
+    if (!check.ok || !check.player) {
+      /**
+       * Cada estado con su propio código, y no todos con `invalid_payment`.
+       *
+       * Esa respuesta única es lo que dejaba a un jugador atrapado: el cliente
+       * la trata como reintentable —y hace bien, casi siempre significa "el
+       * nodo todavía no ve la transacción"— así que un hash que la red nunca
+       * vio se reintentaba durante 48 h contra la nada. Ahora el cliente puede
+       * saber si esperar, si reintentar o si ofrecer una salida
+       * (`lib/pending-fate.ts`).
+       */
+      const [code, status] = ((): [string, number] => {
+        switch (check.status) {
+          // La cadena dice que revirtió: no cobró entrada ni gastó la gratis.
+          case "reverted":
+            return ["payment_reverted", 409];
+          // Existe y todavía no se mina. Esperar es lo correcto.
+          case "pending":
+            return ["payment_pending", 409];
+          // Varios nodos coinciden en que ese hash no existe.
+          case "unknown":
+            return ["payment_unknown", 409];
+          // No se pudo preguntar. NO se afirma nada sobre la jugada.
+          case "unavailable":
+            return ["chain_unavailable", 503];
+          // Minada y sin nuestro evento: sigue siendo `invalid_payment`.
+          default:
+            return ["invalid_payment", 400];
+        }
+      })();
+      return NextResponse.json({ error: code }, { status });
+    }
 
     // El perfil se abre SIEMPRE contra quien pagó según la cadena, nunca contra
     // lo que afirmó el navegador. Así el recibo queda a nombre del dueño real

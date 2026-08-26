@@ -217,7 +217,15 @@ export function reconcilePayer(input: {
  * propia vida: que la bandeja quede vacía no resuelve ninguno, así que
  * retirarlos aquí sería esconder un problema que sigue ahí.
  */
-const AVISOS_POR_PENDIENTE = new Set(["resume_pending", "payer_mismatch"]);
+const AVISOS_POR_PENDIENTE = new Set([
+  "resume_pending",
+  "payer_mismatch",
+  // Los dos veredictos de la cadena que también nacen de un envío pendiente:
+  // "está en vuelo" y "nadie la encuentra". Si la bandeja se vacía —porque el
+  // reenvío de fondo la registró— los dos sobran igual que los otros.
+  "pending_waiting",
+  "pending_unknown",
+]);
 
 /**
  * ¿Se puede retirar el candado del segundo cobro?

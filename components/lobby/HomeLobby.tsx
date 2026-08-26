@@ -40,6 +40,7 @@ interface Props {
   onReconnect: () => void;
   onPickAnotherName: () => void;
   onResumePending: () => void;
+  onDiscardPending: () => void;
   onShowHowTo: () => void;
 }
 
@@ -68,6 +69,7 @@ export default function HomeLobby({
   onReconnect,
   onPickAnotherName,
   onResumePending,
+  onDiscardPending,
   onShowHowTo,
 }: Props) {
   const t = useT();
@@ -86,8 +88,13 @@ export default function HomeLobby({
    * de "abandono la partida y ya no puedo empezar otra" no lo cazaba nadie.
    */
   const decision = decideLobbyCta({
+    // Los cuatro avisos que significan "hay una jugada sin registrar". Ninguno
+    // puede dejar que el botón ofrezca jugar: eso sería un segundo cobro.
     blockedByPending:
-      payBlock?.kind === "resume_pending" || payBlock?.kind === "payer_mismatch",
+      payBlock?.kind === "resume_pending" ||
+      payBlock?.kind === "payer_mismatch" ||
+      payBlock?.kind === "pending_waiting" ||
+      payBlock?.kind === "pending_unknown",
     profileReady: profile.ready,
     authenticated: profile.authenticated,
     profileLoading: profile.loading,
@@ -136,6 +143,7 @@ export default function HomeLobby({
         onReconnect={onReconnect}
         onPickAnotherName={onPickAnotherName}
         onResumePending={onResumePending}
+        onDiscardPending={onDiscardPending}
         onPress={() => {
           if (cta.action === "resume") return onResumePending();
           if (cta.action === "access") return onRequestAccess();

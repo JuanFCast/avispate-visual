@@ -169,11 +169,28 @@ console.log("— 3. Reglas de cobro y validación, intactas —\n");
     "sigue re-comprobando la cuenta pegado a la firma",
     /await assertSameAccount\(\);\n\s+const playHash/.test(pay)
   );
-  ok(
-    "la espera del recibo sigue con tope y sin cancelar la jugada",
-    /timeout: RECEIPT_TIMEOUT_MS/.test(pay) &&
-      /\} catch \{\s*\/\/ Sigue adelante con el hash/.test(pay)
-  );
+  /**
+   * Dos propiedades, y ninguna es una frase concreta: que la espera tenga tope,
+   * y que agotarse NO cancele la jugada. Buscar el texto del comentario ató
+   * esta prueba a una redacción y salió roja el día que ese `catch` pasó a
+   * sondear la red (`probeTxPresence`) sin que nada se hubiera roto. Ahora se
+   * mira el tramo entre la espera y `ensureWalletSession` y se exige que no
+   * haya un `throw`: si el dinero ya salió, un recibo lento no puede quitarle
+   * la jugada a nadie.
+   */
+  {
+    const desdeEspera = pay.slice(pay.indexOf("waitForTransactionReceipt({\n          hash: playHash"));
+    const tramo = desdeEspera.slice(0, desdeEspera.indexOf("void ensureWalletSession"));
+    ok(
+      "la espera del recibo sigue con tope y sin cancelar la jugada",
+      /timeout: RECEIPT_TIMEOUT_MS/.test(tramo) &&
+        /\} catch \{/.test(tramo) &&
+        !/throw/.test(tramo),
+      tramo.length === 0
+        ? "no se encontró la espera del recibo"
+        : "el tramo entre la espera y ensureWalletSession lanza, o perdió el tope"
+    );
+  }
   ok(
     "`ensureWalletSession` sigue corriendo tras la jugada, sin esperarse",
     /void ensureWalletSession\(account, playHash\);/.test(pay)
@@ -276,12 +293,32 @@ console.log("\n— 6. Guardar el hash NO es dar la jugada por buena —\n");
     "y que el evento lo emita el contrato del pozo",
     /l\.address\.toLowerCase\(\) === AVISPATE_POT_ADDRESS/.test(onchain)
   );
-  ok(
-    "`/api/plays` no escribe nada si esa verificación falla",
-    /if \(!check\.ok \|\| !check\.player\)\s*\n\s*return NextResponse\.json\(\{ error: "invalid_payment" \}/.test(
-      readFileSync(join(ROOT, "app/api/plays/route.ts"), "utf8").replace(/\r\n/g, "\n")
-    )
-  );
+  /**
+   * Lo que hay que garantizar es que el endpoint CORTA antes de escribir, no
+   * con qué frase corta. Buscar el texto exacto del `return` ataba esta prueba
+   * a una redacción: el día que el error dejó de ser uno solo —`payment_pending`,
+   * `payment_unknown`, `payment_reverted`…— salió roja sin que nada se hubiera
+   * roto. Ahora se mira el ORDEN, que es la propiedad de verdad: entre la
+   * verificación y la primera escritura tiene que haber un guardia con su
+   * `return`.
+   */
+  {
+    const route = readFileSync(
+      join(ROOT, "app/api/plays/route.ts"),
+      "utf8"
+    ).replace(/\r\n/g, "\n");
+    const desdeCheck = route.slice(
+      route.indexOf("const check = await verifyPlayTx")
+    );
+    const antesDeEscribir = desdeCheck.slice(0, desdeCheck.indexOf("upsert"));
+    ok(
+      "`/api/plays` no escribe nada si esa verificación falla",
+      antesDeEscribir.length > 0 &&
+        /if \(!check\.ok \|\| !check\.player\)/.test(antesDeEscribir) &&
+        /return NextResponse\.json/.test(antesDeEscribir),
+      "no hay un guardia con return entre verifyPlayTx y el primer upsert"
+    );
+  }
   ok(
     "guardar en la bandeja no toca la cadena ni valida nada",
     !/verifyPlayTx|getTransactionReceipt/.test(outbox)

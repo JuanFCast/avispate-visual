@@ -16,7 +16,13 @@ import {
   FEE_AMOUNT,
   APPROVE_UNITS,
 } from "./contracts";
-import { resolveFeeCurrency, RECEIPT_TIMEOUT_MS } from "./celo-tx";
+import {
+  resolveFeeCurrency,
+  walletSupportsFeeCurrency,
+  RECEIPT_TIMEOUT_MS,
+} from "./celo-tx";
+import { probeTxPresence } from "./tx-probe";
+import type { TxPresence } from "./tx-presence";
 import { isMiniPay } from "./minipay";
 import { confirmBeforeSigning, type PayDecision } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
@@ -64,7 +70,15 @@ const MIN_USDT_FOR_FEE = 5_000n; // 0.005 USDT
  * cuando lo que no tenía era CELO. El mensaje era el mismo para todo fallo que
  * dijera "insufficient", así que acusaba siempre al mismo token.
  */
-export type MissingFunds = "entry" | "gas";
+export type MissingFunds =
+  | "entry"
+  /** Falta USDT para la tarifa (se iba a pagar el gas en USDT). */
+  | "gas"
+  /**
+   * Falta CELO, y esta wallet no sabe pagar el gas en USDT. Es una carencia
+   * distinta porque la salida es distinta: aquí no sirve tener USDT.
+   */
+  | "gas_celo";
 
 /** Error de saldo, con la carencia identificada para poder contarla bien. */
 export class InsufficientFundsError extends Error {
@@ -148,6 +162,16 @@ export interface PlayResult {
   player: string;
   /** La transacción consumió la jugada gratis del día (según el contrato). */
   wasFree: boolean;
+  /**
+   * Si la red llegó a VER esa transacción.
+   *
+   * `mined` es el camino normal (llegó el recibo). Los demás salen de
+   * preguntarle a cada nodo cuando la espera del recibo se agota, y existen
+   * porque una wallet puede devolver un hash de algo que nunca difundió: sin
+   * esto, la pantalla anunciaba "Registrando jugada…" sobre una transacción
+   * inexistente y el envío se quedaba 48 h reintentándose contra la nada.
+   */
+  presence: TxPresence;
 }
 
 /**
@@ -242,8 +266,15 @@ export function usePayToPlay() {
         publicClient,
         account,
         PLAY_GAS_LIMIT,
-        isMiniPay()
+        isMiniPay(),
+        walletSupportsFeeCurrency(connector?.name)
       );
+      /**
+       * Sin CELO y sin poder pagar en USDT no hay transacción posible. Se para
+       * ANTES de firmar —con la plata todavía dentro— en vez de mandar una que
+       * la red va a descartar en silencio.
+       */
+      if (feeCurrency.shortOfGas) throw new InsufficientFundsError("gas_celo");
 
       // Saldo antes de la firma: si algo falta, se dice CUÁL falta en vez de
       // mandar al jugador a una transacción que va a revertir. Si el saldo no
@@ -332,13 +363,28 @@ export function usePayToPlay() {
       // cobró. El servidor vuelve a verificar el hash de todos modos antes de
       // aceptar nada.
       onStage("confirming");
+      let presence: TxPresence = "mined";
       try {
         await publicClient.waitForTransactionReceipt({
           hash: playHash,
           timeout: RECEIPT_TIMEOUT_MS,
         });
       } catch {
-        // Sigue adelante con el hash; el registro en el servidor decide.
+        /**
+         * Agotada la espera, la pregunta deja de ser "¿ya está?" y pasa a ser
+         * "¿existe siquiera?", que no es lo mismo y hasta ahora nadie hacía:
+         * se seguía adelante con el hash y la pantalla anunciaba "Registrando
+         * jugada…" sobre una transacción que la red podía no haber visto nunca.
+         *
+         * Se le pregunta a cada nodo por separado —el `fallback` de viem no
+         * sirve para esto, ver `tx-presence.ts`— y hace falta consenso para dar
+         * algo por inexistente. Un nodo lento no puede cancelar una jugada.
+         *
+         * Lo que NO se hace aquí: cancelar el cobro. Si la transacción existe,
+         * el dinero ya salió y quien decide es el servidor. Esto solo sirve
+         * para que la pantalla no mienta.
+         */
+        presence = await probeTxPresence(playHash);
       }
 
       // Con la jugada confirmada, esa transacción es prueba de que la wallet es
@@ -349,7 +395,12 @@ export function usePayToPlay() {
       // tocar el resultado de la partida.
       void ensureWalletSession(account, playHash);
 
-      return { txHash: playHash, player: account.toLowerCase(), wasFree };
+      return {
+        txHash: playHash,
+        player: account.toLowerCase(),
+        wasFree,
+        presence,
+      };
     },
     [address, connector, chainId, publicClient, writeContractAsync, switchChainAsync]
   );
