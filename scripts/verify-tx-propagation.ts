@@ -82,6 +82,43 @@ console.log("\n— 1. La capacidad de la wallet llega a la decisión del gas —
     pay.indexOf("if (feeCurrency.shortOfGas)") < pay.indexOf("writeContractAsync({"),
     "el freno tiene que llegar con la plata todavía dentro"
   );
+
+  /**
+   * Y que los tres digan que falta CELO, no "no tienes saldo".
+   *
+   * En la Arena esto falló de verdad: el error viajaba como texto
+   * (`insufficient_gas_celo`) y lo cazaba antes el `/insufficient/` genérico,
+   * que manda a recargar USDT — el token equivocado, y encima el que sí tiene.
+   * Es el mismo error que ya documenta `MissingFunds` en `pay.ts`: un mensaje
+   * único para todo lo que dice "insufficient" acusa siempre al mismo token.
+   */
+  ok(
+    "el reto diario traduce la carencia a 'falta CELO'",
+    /gas_celo.*\n.*pay\.error\.fee_celo|if \(err\.missing === "gas_celo"\) return "pay\.error\.fee_celo";/.test(
+      leer("components/GameShell.tsx")
+    ),
+    "GameShell no distingue gas_celo de la falta de USDT"
+  );
+  {
+    const arena = leer("lib/arena-join.ts");
+    ok(
+      "la Arena traduce la carencia a 'falta CELO'",
+      /insufficient_gas_celo/.test(arena) &&
+        arena.indexOf("/insufficient_gas_celo/") <
+          arena.indexOf("/insufficient|exceeds balance"),
+      "el caso concreto tiene que ir ANTES del /insufficient/ general"
+    );
+  }
+  {
+    const send = leer("components/wallet/SendModal.tsx");
+    const desdeCorte = send.slice(send.indexOf("if (feeCurrency.shortOfGas)"));
+    ok(
+      "el envío de tokens dice 'falta CELO' y devuelve el formulario",
+      /setError\("pay\.error\.fee_celo"\)/.test(desdeCorte.slice(0, 300)) &&
+        /setPhase\("form"\)/.test(desdeCorte.slice(0, 300)),
+      "sin volver a 'form' el modal se queda en 'enviando' para siempre"
+    );
+  }
 }
 
 /* ── 2. La red de seguridad: el hash no basta ────────────────────────────── */

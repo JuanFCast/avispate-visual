@@ -428,9 +428,15 @@ export function useArenaJoin(): ArenaJoinApi {
               ? "arena.pay.no_storage"
               : /reject|denied|cancel/i.test(msg)
                 ? "pay.error.rejected"
-                : /insufficient|exceeds balance|transfer amount/i.test(msg)
-                  ? "pay.error.insufficient"
-                  : "pay.error.generic"
+                : // Falta CELO Y esta wallet no sabe pagar el gas en USDT. Va
+                  // ANTES del caso general porque ese texto también dice
+                  // "insufficient" y se lo llevaba todo — diciendo "no tienes
+                  // saldo", que manda a recargar el token equivocado.
+                  /insufficient_gas_celo/.test(msg)
+                  ? "pay.error.fee_celo"
+                  : /insufficient|exceeds balance|transfer amount/i.test(msg)
+                    ? "pay.error.insufficient"
+                    : "pay.error.generic"
         );
         setStage(null);
         return false;
