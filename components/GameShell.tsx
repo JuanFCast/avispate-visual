@@ -30,8 +30,10 @@ import {
   pending,
   pendingPlay,
   repairPendingPlayer,
+  subscribeOutbox,
 } from "@/lib/outbox";
 import {
+  decidePendingBlockRelease,
   decidePlayStart,
   type PayDecision,
   type PendingPlay,
@@ -314,6 +316,57 @@ export default function GameShell() {
     const left = pendingPlay();
     if (left) setPayBlock({ kind: "resume_pending", pending: left });
   }, []);
+
+  /**
+   * ...y se retira solo cuando su motivo desaparece.
+   *
+   * El candado lo pone el efecto de arriba al abrir; quien vacía la bandeja es
+   * OTRO componente, `OutboxBridge`, que vive en los providers y reenvía lo
+   * pendiente en cuanto carga la app. Los efectos del hijo corren antes que los
+   * del padre, así que el candado ganaba siempre la carrera y nadie lo apagaba:
+   * el botón ofrecía terminar de registrar una jugada que el servidor ya había
+   * aceptado un segundo antes. No se cobraba de más —tocarlo no encontraba nada
+   * y lo limpiaba— pero el botón mentía, y en MiniPay, sin cerrar sesión, no
+   * había otra forma de salir del aviso.
+   *
+   * Aquí solo se escucha. La regla —qué avisos se retiran y con qué condición—
+   * es pura y vive en `decidePendingBlockRelease`, y NUNCA retira nada mientras
+   * quede una jugada pagada sin registrar: eso es lo que impide el segundo
+   * cobro.
+   */
+  useEffect(() => {
+    const revisar = () =>
+      setPayBlock((actual) =>
+        decidePendingBlockRelease({
+          blockKind: actual?.kind ?? null,
+          pending: pendingPlay(),
+          paying: payStage !== null,
+        })
+          ? null
+          : actual
+      );
+    revisar();
+    return subscribeOutbox(revisar);
+  }, [payStage]);
+
+  /**
+   * "Seguimos intentando registrar tu jugada" deja de ser cierto en el mismo
+   * instante en que la bandeja queda vacía. Es el otro rastro del mismo fallo:
+   * el aviso se retiraba pero el texto de al lado seguía diciendo que algo
+   * había quedado a medias.
+   *
+   * Solo se borra ESE mensaje. `pay.register.rejected` (rechazo definitivo) se
+   * queda: también vacía la bandeja, pero es una noticia que la persona tiene
+   * que leer, no un residuo.
+   */
+  useEffect(() => {
+    if (payError !== "pay.register.retry") return;
+    const revisar = () => {
+      if (!pendingPlay()) setPayError(null);
+    };
+    revisar();
+    return subscribeOutbox(revisar);
+  }, [payError]);
 
   function toggleMuted() {
     const next = !muted;

@@ -208,3 +208,49 @@ export function reconcilePayer(input: {
   if (payer && payer === claimed) return { kind: "match", payer };
   return { kind: "mismatch", payer, claimed };
 }
+
+/**
+ * Los DOS únicos avisos que existen PORQUE hay una jugada pagada sin registrar.
+ *
+ * Los demás (`reconnect`, `account_changed`, `wrong_wallet`, `checking`,
+ * `needs_name`, `name_taken`) hablan de la wallet o del nombre y tienen su
+ * propia vida: que la bandeja quede vacía no resuelve ninguno, así que
+ * retirarlos aquí sería esconder un problema que sigue ahí.
+ */
+const AVISOS_POR_PENDIENTE = new Set(["resume_pending", "payer_mismatch"]);
+
+/**
+ * ¿Se puede retirar el candado del segundo cobro?
+ *
+ * El candado se pone al abrir la app, leyendo la bandeja del dispositivo, y
+ * hasta ahora NADIE lo apagaba: el reenvío de fondo (`flushOutbox`) registraba
+ * la jugada y borraba el envío, pero el aviso en pantalla seguía puesto. El
+ * botón mentía —ofrecía terminar de registrar algo ya registrado— y solo
+ * tocarlo lo limpiaba.
+ *
+ * La regla es una y se lee sola: **el candado se retira cuando desaparece su
+ * motivo, y su motivo es que haya dinero sin registrar.** Mientras
+ * `pendingPlay()` devuelva algo, no se toca nada — es lo que impide el segundo
+ * cobro, y esta función no puede debilitarlo.
+ *
+ * `blockKind` entra como texto a propósito: el tipo `PayBlock` vive en
+ * `components/GameShell.tsx` y este módulo tiene que poder cargarse desde
+ * `node` sin arrastrar React (ver `scripts/verify-pending-release.ts`).
+ */
+export function decidePendingBlockRelease(input: {
+  /** El aviso que hay puesto ahora mismo, o null si no hay ninguno. */
+  blockKind: string | null;
+  /** Lo que queda en la bandeja de este dispositivo. */
+  pending: PendingPlay | null;
+  /** Hay un cobro o un registro EN CURSO en esta pestaña. */
+  paying: boolean;
+}): boolean {
+  if (input.blockKind === null) return false;
+  if (!AVISOS_POR_PENDIENTE.has(input.blockKind)) return false;
+  // El motivo sigue vivo: hay una jugada pagada que el servidor no tiene.
+  if (input.pending) return false;
+  // Con una jugada en curso manda quien la conduce (`handleStart` /
+  // `resumePendingPlay`), que ya pone y quita el aviso paso a paso. Un oyente
+  // de fondo no se mete en mitad de una decisión que está tomándose.
+  return !input.paying;
+}

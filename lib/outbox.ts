@@ -1,6 +1,6 @@
 "use client";
 
-import { postWithRetry, type SendOutcome } from "./submit";
+import { postWithRetry, type SendOutcome } from "./submit.ts";
 
 /**
  * Bandeja de salida en el dispositivo.
@@ -69,6 +69,71 @@ function write(items: OutboxItem[]): void {
     // localStorage lleno o bloqueado (modo privado). El envío en curso sigue
     // funcionando; lo que se pierde es la red de seguridad ante un cierre.
   }
+  // Se avisa SIEMPRE, incluso si el guardado falló: quien escucha vuelve a
+  // leer la bandeja y decide con lo que hay, no con lo que creíamos escribir.
+  notify();
+}
+
+/**
+ * ── Quién está mirando la bandeja ──────────────────────────────────────────
+ *
+ * Existe por un fallo concreto y reproducible: el candado del segundo cobro se
+ * pone al ABRIR (`GameShell` lee `pendingPlay()` al montar) y el reenvío de
+ * fondo (`OutboxBridge`) vacía la bandeja un segundo después. Los efectos del
+ * hijo corren antes que los del padre, así que el candado ganaba SIEMPRE la
+ * carrera y nadie volvía a apagarlo: el botón seguía ofreciendo "terminar de
+ * registrar" una jugada que ya estaba registrada, y solo tocarlo lo limpiaba.
+ *
+ * Esto no decide nada —la regla vive en `decidePendingBlockRelease`, en
+ * `pay-guard.ts`, para poder correrla sin navegador—: solo avisa de que la
+ * bandeja cambió, y quien escucha vuelve a leerla.
+ */
+type OutboxListener = () => void;
+
+const listeners = new Set<OutboxListener>();
+
+function notify(): void {
+  // Copia: un oyente puede darse de baja dentro de su propia llamada.
+  for (const fn of Array.from(listeners)) {
+    try {
+      fn();
+    } catch {
+      // Un oyente roto NO puede tumbar a los demás ni, sobre todo, salir por
+      // `enqueue`: ahí arriba está el recibo de una jugada recién cobrada,
+      // guardándose sin un solo `await` de por medio. Avisar es un extra;
+      // guardar es la razón de ser de este archivo.
+    }
+  }
+}
+
+/**
+ * Cambios hechos en OTRA pestaña. El mismo `localStorage`, la misma jugada: si
+ * allí se registró, aquí tampoco hay ya nada que terminar. `key === null` es
+ * un `clear()` entero, que también nos toca.
+ */
+function onStorage(ev: StorageEvent): void {
+  if (ev.key !== null && ev.key !== KEY) return;
+  notify();
+}
+
+/**
+ * Escucha los cambios de la bandeja. Devuelve la baja.
+ *
+ * UN solo oyente de `storage` para todos los suscriptores, puesto con el
+ * primero y retirado con el último — simétrico a propósito: acumular oyentes
+ * que contestan con estado viejo ya costó un día entero en `embedded-wallet`.
+ */
+export function subscribeOutbox(fn: OutboxListener): () => void {
+  listeners.add(fn);
+  if (listeners.size === 1 && typeof window !== "undefined") {
+    window.addEventListener("storage", onStorage);
+  }
+  return () => {
+    listeners.delete(fn);
+    if (listeners.size === 0 && typeof window !== "undefined") {
+      window.removeEventListener("storage", onStorage);
+    }
+  };
 }
 
 /**
