@@ -115,12 +115,15 @@ export function missingFundsFor(params: {
   usdtBalance: bigint;
   /** La jugada cobra entrada (no es la gratis del día). */
   needsEntry: boolean;
+  /** Cuánto cuesta la entrada. Por defecto, la del reto diario. */
+  entryUnits?: bigint;
 }): MissingFunds | null {
   // Con CELO suficiente la tarifa está cubierta y solo queda mirar la entrada.
   const feeReserve = params.gasInUsdt ? MIN_USDT_FOR_FEE : 0n;
   // La tarifa en USDT sale del MISMO saldo que la entrada, así que se suman.
   if (params.gasInUsdt && params.usdtBalance < feeReserve) return "gas";
-  if (params.needsEntry && params.usdtBalance < FEE_AMOUNT + feeReserve) {
+  const entry = params.entryUnits ?? FEE_AMOUNT;
+  if (params.needsEntry && params.usdtBalance < entry + feeReserve) {
     return "entry";
   }
   return null;

@@ -20,8 +20,11 @@ const ConnectModalBridge = dynamic(
   { ssr: false }
 );
 
-/** Igual que en el reto individual: el único error que se arregla recargando. */
-const FUNDS_ERROR: MessageKey = "pay.error.insufficient";
+/** Igual que en el reto individual: los errores que se arreglan recargando. */
+const FUNDS_ERRORS: readonly MessageKey[] = [
+  "pay.error.insufficient",
+  "pay.error.fee_usdt",
+];
 
 /**
  * Los avisos que se resuelven CONECTANDO la billetera correcta, no
@@ -184,12 +187,14 @@ export default function ArenaSeatPayment({
 
       {error && (
         <p className="alias-error" aria-live="polite">
-          {t(error, { entry })}
+          {/* `fee` también: los textos de saldo vienen del reto diario y
+              nombran la entrada así. Sin él salía "{fee}" tal cual. */}
+          {t(error, { entry, fee: entry })}
           {/* Faltó USDT: el camino de recarga va pegado al aviso, igual que en
               el reto individual. Solo dentro de MiniPay — fuera de ahí la
               cartera del perfil ya trae bridge/swap, y aquí no hay sitio
               para repetir esas tres opciones. */}
-          {error === FUNDS_ERROR && inMiniPay && (
+          {FUNDS_ERRORS.includes(error) && inMiniPay && (
             <>
               {" "}
               <a className="lobby-addcash" href={MINIPAY_ADD_CASH}>

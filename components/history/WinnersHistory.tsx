@@ -15,7 +15,8 @@ export interface HistoryRound {
   prizeUnits: string | null;
   winnerAlias: string | null;
   /** Ya viene abreviada del servidor. */
-  winnerWallet: string | null;
+  /** Hubo ganador aunque no tenga alias (entonces se muestra un genérico). */
+  hasWinner: boolean;
   averageMs: number | null;
   errors: number | null;
   txHash: string | null;
@@ -106,7 +107,8 @@ export default function WinnersHistory() {
     <>
       <ul className="hist-list">
         {rounds.map((round) => {
-          const name = round.winnerAlias || round.winnerWallet;
+          const name =
+            round.winnerAlias || (round.hasWinner ? t("hist.unnamed") : null);
           return (
             <li
               key={`${round.roundDate}-${round.deck}`}

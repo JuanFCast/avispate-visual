@@ -116,6 +116,12 @@ export const en = {
     "Your game is already paid for — we just couldn't register it. Do not pay again: finish registering it.",
   "pay.block.payer_mismatch":
     "The payment came from {address}, not from the wallet we had. Connect that one to finish. You have not been charged twice.",
+  // Las dos de abajo son las mismas sin dirección, para MiniPay: allí está
+  // prohibido mostrarla, ni recortada.
+  "pay.block.wrong_wallet_plain":
+    "This account belongs to a different wallet than the one open here. Use your account's wallet to play — it's the one that collects your prizes. Nothing was charged.",
+  "pay.block.payer_mismatch_plain":
+    "The payment came from a different wallet than the one we had. Open that one to finish. You have not been charged twice.",
   /* ---- Arena con entrada: pagar la silla ---- */
   "arena.pay.title": "Pay your entry to take your seat",
   "arena.pay.support":
@@ -578,6 +584,7 @@ export const en = {
     "Sign in with your email or connect your wallet to see your profile.",
   "profile.guard.cta": "Go to the home screen",
   "profile.creating_wallet": "Creating your wallet…",
+  "profile.link.howto": "How to play",
   "profile.link.about": "About Avíspate",
   "profile.link.support": "Help and support",
   "profile.link.logout": "Log out",
@@ -703,6 +710,7 @@ export const en = {
   "hist.payout.pending": "Payment processing",
   "hist.payout.rollover": "Prize rolled over",
   "hist.winner": "WINNER",
+  "hist.unnamed": "Unnamed player",
   "hist.no_winner": "NO WINNER",
   "hist.nobody": "Nobody played this round",
   "hist.time": "Time: {time} per card",
@@ -927,6 +935,10 @@ export const es: Record<MessageKey, string> = {
     "Tu jugada ya está pagada, solo faltó registrarla. No vuelvas a pagar: termina de registrarla.",
   "pay.block.payer_mismatch":
     "El pago salió de {address}, no de la billetera que teníamos. Conéctala para terminar. No se te ha cobrado dos veces.",
+  "pay.block.wrong_wallet_plain":
+    "Esta cuenta está ligada a otra billetera, no a la que tienes abierta aquí. Usa la billetera de tu cuenta para jugar — es la que cobra tus premios. No te hemos cobrado nada.",
+  "pay.block.payer_mismatch_plain":
+    "El pago salió de otra billetera, no de la que teníamos. Ábrela para terminar. No se te ha cobrado dos veces.",
   /* ---- Arena con entrada: pagar la silla ---- */
   "arena.pay.title": "Paga tu entrada para tomar tu silla",
   "arena.pay.support":
@@ -1355,6 +1367,7 @@ export const es: Record<MessageKey, string> = {
     "Inicia sesión con tu correo o conecta tu wallet para ver tu perfil.",
   "profile.guard.cta": "Ir al inicio",
   "profile.creating_wallet": "Creando tu wallet…",
+  "profile.link.howto": "Cómo se juega",
   "profile.link.about": "Acerca de Avíspate",
   "profile.link.support": "Ayuda y soporte",
   "profile.link.logout": "Cerrar sesión",
@@ -1479,6 +1492,7 @@ export const es: Record<MessageKey, string> = {
   "hist.payout.paid": "Premio pagado",
   "hist.payout.pending": "Pago procesándose",
   "hist.payout.rollover": "Premio acumulado",
+  "hist.unnamed": "Jugador sin nombre",
   "hist.winner": "GANADOR",
   "hist.no_winner": "SIN GANADOR",
   "hist.nobody": "Nadie jugó esta ronda",

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { DECK_OPTIONS, formatMs } from "@/lib/game";
-import { shortAddress, useActiveWallet } from "@/lib/wallet";
+import { useActiveWallet } from "@/lib/wallet";
 import { useProfile } from "@/lib/profile-context";
 import {
   fmtUsdt,
@@ -105,11 +105,10 @@ export default function GlobalLeaderboard({ initialDeck = 10 }: Props) {
                       <span className="lb-you">{t("top3.you")}</span>
                     )}
                   </span>
+                  {/* Sin dirección, ni recortada: MiniPay prohíbe mostrarla
+                      en cualquier parte. La dirección solo sirve para `isMe`. */}
                   <small>
-                    {entry.walletAddress
-                      ? shortAddress(entry.walletAddress)
-                      : t("lb.no_wallet")}{" "}
-                    · {entry.errors} {t("lb.err")}
+                    {entry.errors} {t("lb.err")}
                   </small>
                 </span>
                 <span className="lb-time">

@@ -49,6 +49,7 @@ import { probeWallet } from "@/lib/wallet-access";
 import { useIsMiniPay } from "@/lib/minipay";
 import { useActiveWallet, useCanonicalWallet } from "@/lib/wallet";
 import { checkAliasBeforePaying } from "@/lib/alias-claim";
+import { classifyTxError } from "@/lib/tx-errors";
 import { useWalletAlias } from "@/lib/wallet-alias";
 import { useT } from "@/lib/i18n/client";
 import type { MessageKey } from "@/lib/i18n";
@@ -136,21 +137,20 @@ function describePayError(err: unknown): MessageKey {
       ? "pay.error.fee_usdt"
       : "pay.error.insufficient";
   }
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/rejected|denied|User rejected/i.test(msg)) return "pay.error.rejected";
-  // "insufficient funds for gas * price + value" y compañía: la red pidió su
-  // tarifa en moneda nativa y la wallet no tiene CELO. Va antes del caso
-  // general porque ese texto también dice "insufficient" y se lo llevaba todo.
-  if (
-    /insufficient funds|gas required exceeds|intrinsic transaction cost|max fee per gas/i.test(
-      msg
-    )
-  )
-    return "pay.error.fee_celo";
-  if (/insufficient|exceeds balance|transfer amount/i.test(msg))
-    return "pay.error.insufficient";
-  if (/pot_not_configured/.test(msg)) return "pay.error.not_configured";
-  if (/no_wallet/.test(msg)) return "pay.error.no_wallet";
+  // Lo que dice la wallet o la red se lee por su CÓDIGO, nunca por el texto:
+  // es regla de MiniPay, y el texto cambia con el idioma de la wallet.
+  switch (classifyTxError(err)) {
+    case "rejected":
+      return "pay.error.rejected";
+    case "fee_native":
+      return "pay.error.fee_celo";
+    case "insufficient":
+      return "pay.error.insufficient";
+  }
+  // Errores nuestros (`pay.ts`): su mensaje ES su código.
+  const msg = err instanceof Error ? err.message : "";
+  if (msg === "pot_not_configured") return "pay.error.not_configured";
+  if (msg === "no_wallet") return "pay.error.no_wallet";
   return "pay.error.generic";
 }
 
@@ -268,6 +268,18 @@ export default function GameShell() {
   // Tutorial "Cómo se juega": aparece solo la primera visita y puede
   // reabrirse desde el botón del inicio. Solo vive en la fase de setup.
   const howTo = useHowToPlay();
+
+  // Y desde el menú del Perfil (`/?como-jugar`): MiniPay exige que "How to
+  // Use" esté en el menú, no solo en el inicio. Se quita el parámetro para que
+  // recargar no lo vuelva a abrir.
+  const { replay: replayHowTo } = howTo;
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("como-jugar")) return;
+    url.searchParams.delete("como-jugar");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+    replayHowTo();
+  }, [replayHowTo]);
 
   /**
    * Alias efectivo del jugador. Manda el de la WALLET, no el de la sesión: el

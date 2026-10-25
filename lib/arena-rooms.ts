@@ -221,12 +221,6 @@ export function initialOf(name: string): string {
   return first ? first.toUpperCase() : "🐝";
 }
 
-/** `0xabc…1234`: la wallet como nombre de reserva mientras no haya alias. */
-export function shortWallet(address: string | null | undefined): string {
-  if (!address) return "";
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
-
 /** La mesa está completa. */
 export function roomIsFull(room: Pick<RoomView, "players" | "maxPlayers">): boolean {
   return room.players.length >= room.maxPlayers;

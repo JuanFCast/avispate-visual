@@ -25,7 +25,14 @@ export function AboutEs() {
           comparte exactamente un símbolo con la anterior: lo encuentras, lo
           tocas y sigues. Gana quien vea más rápido.
         </p>
-        <p>Lo hace Casgo Studio, un estudio independiente.</p>
+        {/* MiniPay exige decirlo así, explícito: quién lo opera y que no es
+            Opera ni MiniPay. Un logo no basta. */}
+        <p>
+          <strong>
+            Avíspate es operado por Casgo Studio, un estudio independiente. No
+            está afiliado a Opera, a MiniPay ni a Celo.
+          </strong>
+        </p>
       </section>
 
       <section className="profile-section legal-section">
@@ -58,9 +65,6 @@ export function AboutEs() {
           El código de los dos contratos está publicado y verificado:
         </p>
         <ContractLinks />
-        <p>
-          Avíspate no es operado ni respaldado por MiniPay ni por Celo.
-        </p>
       </section>
 
       <section className="profile-section legal-section">
@@ -90,7 +94,12 @@ export function AboutEn() {
           exactly one symbol with the one before it: spot it, tap it, keep
           going. Whoever sees fastest wins.
         </p>
-        <p>It is made by Casgo Studio, an independent studio.</p>
+        <p>
+          <strong>
+            Avíspate is operated by Casgo Studio, an independent studio. It is
+            not affiliated with Opera, MiniPay or Celo.
+          </strong>
+        </p>
       </section>
 
       <section className="profile-section legal-section">
@@ -120,7 +129,6 @@ export function AboutEn() {
         </p>
         <p>The code of both contracts is published and verified:</p>
         <ContractLinks />
-        <p>Avíspate is not operated or endorsed by MiniPay or Celo.</p>
       </section>
 
       <section className="profile-section legal-section">

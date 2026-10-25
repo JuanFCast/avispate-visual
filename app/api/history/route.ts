@@ -22,11 +22,6 @@ interface ScoreRow {
   errors: number;
 }
 
-/** Nunca sale de aquí una dirección completa ni un correo. */
-function shorten(address: string | null): string | null {
-  if (!address) return null;
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
 
 function key(round: string, deck: number, profile: string): string {
   return `${round}|${deck}|${profile}`;
@@ -95,7 +90,9 @@ export async function GET(req: Request) {
         deck: r.deck_size,
         prizeUnits: r.amount_units === null ? null : String(r.amount_units),
         winnerAlias: r.profiles?.alias ?? null,
-        winnerWallet: shorten(r.winner_wallet),
+        // Ni la dirección recortada: MiniPay prohíbe mostrarla. Si el ganador
+        // no tiene alias, la pantalla pone un nombre genérico traducido.
+        hasWinner: Boolean(r.winner_wallet),
         averageMs: score?.average_ms ?? null,
         errors: score?.errors ?? null,
         txHash: r.tx_hash,

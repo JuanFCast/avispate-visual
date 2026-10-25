@@ -10,6 +10,8 @@ import {
   RECEIPT_TIMEOUT_MS,
 } from "./celo-tx";
 import { ensureAllowance, submitJoin } from "./arena-pay-sequence";
+import { InsufficientFundsError, missingFundsFor } from "./pay";
+import { classifyTxError } from "./tx-errors";
 import { isMiniPay } from "./minipay";
 import { decidePlayStart, confirmBeforeSigning } from "./pay-guard";
 import { probeWallet } from "./wallet-access";
@@ -235,6 +237,36 @@ async function registerAndClaim(params: {
   return true;
 }
 
+/**
+ * Qué decirle a quien no pudo pagar su silla. Devuelve la CLAVE del mensaje.
+ *
+ * Lo que viene de la wallet o de la red se lee por CÓDIGO (`tx-errors.ts`),
+ * nunca por el texto — regla de MiniPay. Lo nuestro llega con su propio tipo.
+ */
+function describeJoinError(e: unknown): MessageKey {
+  if (e instanceof ApprovePendingError) return "arena.pay.approve_pending";
+  if (e instanceof InsufficientFundsError) {
+    // `gas_celo` no se arregla con USDT: la wallet no sabe pagar el gas con
+    // él, así que lo que falta es CELO.
+    if (e.missing === "gas_celo") return "pay.error.fee_celo";
+    return e.missing === "gas" ? "pay.error.fee_usdt" : "pay.error.insufficient";
+  }
+  // `prepareSeat` lanza este con su código como mensaje.
+  if (e instanceof Error && e.message === "seat_store_unavailable") {
+    return "arena.pay.no_storage";
+  }
+  switch (classifyTxError(e)) {
+    case "rejected":
+      return "pay.error.rejected";
+    case "fee_native":
+      return "pay.error.fee_celo";
+    case "insufficient":
+      return "pay.error.insufficient";
+    default:
+      return "pay.error.generic";
+  }
+}
+
 export function useArenaJoin(): ArenaJoinApi {
   const { address, chainId, connector } = useAccount();
   // La wallet del perfil, la que cobra el premio. Entra en el guardián para que
@@ -297,7 +329,33 @@ export function useArenaJoin(): ArenaJoinApi {
         );
         // Sin CELO y sin poder pagar en USDT no hay firma posible. Se para
         // antes de tocar el escrow, no a mitad de la secuencia.
-        if (feeCurrency.shortOfGas) throw new Error("insufficient_gas_celo");
+        if (feeCurrency.shortOfGas) throw new InsufficientFundsError("gas_celo");
+
+        // Saldo antes de la primera firma, como en el reto diario: la entrada
+        // MÁS la tarifa de red, que en MiniPay sale del mismo USDT. Es regla de
+        // publicación de MiniPay, y la alternativa era enterarse cuando la
+        // transacción ya había fallado. Si el saldo no se puede leer no se
+        // bloquea a nadie: que decida la cadena.
+        let usdtBalance: bigint | null = null;
+        try {
+          usdtBalance = (await publicClient.readContract({
+            address: USDT_CELO_ADDRESS as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: "balanceOf",
+            args: [account],
+          })) as bigint;
+        } catch {
+          usdtBalance = null;
+        }
+        if (usdtBalance !== null) {
+          const missing = missingFundsFor({
+            gasInUsdt: Boolean(feeCurrency.feeCurrency),
+            usdtBalance,
+            needsEntry: true,
+            entryUnits,
+          });
+          if (missing) throw new InsufficientFundsError(missing);
+        }
 
         // 3. Permiso de USDT, solo si falta. La secuencia (leer, aprobar,
         //    esperar y recuperarse de un recibo lento) es la misma función
@@ -422,24 +480,7 @@ export function useArenaJoin(): ArenaJoinApi {
         setStage(null);
         return true;
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setError(
-          e instanceof ApprovePendingError
-            ? "arena.pay.approve_pending"
-            : /seat_store_unavailable/.test(msg)
-              ? "arena.pay.no_storage"
-              : /reject|denied|cancel/i.test(msg)
-                ? "pay.error.rejected"
-                : // Falta CELO Y esta wallet no sabe pagar el gas en USDT. Va
-                  // ANTES del caso general porque ese texto también dice
-                  // "insufficient" y se lo llevaba todo — diciendo "no tienes
-                  // saldo", que manda a recargar el token equivocado.
-                  /insufficient_gas_celo/.test(msg)
-                  ? "pay.error.fee_celo"
-                  : /insufficient|exceeds balance|transfer amount/i.test(msg)
-                    ? "pay.error.insufficient"
-                    : "pay.error.generic"
-        );
+        setError(describeJoinError(e));
         setStage(null);
         return false;
       }

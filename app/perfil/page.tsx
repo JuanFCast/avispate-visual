@@ -152,7 +152,10 @@ export default function PerfilPage() {
           conectarla. */}
       {verdict.kind === "connect_canonical" && (
         <p className="room-warn" role="status">
-          {verdict.connected
+          {/* En MiniPay, sin direcciones: su reglamento prohíbe mostrarlas. */}
+          {inMiniPay
+            ? t("pay.block.wrong_wallet_plain")
+            : verdict.connected
             ? t("profile.wallet.mismatch", {
                 connected: shortAddress(verdict.connected),
                 canonical: shortAddress(verdict.canonical),
@@ -176,6 +179,9 @@ export default function PerfilPage() {
       <section className="profile-links">
         <Link className="profile-link-row" href="/stats">
           {t("common.live_stats")}
+        </Link>
+        <Link className="profile-link-row" href="/?como-jugar">
+          {t("profile.link.howto")}
         </Link>
         <Link className="profile-link-row" href="/acerca">
           {t("profile.link.about")}

@@ -15,7 +15,6 @@ import {
   ROOM_TTL_MS,
   generateRoomCode,
   initialOf,
-  shortWallet,
   type RoomError,
   type RoomPlayerView,
   type RoomStatus,
@@ -390,10 +389,10 @@ async function touchPlayer(roomId: string, profileId: string): Promise<void> {
 }
 
 function toPlayerView(row: PlayerRow, viewerId: string | null): RoomPlayerView {
-  // Sin alias todavía, la wallet abreviada sirve de nombre. Si tampoco hay,
-  // queda vacío a propósito: el nombre de reserva es una frase traducible y
-  // eso lo pone la pantalla, no el servidor.
-  const name = row.profiles?.alias ?? shortWallet(row.profiles?.wallet_address);
+  // Sin alias, vacío a propósito: el nombre de reserva es una frase traducible
+  // y eso lo pone la pantalla, no el servidor. Nunca la wallet, ni recortada —
+  // MiniPay prohíbe mostrar direcciones.
+  const name = row.profiles?.alias ?? "";
   return {
     profileId: row.profile_id,
     name,

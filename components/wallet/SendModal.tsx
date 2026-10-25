@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { formatUnits, isAddress, parseUnits } from "viem";
 import { celo } from "viem/chains";
+import { classifyTxError } from "@/lib/tx-errors";
 import {
   useAccount,
   usePublicClient,
@@ -31,12 +32,18 @@ type Phase = "form" | "sending" | "done";
 
 /** Clasifica un fallo de la wallet o de la red. Devuelve la clave del mensaje. */
 function describeSendError(err: unknown): MessageKey {
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/rejected|denied|User rejected/i.test(msg)) return "send.error.rejected";
-  if (/insufficient|exceeds balance|transfer amount/i.test(msg))
-    return "send.error.insufficient";
-  if (/chain|network/i.test(msg)) return "send.error.chain";
-  return "send.error.generic";
+  // Por código, no por texto: ver `lib/tx-errors.ts`.
+  switch (classifyTxError(err)) {
+    case "rejected":
+      return "send.error.rejected";
+    case "fee_native":
+    case "insufficient":
+      return "send.error.insufficient";
+    case "chain":
+      return "send.error.chain";
+    default:
+      return "send.error.generic";
+  }
 }
 
 /**

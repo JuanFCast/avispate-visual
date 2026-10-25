@@ -389,12 +389,16 @@ console.log(
   );
   check(
     "el CTA está condicionado al error de fondos Y a estar dentro de MiniPay",
-    src.includes("error === FUNDS_ERROR && inMiniPay"),
+    src.includes("FUNDS_ERRORS.includes(error) && inMiniPay"),
     true
   );
+  // Los dos que se arreglan recargando USDT: la entrada, y la tarifa de red
+  // cuando se paga en USDT. Son las mismas claves que usa el reto diario.
   check(
-    "el error de fondos es el MISMO que usa el reto diario, no uno propio",
-    src.includes('FUNDS_ERROR: MessageKey = "pay.error.insufficient"'),
+    "los errores de fondos son los MISMOS que usa el reto diario, no unos propios",
+    /FUNDS_ERRORS: readonly MessageKey\[\] = \[\s*"pay\.error\.insufficient",\s*"pay\.error\.fee_usdt",\s*\]/.test(
+      src
+    ),
     true
   );
 }

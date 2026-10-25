@@ -90,16 +90,24 @@ export default function DailyChallengeCard({
   const clockCopy = roundCopy(clock, t);
   const inMiniPay = useIsMiniPay();
 
-  /** El texto del bloqueo, con la dirección abreviada cuando ayuda a reconocerla. */
+  /**
+   * El texto del bloqueo, con la dirección abreviada cuando ayuda a reconocerla.
+   *
+   * Dentro de MiniPay, nunca: su reglamento prohíbe mostrar una dirección en
+   * cualquier parte, ni recortada. Ahí salen las versiones sin dirección (y
+   * cambiar de cuenta no existe: MiniPay tiene una sola wallet).
+   */
   function blockText(block: PayBlock): string {
     switch (block.kind) {
       case "reconnect":
         return t("pay.block.reconnect");
       case "account_changed":
+        if (inMiniPay) return t("pay.block.checking");
         return t("pay.block.account_changed", {
           address: shortAddress(block.actual),
         });
       case "wrong_wallet":
+        if (inMiniPay) return t("pay.block.wrong_wallet_plain");
         return t("pay.block.wrong_wallet", {
           canonical: shortAddress(block.canonical),
           connected: shortAddress(block.connected),
@@ -109,12 +117,13 @@ export default function DailyChallengeCard({
       case "needs_name":
         return t("pay.block.needs_name");
       case "name_taken":
-        return block.owner
+        return block.owner && !inMiniPay
           ? t("pay.block.name_taken", { address: shortAddress(block.owner) })
           : t("pay.block.name_taken_unknown");
       case "resume_pending":
         return t("pay.block.resume");
       case "payer_mismatch":
+        if (inMiniPay) return t("pay.block.payer_mismatch_plain");
         return block.payer
           ? t("pay.block.payer_mismatch", {
               address: shortAddress(block.payer),

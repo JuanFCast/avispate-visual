@@ -103,10 +103,13 @@ console.log("\n— 1. La capacidad de la wallet llega a la decisión del gas —
     const arena = leer("lib/arena-join.ts");
     ok(
       "la Arena traduce la carencia a 'falta CELO'",
-      /insufficient_gas_celo/.test(arena) &&
-        arena.indexOf("/insufficient_gas_celo/") <
-          arena.indexOf("/insufficient|exceeds balance"),
-      "el caso concreto tiene que ir ANTES del /insufficient/ general"
+      // Ya no por texto: la carencia viaja con su tipo (como en el reto
+      // diario) y se traduce antes de mirar ningún error de la wallet.
+      arena.includes('throw new InsufficientFundsError("gas_celo")') &&
+        /if \(e\.missing === "gas_celo"\) return "pay\.error\.fee_celo";/.test(arena) &&
+        arena.indexOf('e.missing === "gas_celo"') <
+          arena.indexOf("classifyTxError(e)"),
+      "la Arena tiene que lanzar InsufficientFundsError('gas_celo') y traducirlo antes que los errores de la wallet"
     );
   }
   {

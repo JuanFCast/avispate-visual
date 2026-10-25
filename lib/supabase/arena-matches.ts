@@ -38,7 +38,7 @@ import { arenaPrize } from "../arena";
 import { decideMatchStart } from "../arena-start";
 import { decideMatchOutcome } from "../arena-outcome";
 import { paidPlayersOf } from "../arena-escrow";
-import { initialOf, shortWallet } from "../arena-rooms";
+import { initialOf } from "../arena-rooms";
 import { getRoomByCode, roomIsLive } from "./arena-rooms";
 import { getSupabaseAdmin } from "./server";
 import { settleFinishedMatch } from "./arena-settle-hook";
@@ -265,7 +265,9 @@ function toPlayerView(
   viewerId: string | null,
   now: number
 ): MatchPlayerView {
-  const name = row.profiles?.alias ?? shortWallet(row.profiles?.wallet_address);
+  // Sin alias, vacío: la pantalla pone el nombre de reserva traducido. Nunca
+  // la wallet, ni recortada — MiniPay prohíbe mostrar direcciones.
+  const name = row.profiles?.alias ?? "";
   return {
     profileId: row.profile_id,
     name,
