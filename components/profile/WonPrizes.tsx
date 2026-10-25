@@ -6,8 +6,11 @@ import { useI18n } from "@/lib/i18n/client";
 import { fmtRoundDate } from "@/lib/i18n/date";
 
 export interface Prize {
+  /** De qué juego sale el premio: el pozo de un mazo o una mesa de Arena. */
+  kind: "daily" | "arena";
   roundDate: string;
-  deck: number;
+  /** Solo en el reto diario; la Arena no tiene mazo de pozo. */
+  deck: number | null;
   amountUnits: string;
   txHash: string | null;
 }
@@ -25,7 +28,7 @@ function fmtUsdt(units: string): string {
 }
 
 /**
- * Los últimos premios cobrados (reales, de `round_settlements` ya pagados) más
+ * Los últimos premios cobrados (reales: reto diario y Arena, ya pagados) más
  * la nota de que el pago es automático: Avíspate no usa "reclamar".
  *
  * Es un resumen a propósito. El total ganado ya está arriba en las tarjetas de
@@ -52,7 +55,7 @@ export default function WonPrizes({ prizes, loading }: Props) {
       ) : (
         <ul className="prize-list">
           {recent.map((p, i) => (
-            <li key={`${p.roundDate}-${p.deck}-${i}`} className="prize-row">
+            <li key={`${p.kind}-${p.roundDate}-${p.deck}-${i}`} className="prize-row">
               <span className="prize-trophy" aria-hidden="true">
                 🏆
               </span>
@@ -61,7 +64,10 @@ export default function WonPrizes({ prizes, loading }: Props) {
                   {fmtUsdt(p.amountUnits)} USDT
                 </span>
                 <small className="prize-meta">
-                  {t("prizes.deck", { deck: p.deck })} ·{" "}
+                  {p.kind === "arena"
+                    ? t("prizes.arena")
+                    : t("prizes.deck", { deck: p.deck ?? "" })}{" "}
+                  ·{" "}
                   {fmtRoundDate(p.roundDate, lang)}
                 </small>
               </span>
