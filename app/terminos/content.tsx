@@ -8,8 +8,8 @@
  * servidor: el jugador recibe HTML y cero JS por ellos.
  */
 
-export const LAST_UPDATED_ES = "Última actualización: 20 de agosto de 2026";
-export const LAST_UPDATED_EN = "Last updated: 20 August 2026";
+export const LAST_UPDATED_ES = "Última actualización: 24 de octubre de 2026";
+export const LAST_UPDATED_EN = "Last updated: 24 October 2026";
 
 const POT_URL =
   "https://celoscan.io/address/0x48089fBD48576390bfd68d106d21715200E0207f";
@@ -22,7 +22,7 @@ function ContactLink() {
   return <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>;
 }
 
-function ContractLinks() {
+export function ContractLinks() {
   return (
     <ul className="legal-list">
       <li>
@@ -103,8 +103,10 @@ export function TermsEs() {
           cualquier caso, esa tarifa corresponde a la red, no a Casgo Studio.
         </p>
         <p>
-          El permiso de gasto que la aplicación te pide está limitado al
-          equivalente de diez entradas — nunca es ilimitado.
+          El permiso de gasto que la aplicación te pide está limitado a 5 USDT
+          por contrato — nunca es ilimitado. Se pide una sola vez y se renueva
+          cuando ya no alcanza para una entrada, así que casi siempre confirmas
+          una sola transacción por jugada.
         </p>
       </section>
 
@@ -316,8 +318,10 @@ export function TermsEn() {
           Either way, that fee goes to the network, not to Casgo Studio.
         </p>
         <p>
-          The spending allowance the app asks you for is capped at the
-          equivalent of ten entries — it is never unlimited.
+          The spending allowance the app asks you for is capped at 5 USDT per
+          contract — it is never unlimited. It is requested once and renewed
+          only when it no longer covers an entry, so you almost always confirm
+          a single transaction per play.
         </p>
       </section>
 

@@ -14,7 +14,7 @@ import {
   ERC20_ABI,
   USDT_CELO_ADDRESS,
   FEE_AMOUNT,
-  APPROVE_UNITS,
+  approveUnitsFor,
 } from "./contracts";
 import {
   resolveFeeCurrency,
@@ -306,19 +306,22 @@ export function usePayToPlay() {
         })) as bigint;
 
         if (allowance < FEE_AMOUNT) {
-          // Monto acotado (varias jugadas). "Approve una vez, luego jugar":
+          // Monto acotado (50 jugadas). "Approve una vez, luego jugar":
           // el patrón que MiniPay exige; se repone cuando baja de una entrada.
           await assertSameAccount();
+          // Antes de la firma y no después: la primera hoja que ve el jugador
+          // es la de autorizar, y el botón tiene que decirlo — si dice
+          // "confirma en tu wallet" dos veces, parecen dos cobros.
+          onStage("approving");
           const approveHash = await writeContractAsync({
             account,
             address: usdt,
             abi: ERC20_ABI,
             functionName: "approve",
-            args: [pot, APPROVE_UNITS],
+            args: [pot, approveUnitsFor(FEE_AMOUNT)],
             chainId: celo.id,
             ...feeCurrency,
           });
-          onStage("approving");
           await publicClient.waitForTransactionReceipt({ hash: approveHash });
           // Falta la firma de la jugada: vuelve a tocarle al jugador.
           onStage("confirm");

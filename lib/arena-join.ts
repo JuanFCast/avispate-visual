@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { useAccount, useWriteContract, usePublicClient, useSwitchChain } from "wagmi";
 import { celo } from "viem/chains";
-import { ERC20_ABI, USDT_CELO_ADDRESS } from "./contracts";
+import { ERC20_ABI, USDT_CELO_ADDRESS, approveUnitsFor } from "./contracts";
 import {
   resolveFeeCurrency,
   walletSupportsFeeCurrency,
@@ -319,7 +319,9 @@ export function useArenaJoin(): ArenaJoinApi {
               address: USDT_CELO_ADDRESS as `0x${string}`,
               abi: ERC20_ABI,
               functionName: "approve",
-              args: [ARENA_ESCROW_ADDRESS, entryUnits * 4n],
+              // El mismo bloque que el reto diario (`APPROVE_UNITS`): con 4
+              // entradas la doble firma volvía cada cuatro mesas.
+              args: [ARENA_ESCROW_ADDRESS, approveUnitsFor(entryUnits)],
               chainId: celo.id,
               ...fee,
             }),

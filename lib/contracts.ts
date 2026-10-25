@@ -32,11 +32,26 @@ export const FEE_AMOUNT = BigInt(
 );
 
 /**
- * Allowance que se aprueba de una vez: varias jugadas por adelantado, NUNCA
- * ilimitado. MiniPay limita el monto que una Mini App puede pedir en approve y
- * auto-rechaza `maxUint256` con -32604 sin mostrar la hoja de firma.
+ * Allowance que se aprueba de una vez: 5 USDT, NUNCA ilimitado. MiniPay limita
+ * el monto que una Mini App puede pedir en approve y auto-rechaza `maxUint256`
+ * con -32604 sin mostrar la hoja de firma (el tope ronda los 10 USDT, sin
+ * confirmar; nerdos.fun aprueba también 5).
+ *
+ * Eran 10 entradas (1 USDT) en el reto y 4 en la Arena, y eso se veía: cada
+ * pocas jugadas volvían las DOS hojas de firma —autorizar y pagar—, y el
+ * revisor de MiniPay lo reportó como "dos ventanas por transacción". MiniPay no
+ * agrupa transacciones, así que la primera vez en cada contrato siguen siendo
+ * dos; lo que se puede hacer es que esa sea la única.
  */
-export const APPROVE_UNITS = FEE_AMOUNT * 10n;
+export const APPROVE_UNITS = 5_000_000n;
+
+/**
+ * Lo que se aprueba para pagar `entryUnits`: el bloque de arriba, salvo que una
+ * sola entrada lo supere (no pasa hoy: la mayor de la Arena es 1 USDT).
+ */
+export function approveUnitsFor(entryUnits: bigint): bigint {
+  return entryUnits > APPROVE_UNITS ? entryUnits : APPROVE_UNITS;
+}
 
 /** ABI mínimo que usa el frontend/backend del contrato AvispatePot (v2). */
 export const AVISPATE_POT_ABI = [
