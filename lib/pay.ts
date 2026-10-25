@@ -405,7 +405,11 @@ export function usePayToPlay() {
         presence,
       };
     },
-    [address, connector, chainId, publicClient, writeContractAsync, switchChainAsync]
+    // `canonical` también: sin él la función guardaba la wallet del perfil tal
+    // como estaba al crearse —casi siempre `loading`, porque MiniPay conecta
+    // antes de que el perfil conteste— y `assertSameAccount` frenaba cada
+    // cobro con "checking" para siempre. `arena-join.ts` ya lo tenía.
+    [address, canonical, connector, chainId, publicClient, writeContractAsync, switchChainAsync]
   );
 
   return {
