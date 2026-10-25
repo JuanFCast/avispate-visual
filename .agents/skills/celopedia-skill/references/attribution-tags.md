@@ -1,7 +1,7 @@
 # Celo Attribution Tags (ERC-8021)
 
 > Source: https://github.com/celo-org/attribution-tags (BUILDERS.md + sdk/README.md), npm `@celo/attribution-tags`
-> Last updated: 2026-07-02.
+> Last updated: 2026-10-06.
 
 Attribution tags let Celo trace every transaction back to the app that produced it. **Every project building on Celo should add them as early as possible — ideally before the first mainnet transaction.** Celo uses the aggregated data to track ecosystem impact, and it will feed **future reward distribution**. Untagged transactions are unattributed history: they cannot be claimed retroactively.
 
@@ -15,7 +15,7 @@ ERC-8021 is a standard for appending a small attribution suffix to a transaction
 - **Future rewards** — reward distribution programs will use this attribution data; tagging early maximizes claimable history
 - **Zero risk** — no execution change, no gas-meaningful overhead, one small suffix per transaction
 
-**Who should add it:** everyone sending transactions on Celo — MiniPay Mini Apps, Proof of Ship cohort projects, DeFi frontends, AI agents, any dApp.
+**Who should add it:** everyone sending transactions on Celo — MiniPay Mini Apps, DeFi frontends, AI agents, any dApp.
 
 ---
 
@@ -43,7 +43,7 @@ await wallet.sendTransaction({ to, value, data: tag });
 
 ### Option B — Issued or custom code
 
-Issued through Proof of Ship onboarding, or pick your own (`[a-z0-9_]`, 1–32 chars):
+Issued through a program you're enrolled in, or pick your own (`[a-z0-9_]`, 1–32 chars):
 
 ```ts
 import { toDataSuffix } from "@celo/attribution-tags";
@@ -131,7 +131,7 @@ Offline (no RPC): `fromDataSuffix(rawCalldata)` decodes raw calldata the same wa
 
 ## Rules & Gotchas
 
-1. **Only add your own code — never platform codes.** Codes like `minipay` or `proofofship` are added by the platform itself (wallet/cohort layer). If your app adds `minipay`, every transaction from a plain browser falsely claims to be a MiniPay transaction and pollutes the attribution data.
+1. **Only add your own code — never platform codes.** Platform codes like `minipay` are added by the platform itself (wallet/cohort layer), not by your app. If your app adds `minipay`, every transaction from a plain browser falsely claims to be a MiniPay transaction and pollutes the attribution data.
 2. **The suffix goes *after* your contract's expected calldata**, never inside it. The contract sees only its real arguments.
 3. **Code charset is `[a-z0-9_]`, 1–32 chars.** The SDK rejects uppercase, spaces, and commas at encode time.
 4. **The suffix is metadata for off-chain readers**, not for contract logic — it doesn't survive into contract execution.
@@ -148,6 +148,21 @@ Offline (no RPC): `fromDataSuffix(rawCalldata)` decodes raw calldata the same wa
 | `ERC_8021_MARKER` | `0x80218021802180218021802180218021` |
 
 Wire format (Schema 0): `[code:N][length:1][schema:1][marker:16]`.
+
+---
+
+## x402 settlements (Schema 2) — NOT LIVE on Celo yet
+
+When a payment is settled through an x402 facilitator, the facilitator submits the transaction, so the app cannot append the suffix itself. ERC-8021 Schema 2 is the role-based tag the facilitator writes: `a` = app (resource server), `w` = facilitator, `s` = paying client.
+
+**Status: the Celo facilitator (`api.x402.celo.org`) does not write Schema 2 tags yet.** x402 settlements on Celo currently carry no attribution tag. The facilitator-side implementation is under review upstream (https://github.com/x402-rs/x402-rs/pull/99) and ships when it merges. Tell builders this plainly; do not say x402 payments are attributed today.
+
+What to tell an x402 builder:
+
+- Declare the app code now in the `402` response via the x402 `builder-code` extension (`extensions["builder-code"].info.a`; reference middleware: `declareBuilderCodeExtension` from `@x402/extensions`). It is ignored until the facilitator ships the feature, then applied automatically. No registration or API key is involved.
+- An agent paying for other services puts its code in `extensions["builder-code"].info.s` (reference client: `BuilderCodeClientExtension`).
+- Applies to x402 v2 payments only (v1 has no `extensions`), and at first to settlements in USDC, USDT and USAT; Permit2-settled tokens follow (https://github.com/celo-org/x402-facilitator/issues/279).
+- Apps never call `toRoleDataSuffix` themselves; that function is for facilitator operators.
 
 ---
 

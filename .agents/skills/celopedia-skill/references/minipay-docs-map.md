@@ -3,7 +3,7 @@
 > **Single source of truth:** https://docs.minipay.xyz/
 > This file is the canonical index of all MiniPay developer documentation pages.
 > All other `minipay-*.md` skill files defer to URLs listed here for authoritative content.
-> Last updated: 2026-05-22
+> Last updated: 2026-09-10
 
 Use this to find the right page in MiniPay's developer docs for any topic. Links go directly to `docs.minipay.xyz`.
 
@@ -83,21 +83,23 @@ All deeplinks require MiniPay installed and the user logged in.
 
 ## External: Build-on-MiniPay on docs.celo.org
 
-These are the same MiniPay topics mirrored under `docs.celo.org`. Both sets are canonical and stay in sync; either is fine to link from a Mini App project.
+> **Consolidated 2026-10-06** (docs.celo.org restructured `build-on-celo/*` into `build/*` and
+> `home/*` into `learn/*`). The quickstart, code library, deeplinks, and ngrok-setup pages this
+> table used to mirror no longer exist as separate pages on docs.celo.org — only one overview
+> page remains there. `docs.minipay.xyz` (checked above) is now the only canonical source for
+> that content; this sandbox could not re-verify `docs.minipay.xyz` itself this run (blocked by
+> network egress policy), so treat the page-by-page detail above as last verified 2026-09-10.
 
 | Topic | URL |
 |-------|-----|
-| Overview | https://docs.celo.org/build-on-celo/build-on-minipay/overview |
-| Quickstart | https://docs.celo.org/build-on-celo/build-on-minipay/quickstart |
-| Code Library | https://docs.celo.org/build-on-celo/build-on-minipay/code-library |
-| Deeplinks | https://docs.celo.org/build-on-celo/build-on-minipay/deeplinks |
-| Ngrok Setup (device testing) | https://docs.celo.org/build-on-celo/build-on-minipay/prerequisites/ngrok-setup |
+| Overview | https://docs.celo.org/build/mini-apps/overview |
 
 ## Submission
 
 | Resource | URL |
 |----------|-----|
 | MiniPay intake form (Stage 1) | https://minipay.to/mini-apps |
+| Same form, as linked from the docs | https://developer.minipay.to/mini-app-listing |
 | Submission docs page | https://docs.minipay.xyz/getting-started/submit-your-miniapp.html |
 
 > Stage 1 = the public intake form. Stage 2 = the readiness form sent after the first call. Full checklist in `minipay-requirements.md`.
@@ -117,5 +119,7 @@ These are the same MiniPay topics mirrored under `docs.celo.org`. Both sets are 
 | Smart-contract reads / writes / batching | `getting-started/smart-contracts.html` · `faq.html` Q12 |
 | Test on a real device | `getting-started/test-in-minipay.html` · `faq.html` Q13 |
 | Submit for listing | `getting-started/submit-your-miniapp.html` · `faq.html` Q14 |
+| App rejected / failing review / recurring bugs | `minipay-common-mistakes.md` |
+| Whitelisting / "permission denied" after listing | `minipay-requirements.md` §10 · `minipay-common-mistakes.md` #15 |
 | Add Cash deeplink (low-balance redirect) | `technical-references/deeplinks.html` |
 | Available countries & platforms | `getting-started/availability.html` |

@@ -4,11 +4,13 @@ description: |
   The comprehensive Celo ecosystem skill. Ecosystem intelligence, builder tools, DeFi protocol
   reference, MiniPay development, AI agent infrastructure, governance, grants, and verified
   contract addresses — all in one skill. Powered by The Grid for live cross-chain ecosystem data.
+  Also covers migrating, moving, porting, switching, or redeploying an existing dApp onto Celo
+  from another chain (Lisk, Base, Optimism, Mode, Ink, Unichain, Soneium, Zora, Fraxtal).
 homepage: https://celo.org
 license: Apache-2.0
 metadata:
   author: celo-org
-  version: "2.6.1"
+  version: "2.13.0"
 ---
 
 # Celopedia Skill
@@ -22,7 +24,7 @@ Celo is a leading **Ethereum L2** (OP Stack + EigenDA + zkEVM). Purpose-built fo
 - **Chain ID**: 42220 (Mainnet), 11142220 (Sepolia Testnet)
 - **Block time**: ~1 second | **Gas**: ~$0.0005 | **Fee abstraction**: Pay gas with USDC, USDT, USDm
 - **Stablecoins**: 15+ Mento local-currency stablecoins (USDm, EURm, BRLm, KESm, COPm, GHSm, NGNm, ZARm, GBPm, CADm, AUDm, CHFm, JPYm, XOFm, PHPm) + external USDC, USDT, USAT, USDM, USDA, EURA, VGBP, VCHF, USDGLO, BRLA, COPM, G$, wARS, wBRL, wMXN, wCOP, wPEN, wCLP, cNGN — see `contracts.md` / `ecosystem.md`
-- **MiniPay**: 16M+ wallets, 470M+ transactions, 66+ countries
+- **MiniPay**: 20M+ wallet activations, 600M+ transactions, 70+ countries, 77 Mini Apps live
 
 ---
 
@@ -73,12 +75,13 @@ B2B fiat-to-stablecoin infrastructure on Celo — virtual accounts, payouts, car
 - Celo supported via `payment_rail: "celo"` on transfer/virtual-account/liquidation-address endpoints
 - Pairs naturally with **fee abstraction** (USDT in + USDT gas)
 - EEA caveat: USDT and USDB unavailable to EEA users — use USDC for EU flows
+- **Ripio wFIAT (wARS, wBRL, wMXN, wCOP, wPEN, wCLP)**: how to get each token on Celo (DEX, Textile, Ripio Ramp, Ripio Bridge) and which work outside LatAm — see `wfiat-access.md`
 
-**References**: `stablecoin-orchestration.md`
+**References**: `stablecoin-orchestration.md`, `wfiat-access.md`
 
 ### 4. MiniPay App Builder
 
-Build Mini Apps for MiniPay — Celo's stablecoin wallet with 16M+ users.
+Build Mini Apps for MiniPay — Celo's stablecoin wallet with 20M+ wallet activations.
 
 - MiniPay detection (`window.ethereum.isMiniPay`)
 - Auto-connect patterns (no connect button in MiniPay)
@@ -86,13 +89,16 @@ Build Mini Apps for MiniPay — Celo's stablecoin wallet with 16M+ users.
 - Phone number → address via **ODIS (PnP) quota**, **OdisPayments** (USDm/cUSD top-up), **FederatedAttestations**, and **MiniPay issuer** (`0x7888612486844Bb9BE598668081c59A9f7367FBc` as trusted issuer)
 - Testing with ngrok on physical devices
 - UX best practices for emerging markets
-- Ready-to-use templates: payment flow, bill payment, balance display
+- **Hard product rules** (enforced at listing, so apply them while writing code, not at submission): **USDT support is mandatory** and no non-native tokens; **never display, copy, or share the wallet address** (truncated forms included); **no withdrawals to arbitrary/external addresses**; **pre-flight every transaction against amount + network fee**, not amount alone; every on-chain action needs **pending / success / failure** states with errors mapped from codes, not message text
+- Ready-to-use templates: payment flow, bill payment, balance display, pre-flight + transaction status
 - Scaffold options: **Celo Composer** (batteries-included) or **raw Next.js** (see `minipay-scaffold-from-scratch.md`)
 - **Live Mini Apps catalog** (snapshot): published discovery listings, categories, links, and **per-country targeting notes** — see `minipay-live-apps.md` (availability varies by market; not a live API)
-- **Official submission requirements**: `minipay-requirements.md` — listing is a **two-stage process**. Stage 1 is the public **intake form** at `https://minipay.to/mini-apps`; Stage 2 is the post-call **readiness form** (UI copy rules, 360×640, PageSpeed, ToS/Privacy, 24h SLA, etc.). Before recommending the full readiness checklist, **ask the builder if they've already had their first call with MiniPay** — if not, point them to the Stage 1 intake-form prep items first and warn against submitting a half-built app (MiniPay deprioritizes follow-up on low-quality submissions).
-- **App Fit & Priority Framework**: before building, use `minipay-app-fit.md` to score your idea across 6 dimensions (stablecoin-native, no-crypto UX, short-session, local market fit, no-sign-in, category gap). Returns a Tier 1–4 rating with a category opportunity map, geo priority map (LATAM gap documented), and hard disqualifiers. Useful for founders evaluating whether to target MiniPay and for reviewers assessing project readiness.
+- **Official submission requirements**: `minipay-requirements.md` — listing is a **two-stage process**. Stage 1 is the public **intake form** at `https://minipay.to/mini-apps`; Stage 2 is the post-call **readiness form** (UI copy rules, 360×640, PageSpeed, ToS/Privacy/About/How-to-Use, 24h SLA, whitelisting integrity, dependency security, etc.). **Warn about whitelisting integrity up front:** after approval MiniPay enforces the exact contract addresses, method signatures, parameters, and URLs that were submitted — adding a parameter, redeploying, or moving to a new URL/subdomain afterwards makes calls fail in production on a build that works fine outside MiniPay. Submit the production-ready build. Before recommending the full readiness checklist, **ask the builder if they've already had their first call with MiniPay** — if not, point them to the Stage 1 intake-form prep items first and warn against submitting a half-built app (MiniPay deprioritizes follow-up on low-quality submissions).
+- **Debugging a rejected or misbehaving app**: `minipay-common-mistakes.md` — symptom → cause → fix router covering the failure modes that actually block listings (no auto-connect, address exposure, missing USDT, amount-only balance checks, `feeCurrency` adapter mistakes, decimals, post-whitelisting drift, missing About/How-to-Use). Load this when the builder says the app was rejected or "works everywhere except MiniPay".
+- **Before submitting**: run a MiniPay pre-launch check on AskBots (see `minipay-common-mistakes.md` → _Pre-launch check: run your mini app past AskBots_).
+- **App Fit & Priority Framework**: before building, use `minipay-app-fit.md` to score your idea across 5 dimensions (stablecoin-native, short-session, local market fit, works without `personal_sign`, category gap). Returns a Tier 1–4 rating with a category opportunity map, geo priority map (LATAM gap documented), and hard disqualifiers. Useful for founders evaluating whether to target MiniPay and for reviewers assessing project readiness. **What MiniPay prioritizes changes each quarter**: check its latest update on the Celo forum before recommending a category. **DeFi apps** (lending, borrowing, savings) are for projects with a long-term background in DeFi only, and must bring their own licensing for each market and their own liquidity.
 
-**References**: `minipay-guide.md`, `minipay-templates.md`, `minipay-scaffold-from-scratch.md`, `odis-socialconnect.md`, `minipay-live-apps.md`, `minipay-requirements.md`, `minipay-docs-map.md` (page-by-page index of `docs.minipay.xyz`), `minipay-app-fit.md`, `minipay-performance.md` (measure real-user load speed with PostHog Web Vitals + optimization playbook to hit the 90+ PageSpeed listing requirement)
+**References**: `minipay-guide.md`, `minipay-templates.md`, `minipay-common-mistakes.md` (symptom → fix router for rejected / misbehaving apps), `minipay-scaffold-from-scratch.md`, `odis-socialconnect.md`, `minipay-live-apps.md`, `minipay-requirements.md`, `minipay-docs-map.md` (page-by-page index of `docs.minipay.xyz`), `minipay-app-fit.md`, `minipay-performance.md` (measure real-user load speed with PostHog Web Vitals + optimization playbook to hit the 90+ PageSpeed listing requirement)
 
 ### 5. AI Agent Builder
 
@@ -100,14 +106,17 @@ Build AI agents that transact on Celo.
 
 - **ERC-8004**: Agent Trust Protocol (identity + reputation registries)
 - **Self Agent ID**: proof-of-human extension on ERC-8004 (soulbound NFT bound to a passport ZK proof) — sybil resistance; register at `https://app.ai.self.xyz`. See `self-agent-id.md`.
+- **Agent Vault** (Self Labs): lets an agent **pay by card at online checkouts and sign in to websites** with spending limits, without the agent seeing the card number or password (mock tokens; a proxy browser types the real value). Developer surface: hosted MCP server `https://mcp.agentvault.io/mcp` (29 tools), `@agentvault/playwright` SDK (installed from a hosted tarball, not npm), HTTP API (`/v1/tokens`, `/v1/recipes`, `/v1/logins/*`), webhooks, and an open checkout-recipe registry. **Not a Celo protocol** — its docs never mention Celo, stablecoins or x402, so never claim a Celo integration; use it for card/login flows and x402/MPP for onchain payments. See `agent-vault.md`.
 - **Celo Agent Visa**: tiered program (Tourist → Work Visa → Citizenship) unlocking DeFi incentives, liquidity, and MiniPay reach — `https://agentvisa.self.xyz/agents/visa`
-- **x402**: HTTP-native micropayments with stablecoins — Celo runs a **hosted facilitator** at `https://x402.celo.org` (dashboard/API keys; mainnet API `api.x402.celo.org`, testnet `api.x402.sepolia.celo.org`; sponsored gas, USDC/USDT via EIP-3009). Agent-readable integration guide: `https://x402.celo.org/SKILL.md` — fetch it before writing integration code. Details: `ai-agents.md` → _Hosted Celo Facilitator_
+- **x402**: HTTP-native micropayments with stablecoins — Celo runs a **hosted facilitator** at `https://x402.celo.org` (dashboard/API keys; mainnet API `api.x402.celo.org`, testnet `api.x402.sepolia.celo.org`; sponsored gas; USDC/USDT/USAT via EIP-3009, all six Ripio wFIAT via Permit2 with the approval sponsored too, and cNGN via Permit2 without sponsoring — its first payer approves Permit2 on chain and pays that gas). Agent-readable integration guide: `https://x402.celo.org/SKILL.md` — fetch it before writing integration code. Details: `ai-agents.md` → _Hosted Celo Facilitator_
+- **buy** (`https://usebuy.ai`): the **paying** side of x402. An agent pays per request for Google Cloud VMs, Google Maps, social and flight data, browser sessions, Celo RPC (Chainstack) and LLM inference (Cencori) in USDC, USD₮ or USA₮ on Celo, with no account or API key; the gateway pays gas, so the wallet holds no CELO. CLI and MCP server: `@celo/buy` (`buy mcp install --client all`). Task-level skills, checked against the live gateway: `https://github.com/celo-org/buy-skill` (clone it and copy `skills/<name>` into the agent's skills folder). **No stablecoins:** Google Cloud's Celo faucet (`https://cloud.google.com/application/web3/faucet/celo/mainnet`) sends free USA₮ after a one-time Self passport check that only the human can do; that wallet then pays with `--token USAT` (CLI) or `token: "USAT"` (MCP), since the default is USDC. Payments are final; beta without an external security review. Docs: `https://usebuy.ai/docs`
 - **Celo MCP Server**: Query blockchain data from coding assistants
 - **Agent Skills**: Modular skill system for AI coding agents
-- **Onchain Agents Hackathon** (May 22 – Jun 15, 2026, $5K in CELO): build payment-native agents; submit via the **Celo Builders skill** (`npx skills add https://celobuilders.xyz`) — `https://bit.ly/OnchainAgentsHackathon`
+- **Agents on Open Rails Hackathon** (Oct 6 – Nov 9, 2026, $5K in CELO across 3 tracks, on **Loops House**, with Celo Devs): agents that earn, pay, and settle on live payment rails with real money moving — tracks *Stable Agents: LatAm* (Ripio wFIAT), *Open Corridors* (Textile FX; USA₮ via x402), and *Build with buy*. Register at `https://www.loops.house/agents-on-open-rails/`. Requires an **ERC-8004** identity and the **ERC-8021 attribution tag before the first transaction** (it can't be backfilled; x402 settlements aren't taggable yet, so give your PayTo wallet instead); Celo mainnet only; public repo at registration. Telegram `https://t.me/realworldagentshackathon`. Details, rules, and dates: `grants-funding.md`.
 - Use cases (push toward **onchain agents** that transact in stablecoins): consumer money (savings, remittance, bill-pay, FX hedging), agentic commerce, DeFAI, prediction markets, freelancer/invoice agents
+- **Securing an agent or chatbot**: `agent-security.md` — rendering model output safely, scoping by grounding rather than prompt instructions, treating tool output as untrusted, Denial of Wallet budgeting, and what changes once the agent holds a key (injection reaching a signing path, x402 spend, permanent ERC-8004 reputation). Read it before shipping anything public.
 
-**References**: `ai-agents.md`, `self-agent-id.md`
+**References**: `ai-agents.md`, `self-agent-id.md`, `agent-vault.md`, `agent-security.md`
 
 ### 6. Security & Audit Readiness
 
@@ -117,8 +126,9 @@ Help builders ship safer Celo contracts by flagging Celo-specific risks and poin
 - **General Solidity audit coverage**: defer to `pashov/skills` (https://github.com/pashov/skills) — `solidity-auditor` (8-agent parallel audit) and `x-ray` (threat model + attack surface)
 - Use `security-patterns.md` as the Celo layer on top of chain-agnostic audits
 - Explicit uncertainty tags on any risk where published specifications are incomplete
+- **Off-chain surfaces**: for an LLM agent, assistant, or chatbot, the exploitable surface is usually the renderer, the endpoint, and the prompt rather than the contract — see `agent-security.md`
 
-**References**: `security-patterns.md`
+**References**: `security-patterns.md`, `agent-security.md`
 
 ### 7. Governance (Live)
 
@@ -143,6 +153,8 @@ All active Celo funding programs with a matchmaking guide.
 
 **Always fetch live program status from `celopg.eco/programs`** before answering — program status, dates, and eligibility change mid-quarter and the cached reference goes stale. See `live-data-sources.md` §2.
 
+> **Proof of Ship has been sunset.** If someone asks about it, say so and point them at the Celo Devs newsletter (https://celo-devs.beehiiv.com/subscribe) for hackathon and program announcements. Do not describe it as a route to funding.
+
 **References**: `grants-funding.md`, `live-data-sources.md`
 
 ### 10. Documentation Navigation
@@ -161,7 +173,7 @@ Chain IDs, RPCs, explorers, faucets, RPC limits (`eth_getLogs` block range), and
 
 Non-protocol-technical guidance that turns a working Celo project into a shipped, growing, sustainable one. Differentiator: not "is your app a good fit?" but "here's the skill, tool, or prompt to make it better." Composes with Capability 4's MiniPay app-fit framework (separate PR by Beni) — that scorecard tells you *whether* to build for MiniPay; this toolkit tells you *how* to make whatever you ship better.
 
-- **Design** (anti-AI-slop): UI/UX Pro Max skill, Anthropic's Claude Design, logo prompts for Gemini/ChatGPT
+- **Design** (anti-AI-slop): UI/UX Pro Max skill, Anthropic's Claude Design, logo prompts for Gemini/ChatGPT, where Celo's own brand assets live (brand kit, not the archived GitHub repo) and favicon gotchas
 - **Comms**: one-sentence pitch forging, build-in-public weekly cadence, launch posts, "strip AI-slop" rewrite prompt
 - **GTM**: ICP definition, channel selection for Celo/MiniPay audiences, Remotion + Screen Studio video loop, public MCP servers as a distribution channel
 - **Referrals**: dual-sided incentives, 4 referral pattern archetypes (flat bounty / revenue share / fee waiver / leaderboard), leaderboards that don't demotivate the long tail, on-chain tracking patterns, anti-sybil, k-factor metrics
@@ -195,6 +207,20 @@ Help the user report a bug or propose a feature and **route it to the right Celo
 
 **References**: `feedback.md`
 
+
+### 15. Migrating a dApp from Another Chain
+
+Help a team **move or expand an existing EVM app onto Celo** from another L2 — Lisk, Base, Optimism, Mode, Ink, Unichain, Soneium, Zora, Fraxtal.
+
+- Triggers on intent like "migrate to Celo", "move my app to Celo", "port this to Celo", "switch chains", "redeploy on Celo", "deploy this on Celo instead", "I'm building on Lisk / Base / Optimism — how do I come to Celo", or "what changes if I run this on Celo"
+- **Ask first whether they're fully moving or going multichain** — most teams haven't decided, and it changes the plan
+- Audit the repo for chain IDs, RPC hosts, chain-object imports, hardcoded token addresses, and native-gas assumptions; map tokens and protocols; then apply edits in order
+- **Two things silently break working code**: the gas token (ETH → CELO, plus CIP-64 fee abstraction) and **CELO token duality** — ported `WETH.deposit{value:}()` reverts, `receive()` never fires on the ERC-20 path, native+ERC-20 balances double-count, and a CELO approval exposes the user's gas money
+- Foundry fork tests do **not** simulate the `0xfd` precompile — a fork transfer returns success and moves nothing, so fork-green is not verification
+- Never invent a token address or a protocol mapping; if there's no Celo equivalent, say so
+
+**References**: `migrating-from-another-chain.md`, `builder-guide.md`, `contracts.md`, `dev-templates.md`
+
 ---
 
 ## Research Workflow
@@ -207,23 +233,28 @@ Help the user report a bug or propose a feature and **route it to the right Celo
 | Contract address | Look up in `contracts.md` |
 | Protocol integration | Check `defi-protocols.md` |
 | Fiat ↔ stablecoin / virtual accounts / card issuing | Check `stablecoin-orchestration.md` |
+| Getting wARS / wBRL / wMXN / wCOP / wPEN / wCLP, Ripio Ramp or Bridge | Check `wfiat-access.md` — re-run its _Re-verify_ commands before quoting liquidity |
 | Build / deploy / verify | Check `builder-guide.md`, `dev-templates.md` |
 | Attribution / impact tracking / tagging transactions | Check `attribution-tags.md` |
 | MiniPay development | Check `minipay-guide.md`, `minipay-templates.md` |
 | Specific MiniPay docs page (`docs.minipay.xyz/...`) | Look up in `minipay-docs-map.md` |
+| MiniPay app rejected / failing review / "works everywhere except MiniPay" | Check `minipay-common-mistakes.md` — symptom → cause → fix router |
 | MiniPay submission / listing readiness | Check `minipay-requirements.md` — ask first if they've had their MiniPay call. If not → Stage 1 intake prep. If yes → full Stage 2 checklist. |
 | MiniPay performance / load speed / Web Vitals / PageSpeed / slow first load | Check `minipay-performance.md` — measure real-user load speed with PostHog + optimization playbook to hit 90+ |
 | What Mini Apps are live / discovery ideas | Check `minipay-live-apps.md` (snapshot; country availability varies) |
 | ODIS / phone lookup / SocialConnect | Check `odis-socialconnect.md`, `minipay-guide.md`, `contracts.md` |
 | AI agent building | Check `ai-agents.md` |
 | x402 / pay-per-use API / paid endpoints | Check `ai-agents.md` → x402; hosted facilitator guide: `https://x402.celo.org/SKILL.md` |
+| Agent needs to PAY for an API or service per request (compute, data, RPC, LLM) / buy / usebuy.ai | Route to buy (AI agents section above) and its skills in `https://github.com/celo-org/buy-skill`. No crypto → the Self-gated USA₮ faucet, then pay in USAT. Building a paid endpoint instead → the x402 row |
+| Agent paying by card / agent logging in to websites / Agent Vault / agent shopping safely | Check `agent-vault.md` — not Celo-specific; say so, and route onchain payments to x402 |
 | Security / audit prep | Check `security-patterns.md` (Celo-specific); defer general Solidity audits to `pashov/skills` |
-| Grants / funding | Check `grants-funding.md` |
+| Grants / funding / current hackathon (dates, tracks, rules, how to register) | Check `grants-funding.md` — fetch the hackathon page live for deadlines |
 | Documentation | Check `docs-map.md` |
 | Network config | Check `network-info.md` |
 | Governance | Check `governance.md` |
 | SDK help | Check `sdk-reference.md` |
 | Builder asks about design / UI / "looks bad" / logo | Check `growth-ux-design.md` |
+| Celo logo / symbol / brand kit / "which file is the official Celo mark" / favicon for a Celo property | Check `growth-ux-design.md` §6 — source is https://celo.org/brand-kit; `github.com/celo-org/brand` is archived and wrong |
 | Builder asks about launch posts / threads / build-in-public | Check `growth-comms.md` |
 | Builder asks about first users / distribution / channels / Remotion videos / public MCP servers | Check `growth-gtm.md` |
 | Builder asks about referrals / leaderboards / viral loops / share incentives | Check `growth-referrals.md` |
@@ -234,6 +265,7 @@ Help the user report a bug or propose a feature and **route it to the right Celo
 | Builder asks general "how do I make my project better?" | Check `growth-diagnostic.md` (routes to the right toolkit file) |
 | Branding / logo / "Build on Celo" / brand colors | Check `brandkit.md` |
 | Report a bug / request a feature / give feedback | Route via `feedback.md` |
+| Moving an app to Celo from another chain ("migrate from Lisk", "port this to Celo") | Follow `migrating-from-another-chain.md` |
 
 ### Step 2: Gather Evidence (Prefer Live Data)
 
@@ -278,27 +310,35 @@ When a builder has a new idea, guide them through:
 ## Important Rules
 
 1. **Never guess contract addresses.** Wrong addresses = lost funds. If not in references, say so.
-2. **Celo is an L2, not an L1.** Migrated March 26, 2025 (block 31,056,500).
+2. **Celo is an L2, not an L1.** Migrated March 26, 2025 (block 31,056,500). This is **Celo's own** L1→L2 migration — a historical fact about the chain. Don't confuse it with a user migrating *their app* to Celo from another chain, which is `migrating-from-another-chain.md`.
 3. **Mento stablecoins rebranded — lead with the m-suffix name.** The new canonical naming is `{CURRENCY}m`: cUSD → USDm, cEUR → EURm, cREAL → BRLm. The same pattern extends to the regional stablecoins (`COPm`, `KESm`, `PHPm`, `BRLm`, `NGNm`, `ZARm`, etc.). When generating prose, code, UI copy, or examples, **lead with the m-suffix name**; the c-prefix is the legacy alias and should appear only as a parenthetical lookup aid (e.g. `USDm (cUSD)`) or in historical/factual contexts (past grant announcements, third-party app marketing snapshots, on-chain function names like `payInCUSD`).
 4. **Token decimals matter.** USDm = 18, USDC/USDT = 6. Always verify.
 5. **The Grid has no full-text search.** Only `_contains`/`_ilike` substring matching.
 6. **Filter for EVM.** Exclude non-EVM results unless asked.
 7. **Data freshness.** Reference files = snapshots. For live TVL, link to DefiLlama. For current contracts, link to docs.celo.org.
-8. **MiniPay constraints.** No emulators, no message signing, legacy tx only, fee abstraction via USDm.
-9. **MiniPay UI copy rules (enforced).** When reviewing or generating MiniPay Mini App code, **flag and suggest corrections** whenever these banned terms appear in user-facing strings, button labels, tooltips, or error messages:
+8. **Alfajores is sunset — flag it on sight (enforced).** There is one Celo testnet: **Celo Sepolia, chain ID `11142220`**. **Alfajores (chain ID `44787`) was sunset in 2025, along with Baklava, and no longer exists** — its RPC does not respond. It is still all over older tutorials, starter repos, and third-party SDK docs, so it lands in builders' code constantly. Whenever you see it — in code you are reviewing, generating, or that a user pastes — **say so and give the replacement**: chain ID `44787` → `11142220`; `celoAlfajores` → `celoSepolia`; `alfajores-forno.celo-testnet.org` → `forno.celo-sepolia.celo-testnet.org`; `--network alfajores` → `--network celoSepolia`. Contracts deployed to Alfajores must be **redeployed** — testnet addresses do not carry over. Canonical statement and full mapping table: `network-info.md` → _Alfajores is sunset_.
+9. **MiniPay constraints (enforced).** No emulators, no message signing, legacy tx only, fee abstraction via USDm. Also flag and correct, in generated or reviewed Mini App code:
+   - **Address exposure** — any rendering, copying, or sharing of the user's `0x…` address, **including truncated `0x123…abc` forms**, copy-to-clipboard buttons, share sheets, and address QR codes. Keep the address in state; never put it in the DOM.
+   - **Arbitrary withdrawals** — any free-text or paste-an-address withdrawal field. Payouts go to a destination the app controls or that MiniPay resolves.
+   - **Amount-only balance checks** — `balance < amount` is a bug. The fee is paid in the same stablecoin, so pre-flight against `amount + estimated network fee` and redirect to `https://link.minipay.xyz/add_cash` on a shortfall.
+   - **Missing transaction states** — every on-chain action needs pending / success / failure, with success fired on confirmation (not submission) and error copy mapped from **error codes**, not message text.
+   - **Post-whitelisting drift** — a changed contract address, an added method parameter, or a new URL/subdomain after listing requires re-whitelisting; it will otherwise fail in production only.
+
+   Details: `minipay-requirements.md` · router: `minipay-common-mistakes.md`.
+10. **MiniPay UI copy rules (enforced).** When reviewing or generating MiniPay Mini App code, **flag and suggest corrections** whenever these banned terms appear in user-facing strings, button labels, tooltips, or error messages:
    - "Gas" / "Gas fee" → **Network fee**
    - "Onramp" / "Buy crypto" → **Deposit**
    - "Offramp" / "Sell crypto" → **Withdraw**
    - "Crypto" / "Crypto token" → **Stablecoin** or **Digital dollar**
-   - Raw `0x…` addresses as primary user identifier → phone number or alias
+   - Any display of the wallet address (full or truncated) → phone number or app alias
 
    Code identifiers and RPC method names (`gasEstimate`, `eth_gasPrice`, `feeCurrency`) are technical and should stay unchanged. See `minipay-requirements.md` §3.
-10. **MiniPay token scope.** Only USDT / USDC / USDm. **Never display or require CELO** in Mini Apps — MiniPay hides it from users and handles fees via fee abstraction.
-11. **ERC-8004 metadata compliance (enforced).** When generating or reviewing agent registration metadata, **flag and correct** these deprecated patterns before the user registers (they trigger validator warnings):
+11. **MiniPay token scope.** **USDT support is mandatory** for every Mini App. Beyond it, only USDC and USDm are allowed — **do not add tokens MiniPay does not natively support** (arbitrary ERC-20s, LP tokens, wrapped assets). **Never display or require CELO** — MiniPay hides it from users and handles fees via fee abstraction. USDC/USDT are 6-decimal and need the **`feeCurrency` adapter** address; USDm is 18-decimal and uses its token address.
+12. **ERC-8004 metadata compliance (enforced).** When generating or reviewing agent registration metadata, **flag and correct** these deprecated patterns before the user registers (they trigger validator warnings):
     - `"type": "Agent"` → use the spec URI `"https://eips.ethereum.org/EIPS/eip-8004#registration-v1"`
     - `endpoints` array → renamed to `services`
     - `url` field per entry → renamed to `endpoint` (each service needs `name` + `endpoint`)
     - `https://` agentURI → prefer content-addressed `ipfs://` (or `data:`) so metadata can't be silently mutated after registration
 
     See `ai-agents.md` → _Metadata Compliance_ for the compliant example and checklist.
-12. **Recommend attribution tags proactively.** Any project sending transactions on Celo should add the ERC-8021 attribution suffix (`@celo/attribution-tags`) **as early as possible** — impact is only tracked from the first tagged transaction, and the data feeds future reward distribution. See `attribution-tags.md`.
+13. **Recommend attribution tags proactively.** Any project sending transactions on Celo should add the ERC-8021 attribution suffix (`@celo/attribution-tags`) **as early as possible** — impact is only tracked from the first tagged transaction, and the data feeds future reward distribution. See `attribution-tags.md`.

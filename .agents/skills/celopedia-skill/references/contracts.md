@@ -1,7 +1,7 @@
 # Celo Contract Addresses
 
 > Source: https://docs.celo.org/tooling/contracts/
-> Last updated: 2026-08-06
+> Last updated: 2026-10-05
 
 All addresses verified from official Celo documentation. **Do not guess addresses not listed here.**
 
@@ -85,12 +85,15 @@ All addresses verified from official Celo documentation. **Do not guess addresse
 | Wrapped Ether | WETH | `0xD221812de1BD094f35587EE8E174B07B6167D9Af` |
 | CELO (ERC-20) | CELO | `0x471EcE3750Da237f93B8E339c536989b8978a438` |
 | cNGN (Nigerian Naira, regulated) | cNGN | `0xF6829D7393dAe24509eb1E52eE8e572e2E271a4f` |
+| IDRX (Indonesian Rupiah) | IDRX | `0x18Bc5bcC660cf2B9cE3cd51a404aFe1a0cBD3C22` |
 
 > Third-party stablecoins above are sourced from and verified against the official list: https://docs.celo.org/build-on-celo/build-with-local-stablecoin (addresses confirmed on-chain).
 >
 > **Ticker collisions to watch** (match on address, not symbol): Mountain Protocol's **USDM** (yield-bearing, US-Treasury-backed) is **not** Celo's **USDm** (cUSD, the Mento dollar). Minteo's **COPM** (`0xC92E…`) is **not** Mento's **COPm** (`0x8A56…`).
 
 > **USAT** (Tether America USD) launched on Celo in April 2026 — a USD stablecoin backed by short-term T-bills + cash (supervised by Anchorage Digital). **6 decimals** (like USDC/USDT). It is a whitelisted fee currency; its `feeCurrency` adapter is `0x0357EE22278c922e1D36cFe6b899269b161880C4` (18-decimal adapter — use the adapter, not the token, in the `feeCurrency` field). Caveat: upstream price oracles don't yet index the Celo contract address, so Valora-derived wallets may show `priceUsd: NaN` until that's resolved.
+
+> **IDRX** (Indonesian Rupiah, issued by [IDRX](https://idrx.co/)) is live on Celo Mainnet as of 2026-09-09 — the same address it uses on Base, Lisk and other EVM chains (`0x18Bc…3C22`), per IDRX's own [supported-chain list](https://docs.idrx.co/introduction/supported-chain-and-contract-address). **2 decimals** — `name()`/`symbol()` both return `IDRX`, `decimals()` returns `2`, read on-chain 2026-09-14 — so `1 IDRX = 100` raw units; anything that assumes 6 or 18 decimals is off by 10⁴ or 10¹⁶ silently. It is an upgradeable proxy (ERC-1967/UUPS). It is **not** a fee currency and has no `permit()` / EIP-3009 — a transfer needs CELO for gas.
 
 **Ripio wFIAT notes** (added Jul 2026):
 - `wBRL` ≠ `BRLm`: `wBRL` is Ripio-issued; `BRLm` (cREAL) is Mento-issued — different issuers, different risk profiles
@@ -221,8 +224,11 @@ Supported assets: USDC, USDT, EURm, USDm, CELO, WETH
 
 | Token | Symbol | Address |
 |-------|--------|---------|
-| USDm | USDm | `0xEF4d55D6dE8e8d73232827Cd1e9b2F2dBb45bC80` |
-| EURm | EURm | `0x6B172e333e2978484261D7eCC3DE491E79764BbC` |
+| USDm | USDm | `0xdE9e4C3ce781b4bA68120d6261cbad65ce0aB00b` |
+| EURm | EURm | `0xA99dC247d6b7B2E3ab48a1fEE101b83cD6aCd82a` |
+| Celo Dollar (legacy) | cUSD | `0xEF4d55D6dE8e8d73232827Cd1e9b2F2dBb45bC80` |
+| Celo Euro (legacy) | cEUR | `0x6B172e333e2978484261D7eCC3DE491E79764BbC` |
+| Celo Brazilian Real (legacy) | cREAL | `0x13d68A1Bf4a8cB7d9feF54EF70401871b666269c` |
 | BRLm | BRLm | `0x2294298942fdc79417DE9E0D740A4957E0e7783a` |
 | USDC | USDC | `0x01C5C0122039549AD1493B8220cABEdD739BC44E` |
 | USDT | USDT | `0xd077A400968890Eacc75cdc901F0356c943e4fDb` |
@@ -240,16 +246,14 @@ Supported assets: USDC, USDT, EURm, USDm, CELO, WETH
 | CADm | CADm | `0xF151c9a13b78C84f93f50B8b3bC689fedc134F60` |
 | AUDm | AUDm | `0x5873Faeb42F3563dcD77F0fbbdA818E6d6DA3139` |
 
-### Uniswap V3 (Alfajores Testnet)
-
-| Contract | Address |
-|----------|---------|
-| UniswapV3Factory | `0x229Fd76DA9062C1a10eb4193768E192bdEA99572` |
-| NonfungiblePositionManager | `0x0eC9d3C06Bc0A472A80085244d897bb604548824` |
-| SwapRouter02 | `0x8C456F41A3883bA0ba99f810F7A2Da54D9Ea3EF0` |
-| QuoterV2 | `0x3c1FCF8D6f3A579E98F4AE75EB0adA6de70f5673` |
-| UniversalRouter | `0x84904B9E85F76a421223565be7b596d7d9A8b8Ce` |
-| Permit2 | `0x000000000022D473030F116dDEE9F6B43aC78BA3` |
+> **Sepolia is not mainnet here — do not copy the mainnet pattern.** On **mainnet**,
+> USDm/EURm are the *same contracts* cUSD/cEUR were, renamed: `0x765DE816…` returns
+> `name() = "Mento Dollar", symbol() = "USDm"` today. On **Celo Sepolia** they are
+> **two separate deployments** — the legacy `0xEF4d55D6…` / `0x6B172e33…` still return
+> `cUSD` / `cEUR`, and USDm/EURm live at the new addresses above. A testnet integration
+> that reuses the mainnet mental model will point at the wrong token. Verified by
+> `eth_call symbol()` against `forno.celo-sepolia.celo-testnet.org` and
+> `forno.celo.org` on 2026-08-28.
 
 ### L1 Contracts on Sepolia
 

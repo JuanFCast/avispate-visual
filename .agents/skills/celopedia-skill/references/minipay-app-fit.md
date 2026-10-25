@@ -11,6 +11,14 @@
 
 ---
 
+## What MiniPay Is Looking For
+
+MiniPay publishes the kinds of Mini Apps it is prioritizing, and where it is heading, in its quarterly updates on the Celo forum. **Check the [latest MiniPay update](https://forum.celo.org/search?q=%22MiniPay%20Update%22%20%40opera_minipay%20order%3Alatest) before recommending a category**; that search always returns the newest one first. Do not steer a builder toward a category from memory.
+
+> ⚠️ **DeFi apps (lending, borrowing, savings and similar) are for projects with a long-term background in DeFi only**, to ensure the highest quality and security for users. They must also hold the licenses required in every market they operate in and provide their own liquidity. If that does not describe the builder, recommend something else.
+
+---
+
 ## 0. Understand Your Builder Profile First
 
 Before scoring your idea, answer these questions honestly. Your profile changes what you should build.
@@ -31,13 +39,13 @@ Before scoring your idea, answer these questions honestly. Your profile changes 
 
 | Profile | Best path |
 |---------|-----------|
-| First-time founder, no traction | Start with **x2earn games** or **pay-as-you-go AI tools** — low regulatory risk, fastest to ship, high demand |
+| First-time founder, no traction | Start with something low-risk and fast to ship, in a category from MiniPay's latest quarterly update on the forum (see *What MiniPay Is Looking For*) |
 | Domain expert in fintech / tradfi, existing users | Financial apps (savings, credit, FX) are viable — but require proper licensing in each market you serve |
 | Second-time founder with tradfi background | More options open, including credit/lending — still requires compliance |
 | B2B app, no traction yet | Not a good MiniPay fit right now. Come back when you have live users |
-| B2B app, proven traction | Strong fit — MiniPay gives you direct reach to 14M+ wallets |
+| B2B app, proven traction | Strong fit — MiniPay gives you direct reach to 20M+ activated wallets |
 
-> ⚠️ **Financial apps (credit, lending, savings, FX) require licensing in most MiniPay primary markets.** Building without proper compliance puts your users at risk and your app at risk of removal. If you are not established in the domain, default to games or AI pay-as-you-go instead.
+> ⚠️ **Financial apps (credit, lending, savings, FX) require licensing in most MiniPay primary markets.** Building without proper compliance puts your users at risk and your app at risk of removal. If you are not established in the domain, default to a lower-risk category from MiniPay's latest quarterly update instead. DeFi apps carry the extra bar in *What MiniPay Is Looking For* above.
 
 ---
 
@@ -47,7 +55,7 @@ Before scoring your idea, know the person on the other end of the screen.
 
 | Dimension | Reality |
 |-----------|---------|
-| **Geography** | Global South — Nigeria, Kenya, Uganda, Ghana, South Africa, Brazil, Colombia, Philippines (60+ countries) |
+| **Geography** | Global South — Nigeria, Kenya, Uganda, Ghana, South Africa, Brazil, Colombia, Philippines (70+ countries) |
 | **Device** | Budget Android (most common), basic iOS. Expect small screens, low RAM |
 | **Connectivity** | Intermittent, low bandwidth. 2G/3G is common in primary markets |
 | **Financial profile** | Unbanked or underbanked. Stablecoins serve as the primary savings and payment tool |
@@ -152,8 +160,8 @@ Use your total score to understand what to do next.
 |-------------|----------|------------|
 | **8–10** | 🟢 **Tier 1 — Build now** | Strong fit. MiniPay Discovery should be your primary distribution target. Get a Celo team review before submitting. |
 | **5–7** | 🟡 **Tier 2 — Build, fix the gaps** | Good fit but one or two dimensions are weak. Find your lowest score, fix that specific gap, then re-evaluate. |
-| **3–4** | 🟠 **Tier 3 — Validate before committing** | Partial fit. Test with real users via ngrok before building further. Consider Proof of Ship to get community feedback first. |
-| **0–2** | 🔴 **Tier 4 — Wrong channel for now** | Structural mismatch with MiniPay. Pivot the concept or choose a different channel. Proof of Ship is a good place to explore alternatives. |
+| **3–4** | 🟠 **Tier 3 — Validate before committing** | Partial fit. Test with real users via ngrok before building further, and get community feedback in the Celo Discord or the weekly office hours first. |
+| **0–2** | 🔴 **Tier 4 — Wrong channel for now** | Structural mismatch with MiniPay. Pivot the concept or choose a different channel — see `growth-gtm.md` for alternatives. |
 
 ---
 
@@ -163,17 +171,17 @@ Current catalog density from `minipay-live-apps.md` (snapshot — verify before 
 
 | Category | Apps live | Opportunity | Notes |
 |----------|-----------|-------------|-------|
-| **Games** | 11 | 🟢 High | Easiest to build and launch; strong Celo interest; novel mechanics (skill-based, local IP, cultural context) differentiate |
+| **Games** | 11 | 🟠 Low priority | Not what MiniPay is prioritizing. Easy to build, but a crowded category; only a novel mechanic (skill-based, local IP, cultural context) differentiates |
 | **Rewards / earn** | 10 | 🟢 High | High interest from Celo; differentiated earning mechanics have strong potential |
 | **Pay AI as you go** | 0 | 🟢 High | No apps yet. Pay-per-use AI tools with stablecoin micropayments are a strong fit for MiniPay's UX model |
 | **Social** | 0 | 🟢 High | No social app listed — but requires network effects, plan for user acquisition from day one |
 | **Health / fitness** | 1 | 🟢 High | Only Squadletics. Large green field |
 | **News / media** | 1 | 🟢 High | Only Briefing. Untapped |
 | **Shopping** | 1 | 🟢 High | E-commerce + stablecoins is open — **only if you already have users/traction** |
-| **Utility** | 8 | 🟡 Medium | Bill pay led by Bitgifty and Fonbank (Nigeria-focused). Check which markets they do not cover — that gap is your opportunity |
+| **Utility** | 8 | 🟢 High | Bill payments and utilities are among MiniPay's best-performing categories. Bill pay is led by Bitgifty and Fonbank (Nigeria-focused); check which markets they do not cover — that gap is your opportunity |
 | **Sports** | 4 | 🟢 High | Africa-focused. Opportunities in other markets |
-| **Finance — savings/FX** | 7 | 🟠 Established builders only | Many markets underserved, but this space suits teams with existing users and relevant domain background |
-| **Finance — credit/lending** | 0 | 🔴 Requires licensing | Massive market need, but requires financial licensing in each market. Not recommended without legal compliance and domain expertise |
+| **Finance — savings/FX** | 7 | 🟠 Established builders only | Savings is a best-performing category and many markets are underserved, but only for projects with a long-term DeFi background, licensing in each market and their own liquidity. See *What MiniPay Is Looking For* |
+| **Finance — credit/lending** | 0 | 🔴 Requires licensing | Massive market need, but requires financial licensing in each market. Not recommended without legal compliance and a long-term DeFi background. See *What MiniPay Is Looking For* |
 
 ---
 
@@ -183,10 +191,17 @@ These are technical constraints that need to be addressed before your app can fu
 
 | Item | What to do |
 |---|---|
-| App uses `personal_sign` | Replace with wallet-address-only identity or ODIS phone resolution. See `odis-socialconnect.md`. |
+| App uses `personal_sign` | Replace with a flow that authenticates from the connected account alone, or ODIS phone resolution. See `odis-socialconnect.md`. |
 | App uses `eth_signTypedData` | Replace with a flow that only requires `eth_sendTransaction`. |
 | App displays CELO balance or requires CELO payment | Remove CELO from your UI entirely. MiniPay handles gas automatically — users never see it. |
 | App sets EIP-1559 transaction fields | Remove `maxFeePerGas` / `maxPriorityFeePerGas`. Use legacy transaction format. |
+| App displays, copies, or shares the wallet address | Remove it entirely — including truncated `0x123…abc` forms, copy buttons, share sheets, and address QR codes. Identify users by phone number or an app alias. |
+| App has a "withdraw to address" field | Remove it. Withdrawals to arbitrary or external addresses are prohibited; pay out to a destination you control or that MiniPay resolves. |
+| App does not support USDT | Add it. USDT support is mandatory for listing. |
+| App supports tokens MiniPay doesn't | Remove them. Only USDT / USDC / USDm belong in a Mini App. |
+| App checks balance against the amount only | Check against **amount + network fee** before triggering the transaction, and redirect to the Add Cash deeplink on a shortfall. |
+| Transactions have no pending / success / failure states | Add all three, with error copy mapped from error **codes**, not message text. |
+| First version tries to ship everything | Cut to the core flow. Complex multi-step v1s fail review and lose users on slow connections. |
 | Bundle size > 2 MB or heavy images | Use SVG/WebP, lazy-load aggressively, and keep your initial JS bundle small. |
 
 ---
@@ -196,7 +211,7 @@ These are technical constraints that need to be addressed before your app can fu
 Before applying the scorecard, answer these questions. A single "No" on items 1–3 is an immediate Tier 4:
 
 - [ ] Can the entire core user flow run inside MiniPay's WebView?
-- [ ] Can you build the UI without showing CELO or raw `0x…` addresses?
+- [ ] Can you build the UI without showing CELO, and without displaying, copying, or sharing wallet addresses anywhere?
 - [ ] Can a non-crypto user understand what the app does from the first screen?
 
 ---

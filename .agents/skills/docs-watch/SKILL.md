@@ -1,6 +1,6 @@
 ---
 name: docs-watch
-description: Check docs.celo.org and other live sources for drift against this repo's cached reference files (contracts, network info, docs sitemap, ecosystem, grants) and fix or flag it. Use when asked to check docs updates, run the docs watch, or on the scheduled weekly run.
+description: Check docs.celo.org, docs.minipay.xyz, and other live sources for drift against this repo's cached reference files (contracts, network info, docs sitemap, ecosystem, grants, MiniPay, wFIAT access) and fix or flag it. Use when asked to check docs updates, run the docs watch, or on the scheduled weekly run.
 ---
 
 # celopedia-skills docs upstream watch
@@ -24,6 +24,56 @@ a single PR as the one place everything gets reviewed.
 | 3 | Network info | `https://docs.celo.org/build-on-celo/network-overview` (WebFetch) | `network-info.md` |
 | 4 | Ecosystem / TVL | `curl -s https://api.llama.fi/protocols \| jq '[.[] \| select(.chains[]? == "Celo")]'` | `ecosystem.md` |
 | 5 | Grant programs | `curl -s https://www.celopg.eco/programs` (WebFetch) | `grants-funding.md` |
+| 6 | MiniPay docs | `https://docs.minipay.xyz/` page tree + `getting-started/submit-your-miniapp.html` + `getting-started/best-practices.html` + `technical-references/deeplinks.html` (WebFetch) | `minipay-docs-map.md`, `minipay-requirements.md`, `minipay-common-mistakes.md` |
+| 7 | wFIAT access (Ripio tokens on Celo) | the commands in `wfiat-access.md` → _Re-verify_ (x402 `/supported` + `/api/config`, Ripio Ramp `/api/countries`, Textile RFQ levels, GeckoTerminal pools, LI.FI quotes, Aave `getReservesList`, CapyFi `eth_getCode`) | `wfiat-access.md`, plus the x402 token rows in `ai-agents.md` and `SKILL.md` |
+
+### Source 6 — MiniPay: classify carefully
+
+MiniPay's docs mix **structure** (which pages and deeplinks exist) with
+**policy** (what is required to get listed). They do not get the same
+treatment:
+
+- `reference update` — a docs page added / removed / renamed, or a new or
+  changed **deeplink**. These are structural facts; edit `minipay-docs-map.md`
+  directly.
+- `needs review` — any change to a **listing requirement**: supported or
+  mandatory tokens, the SLA, the dependency-security policy, the submission
+  form URL or fields, whitelisting rules, the minimum viewport, or the
+  performance bar. These are policy, not data, and they drive what the skill
+  tells builders to build. **Never auto-edit `minipay-requirements.md` or
+  `minipay-common-mistakes.md` from a docs diff** — describe what changed
+  versus what's cached and let a human decide.
+- Also check that the URLs cited in `minipay-requirements.md` and
+  `minipay-docs-map.md` still resolve (`curl -o /dev/null -w "%{http_code}"`).
+  A dead URL is a `reference update` only if the replacement is unambiguous;
+  otherwise flag it.
+
+### Source 7 — wFIAT access: track structure, not prices
+
+`wfiat-access.md` mixes **structural facts** (which route exists for which
+token) with **liquidity snapshots** (pool TVL, Textile max size) that move
+hourly. Only structure drives edits:
+
+- `reference update` — a route appears or disappears for a token: a Textile
+  pair goes from zero to non-zero buy depth (or back), LI.FI starts or stops
+  returning a same-chain route into a token, a new Celo DEX pool for a token
+  shows up, the Ripio Ramp adds/removes a country or a Celo token, the x402
+  `/supported` list adds/removes an asset. Edit the per-token table and the
+  matching path section. When the x402 list changes, update `ai-agents.md`
+  (_Enabled tokens_ table and Token-support line) and the x402 line in
+  `SKILL.md` in the same run so the three never disagree.
+- Liquidity numbers: update a figure only when it moves by **more than 2×**
+  or crosses zero, and restamp `Last verified`. Smaller moves are
+  `no action` — they would make every run a PR.
+- `needs review` — anything that changes money-path behaviour for an
+  integrator: an x402 asset's `assetTransferMethod` or
+  `eip2612GasSponsoring` flag changes, a wFIAT token address changes, the
+  Ripio BridgeDeposit address (`0x465e642387d3d73a57CDc1368fFA53A800bA5D47`)
+  stops returning code, or a yield venue for wFIAT appears **on Celo**
+  (Aave reserve list gains a wFIAT, or CapyFi's Comptroller address gains
+  code on Celo). Never auto-edit these.
+- A source that answers with an error (Textile, ramp.ripio.com, li.quest are
+  third-party APIs) counts as **blocked** for that source, same as sources 5–6.
 
 ## Procedure
 
