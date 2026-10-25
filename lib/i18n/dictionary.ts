@@ -49,6 +49,7 @@ export const en = {
   "meta.arena.match.title": "Match {code} · Avíspate",
   "meta.terms.title": "Terms · Avíspate",
   "meta.privacy.title": "Privacy · Avíspate",
+  "meta.about.title": "About · Avíspate",
 
   /* ------------------------------ Navegación ----------------------------- */
   "nav.aria": "Main navigation",
@@ -577,6 +578,7 @@ export const en = {
     "Sign in with your email or connect your wallet to see your profile.",
   "profile.guard.cta": "Go to the home screen",
   "profile.creating_wallet": "Creating your wallet…",
+  "profile.link.about": "About Avíspate",
   "profile.link.support": "Help and support",
   "profile.link.logout": "Log out",
   "profile.links.hint": "Log out to switch accounts.",
@@ -590,7 +592,7 @@ export const en = {
   /* --------------------------------- Premios ----------------------------- */
   "prizes.title": "Your prizes",
   "prizes.note":
-    "Prizes are sent automatically to your wallet every day at 7:00 p.m. (Colombia).",
+    "Prizes are sent automatically to your wallet: the daily challenge at 7:00 p.m. (Colombia), the Arena as soon as the match ends.",
   "prizes.empty": "No wins yet. Keep playing to take the pot!",
   "prizes.deck": "Deck {deck}",
   "prizes.arena": "Arena",
@@ -824,6 +826,7 @@ export const en = {
      las rutas del juego. */
   "terms.title": "Terms",
   "privacy.title": "Privacy",
+  "about.title": "About Avíspate",
 
   /* ------------------------ Formulario suelto (legacy) ------------------- */
   "form.pay_and_play": "Pay 0.10 USDT and play",
@@ -871,6 +874,7 @@ export const es: Record<MessageKey, string> = {
   "meta.arena.match.title": "Partida {code} · Avíspate",
   "meta.terms.title": "Términos · Avíspate",
   "meta.privacy.title": "Privacidad · Avíspate",
+  "meta.about.title": "Acerca de · Avíspate",
 
   /* ------------------------------ Navegación ----------------------------- */
   "nav.aria": "Navegación principal",
@@ -1351,6 +1355,7 @@ export const es: Record<MessageKey, string> = {
     "Inicia sesión con tu correo o conecta tu wallet para ver tu perfil.",
   "profile.guard.cta": "Ir al inicio",
   "profile.creating_wallet": "Creando tu wallet…",
+  "profile.link.about": "Acerca de Avíspate",
   "profile.link.support": "Ayuda y soporte",
   "profile.link.logout": "Cerrar sesión",
   "profile.links.hint": "Cierra sesión para cambiar de cuenta.",
@@ -1364,7 +1369,7 @@ export const es: Record<MessageKey, string> = {
   /* --------------------------------- Premios ----------------------------- */
   "prizes.title": "Tus premios",
   "prizes.note":
-    "Los premios se envían automáticamente a tu wallet todos los días a las 7:00 p. m. (Colombia).",
+    "Los premios se envían automáticamente a tu wallet: los del reto diario a las 7:00 p. m. (Colombia), los de la Arena apenas termina la partida.",
   "prizes.empty": "Aún no has ganado. ¡Sigue jugando para ganar el pozo!",
   "prizes.deck": "Mazo {deck}",
   "prizes.arena": "Arena",
@@ -1593,6 +1598,7 @@ export const es: Record<MessageKey, string> = {
   /* ------------------------------ Legales -------------------------------- */
   "terms.title": "Términos",
   "privacy.title": "Privacidad",
+  "about.title": "Acerca de Avíspate",
 
   /* ------------------------ Formulario suelto (legacy) ------------------- */
   "form.pay_and_play": "Pagar 0.10 USDT y jugar",

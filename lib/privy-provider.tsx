@@ -31,7 +31,13 @@ const WalletProviders = dynamic(() => import("./wallet-providers"));
  * Ante la duda, una ruta NO va en esta lista: sobrarle un megabyte a una página
  * es un problema de velocidad, y faltarle un provider es una pantalla rota.
  */
-const WALLET_FREE_ROUTES = ["/terminos", "/privacidad", "/historial", "/stats"];
+const WALLET_FREE_ROUTES = [
+  "/terminos",
+  "/privacidad",
+  "/acerca",
+  "/historial",
+  "/stats",
+];
 
 function isWalletFree(pathname: string): boolean {
   return WALLET_FREE_ROUTES.some(
